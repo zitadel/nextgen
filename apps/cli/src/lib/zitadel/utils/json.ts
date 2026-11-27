@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { ConfigError } from "@/lib/zitadel/errors";
+import { ZitadelConfigInternalError } from "@/lib/zitadel/errors";
 import type { JsonArray, JsonObject, JsonValue } from "@/lib/zitadel/types";
 
 /**
@@ -52,11 +52,11 @@ export function isJsonValue(value: unknown): value is JsonValue {
  * @param value - Anything.
  * @param what - What the value is, for the message when it is not one.
  * @returns The same value, typed as a JSON object.
- * @throws {@link ConfigError} When it is not a JSON object.
+ * @throws {@link ZitadelConfigInternalError} When it is not a JSON object.
  */
 export function toJsonObject(value: unknown, what: string): JsonObject {
   if (!isJsonValue(value) || !isJsonObject(value)) {
-    throw new ConfigError(`${what} is not a JSON object`);
+    throw new ZitadelConfigInternalError(`${what} is not a JSON object`);
   }
   return value;
 }

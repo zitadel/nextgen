@@ -1,22 +1,12 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
 
-import {
-  BackendError,
-  ConflictError,
-  ForbiddenError,
-  NotFoundError,
-  UnauthorizedError,
-  UnavailableError,
-  type UnavailableReason,
-} from "./backend";
+import { BackendError } from "./backend";
+import { errnoOf } from "./errno";
 import { isObject } from "./json";
+import { ZitadelLibError } from "./lib-error";
 import type { Suggested } from "./suggestion";
-import {
-  ConflictError as ConfigConflictError,
-  ConfigError,
-  BrokenFlowsError,
-  NotFoundError as ConfigNotFoundError,
-} from "./zitadel";
+
+export { ZitadelLibError };
 
 /**
  * The one sentence a cancellation ends on, wherever it is reported.
@@ -28,6 +18,40 @@ import {
  * that does know says so on a line under this one.
  */
 export const CANCELLED = "Cancelled";
+
+/**
+ * The closed set of kinds a failure can be, shared by every package's errors.
+ *
+ * @remarks
+ * A package's base error carries one of these as `category`, so the command
+ * that catches it can say what kind of failure it was without knowing which
+ * package raised it.
+ *
+ * Choose one by walking this list in order; the first yes wins.
+ *
+ * 1. `fault`: our own code is wrong (an internal guard).
+ * 2. `unknown`: nobody anticipated it; only a package's own "<X>FailedError"
+ *    generic wrapper uses it.
+ * 3. `unavailable`: the request got no decision: no network, a timeout, a 429,
+ *    a 5xx, a server or machine that is not up, a port or lock that is held.
+ * 4. `denied`: the problem is identity: not signed in, or not allowed (401, 403).
+ * 5. `missing`: the thing it refers to is not there (404, 410).
+ * 6. `conflict`: it exists but its state refuses: already exists, a stale
+ *    write, a prerequisite not in place, a server not running.
+ * 7. `invalid`: whatever remains: the input can never work as given,
+ *    including an unsupported shape or version.
+ *
+ * Whether trying the identical request again may work is a separate trait,
+ * the `retryable` property of the error.
+ */
+export type ErrorCategory =
+  | "invalid"
+  | "missing"
+  | "conflict"
+  | "denied"
+  | "unavailable"
+  | "fault"
+  | "unknown";
 
 /**
  * Closed set of failure categories the CLI can surface. Every error the
@@ -78,15 +102,6 @@ export const EXIT_CODES: Record<ZitadelErrorCode, number> = {
   // 128 + SIGINT, what a shell reports for a command stopped by Ctrl-C.
   E_CANCELLED: 130,
 };
-
-/**
- * The hint of an `E_CONFIRMATION_REQUIRED` refusal: the question the prompt
- * would have asked, for whoever runs the CLI to put to a person, and when
- * `--force` may follow.
- */
-export function confirmationHint(question: string): string {
-  return `Ask a person first: ${question} Pass --force only once they agree.`;
-}
 
 /**
  * Optional, user-facing extras attached to a {@link ZitadelError}. Kept
@@ -150,41 +165,6 @@ export class PromptCancelled extends ZitadelError {
   constructor() {
     super("E_CANCELLED", "Cancelled by user");
   }
-}
-
-/** What to do about a request that got no usable response, by its reason. */
-const NETWORK_HINTS: Record<UnavailableReason, string> = {
-  unreachable: "Check your connection and the server URL (ZITADEL_URL or --server).",
-  timeout:
-    "The server accepted the connection but did not answer in time. Check that it is healthy, then retry.",
-  unreadable:
-    "The server answered, but its response could not be read. Check any proxy between you and the server, then retry.",
-};
-
-/**
- * The error code a configuration error is reported with.
- *
- * @remarks
- * A file or directory the OS refused to read carries its errno in
- * `details.code`; a permission failure is `E_AUTH`, as it is for any other
- * file the CLI reads.
- *
- * @param error - The error.
- * @returns The code it is reported with.
- */
-function configErrorCode(error: ConfigError): ZitadelErrorCode {
-  const errno = error.details?.code;
-  if (errno === "EACCES" || errno === "EPERM") {
-    return "E_AUTH";
-  }
-  if (error instanceof ConfigConflictError) {
-    return "E_CONFLICT";
-  }
-  if (error instanceof ConfigNotFoundError) {
-    return "E_NOT_FOUND";
-  }
-
-  return "E_VALIDATION";
 }
 
 /**
@@ -273,42 +253,18 @@ export function toZitadelError(error: unknown): ZitadelError {
     return error;
   }
 
-  if (error instanceof BackendError) {
-    return fromBackendError(error);
+  if (error instanceof BackendError && error.status !== undefined && error.url !== undefined) {
+    return fromBackendError(error, error.status, error.url);
   }
 
-  // Configuration that cannot be read or edited as asked is the developer's
-  // to fix, with the hint and details the configuration library gave.
-  if (error instanceof ConfigError) {
-    return new ZitadelError(configErrorCode(error), error.message, {
-      ...(error.hint === undefined ? {} : { hint: error.hint }),
-      ...(error.details === undefined ? {} : { details: error.details }),
-      ...(error instanceof BrokenFlowsError && error.hint?.includes("deploy --dry-run")
-        ? { nextCommands: [{ id: "deploy", flags: { dryRun: true } }] }
-        : {}),
+  // A lib error is reported as it states itself: its code, message, hint and
+  // facts. A backend error the server did not answer is one of them too.
+  if (error instanceof ZitadelLibError) {
+    const { details } = error;
+    return new ZitadelError(error.code, error.message, {
+      hint: error.hint,
+      details: Object.keys(details).length === 0 ? undefined : details,
     });
-  }
-
-  if (isErrnoException(error)) {
-    const details = { original: pickErrorShape(error) };
-    if (error.code === "EACCES" || error.code === "EPERM") {
-      return new ZitadelError("E_AUTH", `Permission denied: ${error.message}`, {
-        hint: "Check file permissions or run with the right user.",
-        details,
-      });
-    }
-    if (error.code === "EEXIST") {
-      return new ZitadelError("E_CONFLICT", error.message, {
-        hint: "A file already exists. Use --force to overwrite or remove it first.",
-        details,
-      });
-    }
-    if (error.code === "ENOENT") {
-      return new ZitadelError("E_VALIDATION", error.message, {
-        hint: "A required file or directory is missing.",
-        details,
-      });
-    }
   }
 
   if (isZodLikeError(error)) {
@@ -318,8 +274,34 @@ export function toZitadelError(error: unknown): ZitadelError {
   }
 
   if (error instanceof Error) {
+    const errno = errnoOf(error);
+    const details = { original: originalOf(error) };
+    if (errno === "EACCES") {
+      return new ZitadelError("E_AUTH", `Permission denied: ${error.message}`, {
+        hint: "Check file permissions or run with the right user.",
+        details,
+      });
+    }
+    if (errno === "EPERM") {
+      return new ZitadelError("E_AUTH", `Permission denied: ${error.message}`, {
+        hint: "Check file permissions or run with the right user.",
+        details,
+      });
+    }
+    if (errno === "EEXIST") {
+      return new ZitadelError("E_CONFLICT", error.message, {
+        hint: "A file already exists. Remove it first.",
+        details,
+      });
+    }
+    if (errno === "ENOENT") {
+      return new ZitadelError("E_VALIDATION", error.message, {
+        hint: "A required file or directory is missing.",
+        details,
+      });
+    }
     return new ZitadelError("E_VALIDATION", error.message, {
-      details: { original: pickErrorShape(error) },
+      details,
     });
   }
 
@@ -327,40 +309,20 @@ export function toZitadelError(error: unknown): ZitadelError {
 }
 
 /**
- * A {@link BackendError} as the CLI's error. One the server answered carries
- * its status, and is classified by it; one the backend raised itself carries
- * its class, and its message, hint and details as they were given.
+ * A {@link BackendError} the server answered, as the CLI's error: classified
+ * by its status and the body the server sent.
+ *
+ * @param error - The error.
+ * @param status - The status the server answered with.
+ * @param url - The URL it answered.
+ * @returns The CLI's error.
  */
-function fromBackendError(error: BackendError): ZitadelError {
-  if (error instanceof UnavailableError && error.reason !== undefined) {
-    return new ZitadelError("E_NETWORK", error.message, {
-      hint: NETWORK_HINTS[error.reason],
-      details: { url: error.url, reason: error.reason },
-    });
-  }
-  if (error.status === undefined || error.url === undefined) {
-    const code: ZitadelErrorCode =
-      error instanceof NotFoundError
-        ? "E_NOT_FOUND"
-        : error instanceof ConflictError
-          ? "E_CONFLICT"
-          : error instanceof UnauthorizedError || error instanceof ForbiddenError
-            ? "E_AUTH"
-            : error instanceof UnavailableError
-              ? "E_NETWORK"
-              : "E_VALIDATION";
-
-    return new ZitadelError(code, error.message, {
-      ...(error.hint === undefined ? {} : { hint: error.hint }),
-      ...(error.details === undefined ? {} : { details: error.details }),
-    });
-  }
+function fromBackendError(error: BackendError, status: number, url: string): ZitadelError {
   // `401`/`403` → bad or missing project secret; `404` → something is
   // missing (see below); `5xx` → transport or server fault; everything
   // else 4xx → the body the CLI sent was rejected (validation, conflict, …).
-  const { status, url } = error;
   const details = { status, url, body: error.body };
-  if (error.status === 404) {
+  if (status === 404) {
     // A 404 carrying the platform's error envelope (a `code` field) is a
     // domain-level miss from a real Zitadel API — an unknown schema or
     // project id — except `req.not_found`, which the server answers for a
@@ -368,18 +330,14 @@ function fromBackendError(error: BackendError): ZitadelError {
     // the endpoint itself is missing: the CLI is pointed at a server that
     // isn't a Zitadel platform API.
     if (error.serverCode === "req.not_found") {
-      return new ZitadelError(
-        "E_NOT_FOUND",
-        `${error.url} has no such endpoint on this Zitadel server`,
-        {
-          hint: "The server and this CLI are different versions; a server from before the API moved under /api/v1 answers every call so. Run the CLI release that matches the server, or upgrade the server.",
-          details,
-        },
-      );
+      return new ZitadelError("E_NOT_FOUND", `${url} has no such endpoint on this Zitadel server`, {
+        hint: "The server and this CLI are different versions; a server from before the API moved under /api/v1 answers every call so. Run the CLI release that matches the server, or upgrade the server.",
+        details,
+      });
     }
     const wrongServer = error.serverCode === undefined;
     const message = wrongServer
-      ? `${error.message} — ${error.url} has no such endpoint; is this a Zitadel platform API?`
+      ? `${error.message} — ${url} has no such endpoint; is this a Zitadel platform API?`
       : error.message;
 
     return new ZitadelError("E_NOT_FOUND", message, { details });
@@ -394,16 +352,16 @@ function fromBackendError(error: BackendError): ZitadelError {
   // correct. A 429 is the server asking for less traffic, so it joins the
   // failures worth retrying rather than the ones to fix, which is what
   // `E_NETWORK` says and what its exit code means to a script.
-  const originRefused = error.status === 403 && error.serverCode === "proj.origin_not_allowed";
+  const originRefused = status === 403 && error.serverCode === "proj.origin_not_allowed";
   const code: ZitadelErrorCode = originRefused
     ? "E_VALIDATION"
-    : error.status === 401 || error.status === 403
+    : status === 401 || status === 403
       ? "E_AUTH"
-      : error.status === 409
+      : status === 409
         ? "E_CONFLICT"
-        : error.status === 410
+        : status === 410
           ? "E_NOT_FOUND"
-          : error.status === 429 || error.status >= 500
+          : status === 429 || status >= 500
             ? "E_NETWORK"
             : "E_VALIDATION";
   // The platform names the fields it rejected, and the message does not
@@ -536,10 +494,6 @@ export function isCancellation(error: unknown): boolean {
   return error instanceof ZitadelError && error.code === "E_CANCELLED";
 }
 
-function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && typeof (error as NodeJS.ErrnoException).code === "string";
-}
-
 function isZodLikeError(error: unknown): boolean {
   return (
     typeof error === "object" &&
@@ -560,10 +514,22 @@ export function errorMessage(error: unknown): string {
   return String(error);
 }
 
-function pickErrorShape(error: Error): Record<string, unknown> {
+/**
+ * An error as a failure's `details.original` reports it: its name, its
+ * message and the errno it carries, if any. A lib error that stands for a
+ * foreign one, which it holds as its `cause`, reports that one, as the CLI
+ * did when the foreign error escaped as it was; one that stands for nothing
+ * else reports itself, with no errno, as its product code is not one.
+ *
+ * @param error - The error.
+ * @returns The name, message and errno of the error it stands for.
+ */
+export function originalOf(error: Error): Record<string, unknown> {
+  const source =
+    error instanceof ZitadelLibError && error.cause instanceof Error ? error.cause : error;
   return {
-    name: error.name,
-    message: error.message,
-    code: (error as NodeJS.ErrnoException).code,
+    name: source.name,
+    message: source.message,
+    code: source instanceof ZitadelLibError ? undefined : errnoOf(source),
   };
 }

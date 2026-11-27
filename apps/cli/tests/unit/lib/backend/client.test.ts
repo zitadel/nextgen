@@ -9,12 +9,12 @@ import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import {
   allowDestructive,
+  BackendRequestInvalidError,
   createZitadelClient,
   responseFailure,
   type ZitadelClient,
 } from "@/lib/backend";
 import { connectionOf, REQUEST_TIMEOUT_MS, translateFailure } from "@/lib/backend/client";
-import { InvalidError } from "@/lib/backend/errors";
 
 const signal = new AbortController().signal;
 
@@ -73,7 +73,7 @@ describe("createZitadelClient", () => {
       .getProject("p1")
       .catch((err: unknown) => err);
 
-    expect(error).toBeInstanceOf(InvalidError);
+    expect(error).toBeInstanceOf(BackendRequestInvalidError);
     expect(error).toMatchObject({
       status: 400,
       body: {
@@ -89,7 +89,7 @@ describe("createZitadelClient", () => {
 
     const error = await rejectionOf(() => client().getProject("p1"));
 
-    expect(error).toBeInstanceOf(InvalidError);
+    expect(error).toBeInstanceOf(BackendRequestInvalidError);
     expect(error).toMatchObject({
       requestId: "req_1",
     });
@@ -164,18 +164,43 @@ describe("a client's destructive operations", () => {
 
 describe("responseFailure", () => {
   it.each([
-    [404, "NotFoundError"],
-    [410, "NotFoundError"],
-    [409, "ConflictError"],
-    [401, "UnauthorizedError"],
-    [403, "ForbiddenError"],
-    [400, "InvalidError"],
-    [422, "InvalidError"],
-    [429, "UnavailableError"],
-    [500, "UnavailableError"],
-    [503, "UnavailableError"],
+    [404, "BackendNotFoundError"],
+    [410, "BackendGoneError"],
+    [409, "BackendConflictError"],
+    [401, "BackendUnauthorizedError"],
+    [403, "BackendForbiddenError"],
+    [400, "BackendRequestInvalidError"],
+    [422, "BackendRequestInvalidError"],
+    [429, "BackendTooManyRequestsError"],
+    [500, "BackendUnavailableError"],
+    [503, "BackendUnavailableError"],
   ])("raises a %i as a %s", (status, name) => {
     expect(responseFailure(status, "http://localhost:8080/p", {}, "refused")).toMatchObject({
+      name,
+      status,
+    });
+  });
+
+  it.each([
+    [410, "proj.claim_window_expired", "BackendClaimWindowExpiredError"],
+    [404, "claim_challenge.not_found", "BackendClaimChallengeNotFoundError"],
+    [409, "rel.revoked", "BackendReleaseRevokedError"],
+    [409, "rel.in_use", "BackendReleaseInUseError"],
+    [409, "att.proof_rejected", "BackendProofRejectedError"],
+    [400, "req.invalid", "BackendRequestMalformedError"],
+    [422, "pol.invalid", "BackendRequestInvalidError"],
+    [400, "pol.invalid", "BackendRequestInvalidError"],
+  ])("raises a %i answering %s as a %s", (status, code, name) => {
+    expect(
+      responseFailure(
+        status,
+        "http://localhost:8080/p",
+        {
+          code,
+        },
+        "refused",
+      ),
+    ).toMatchObject({
       name,
       status,
     });
@@ -189,7 +214,9 @@ describe("responseFailure", () => {
         { code: "proj.origin_not_allowed" },
         "refused",
       ),
-    ).toMatchObject({ name: "InvalidError" });
+    ).toMatchObject({
+      name: "BackendRequestInvalidError",
+    });
   });
 
   it("carries the status, the URL and the body the server answered with", () => {
@@ -236,12 +263,16 @@ describe("responseFailure", () => {
 });
 
 describe("translateFailure", () => {
-  it.each(["unreachable", "timeout", "unreadable"] as const)(
-    "raises a request that got no response as unavailable, saying it was %s",
-    (reason) => {
+  it.each([
+    ["unreachable", "BackendUnreachableError"],
+    ["timeout", "BackendTimeoutError"],
+    ["unreadable", "BackendUnreadableError"],
+  ] as const)(
+    "raises a request that got no response, saying it was %s, as a %s",
+    (reason, name) => {
       expect(
         translateFailure(new NetworkError("http://localhost:8080", reason, "no answer")),
-      ).toMatchObject({ name: "UnavailableError", reason });
+      ).toMatchObject({ name });
     },
   );
 

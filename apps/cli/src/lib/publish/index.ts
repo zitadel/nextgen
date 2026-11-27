@@ -12,3 +12,17 @@ export {
   type PublishOutcome,
   type ReleaseRequest,
 } from "./publisher";
+export {
+  PublishAssetLookupFailedError,
+  PublishAssetTargetUnsafeError,
+  PublishConfigInvalidError,
+  type ApplicationSecretUse,
+  PublishApplicationSecretMissingError,
+  PublishApplicationSecretPlainError,
+  PublishConnectionSecretLiteralError,
+  PublishConnectionVariableKindError,
+  PublishConnectionVariableMissingError,
+  PublishConnectionVariableSharedError,
+  PublishError,
+  PublishReleaseBodyInvalidError,
+} from "./errors";

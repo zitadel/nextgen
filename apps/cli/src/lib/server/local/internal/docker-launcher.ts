@@ -1,7 +1,7 @@
-import { execa } from "execa";
+import { ExecaError, execa } from "execa";
 
-import { LocalServerError } from "../local-server-error";
-import { isErrno } from "@/lib/errno";
+import { errorMessage } from "@/lib/errors";
+import { LocalServerDockerMissingError, LocalServerDockerFailedError } from "@/lib/server/errors";
 
 import {
   EMPTY_ENV,
@@ -18,7 +18,13 @@ import {
 } from "@/lib/server/local/runtime";
 import type { LogSink } from "@/lib/server/local/server-log";
 import { stopSignal } from "./stop-signal";
-import { type Launched, type Launcher, type StopOutcome, launched } from "./lifecycle";
+import {
+  type LaunchFacts,
+  type Launched,
+  type Launcher,
+  type StopOutcome,
+  launched,
+} from "./lifecycle";
 
 export type DockerResult = {
   status: number;
@@ -79,29 +85,37 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     await DockerLauncher.remove(spec.containerName);
     await ensureImage(spec.image);
     const env = spec.env ?? EMPTY_ENV;
-    const result = await requireDocker(
-      DockerLauncher.runArgs({ ...spec, port: target.port }, env.injected),
-      "Start local Zitadel container",
-      env.values,
-    ).catch(async (error: unknown) => {
-      // A run that failed after the container was created leaves it behind.
-      await DockerLauncher.remove(spec.containerName).catch(() => {
-        return false;
+    try {
+      const result = await requireDocker(
+        DockerLauncher.runArgs({ ...spec, port: target.port }, env.injected),
+        "Start local Zitadel container",
+        env.values,
+      );
+      return launched(
+        DockerLauncher.metadata({
+          cwdDataDir: spec.dataDir,
+          cliVersion: spec.cliVersion,
+          containerName: spec.containerName,
+          containerId: result.stdout.trim(),
+          image: spec.image,
+          port: target.port,
+          serverUrl: target.serverUrl,
+          env: envSummary(env),
+        }),
+      );
+    } catch (error) {
+      // The launch failure is the one to report when cleaning up fails too.
+      await DockerLauncher.remove(spec.containerName).catch((error: unknown) => {
+        if (error instanceof LocalServerDockerFailedError) {
+          return false;
+        }
+        if (error instanceof ExecaError) {
+          return false;
+        }
+        throw error;
       });
       throw error;
-    });
-    return launched(
-      DockerLauncher.metadata({
-        cwdDataDir: spec.dataDir,
-        cliVersion: spec.cliVersion,
-        containerName: spec.containerName,
-        containerId: result.stdout.trim(),
-        image: spec.image,
-        port: target.port,
-        serverUrl: target.serverUrl,
-        env: envSummary(env),
-      }),
-    );
+    }
   }
 
   /**
@@ -117,9 +131,14 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     return this.isAlive(server);
   }
 
-  /** The container, which is where to look when a start fails. */
-  describe(record: DockerRuntimeMetadata): Readonly<Record<string, unknown>> {
-    return { runtime: "docker", container_name: record.container_name };
+  /**
+   * How the server runs, which is where to look when a start fails.
+   *
+   * @param record - The server's record.
+   * @returns Its runtime and the container it runs in.
+   */
+  describe(record: DockerRuntimeMetadata): LaunchFacts {
+    return { runtime: "docker", containerName: record.container_name };
   }
 
   /**
@@ -243,13 +262,35 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     }
 
     const args = ["manifest", "inspect", image];
-    const result = await runDocker(args).catch((error: unknown) => {
-      throw dockerError(`Inspect Docker image ${image}`, args, error);
-    });
-    if (result.status === 0) {
-      return "remote";
+    try {
+      const result = await runDocker(args);
+      if (result.status === 0) {
+        return "remote";
+      }
+      throw new LocalServerDockerFailedError(
+        `Inspect Docker image ${image} failed`,
+        ["docker", ...args],
+        result.stderr,
+      );
+    } catch (error) {
+      if (error instanceof LocalServerDockerFailedError) {
+        throw error;
+      }
+      if (error instanceof ExecaError) {
+        throw new LocalServerDockerFailedError(
+          `Inspect Docker image ${image} failed`,
+          ["docker", ...args],
+          String(error.stderr),
+          error,
+        );
+      }
+      throw new LocalServerDockerFailedError(
+        `Inspect Docker image ${image} failed`,
+        ["docker", ...args],
+        undefined,
+        error,
+      );
     }
-    throw dockerError(`Inspect Docker image ${image}`, args, result);
   }
 
   /**
@@ -282,21 +323,22 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
    * a container must not fail for want of a `docker` to ask.
    */
   static async remove(containerName: string): Promise<boolean> {
-    const inspect = await DockerLauncher.inspect(containerName).catch((error: unknown) => {
-      // No `docker` on PATH: Docker is not installed, so it runs no container.
-      if (isErrno(error, "ENOENT")) {
-        return undefined;
+    try {
+      const inspect = await DockerLauncher.inspect(containerName);
+      if (!inspect.exists) {
+        return false;
+      }
+      if (inspect.running) {
+        await requireDocker(["stop", containerName], `Stop ${containerName}`);
+      }
+      await requireDocker(["rm", containerName], `Remove ${containerName}`);
+      return true;
+    } catch (error) {
+      if (error instanceof LocalServerDockerMissingError) {
+        return false;
       }
       throw error;
-    });
-    if (!inspect?.exists) {
-      return false;
     }
-    if (inspect.running) {
-      await requireDocker(["stop", containerName], `Stop ${containerName}`);
-    }
-    await requireDocker(["rm", containerName], `Remove ${containerName}`);
-    return true;
   }
 
   /**
@@ -367,6 +409,13 @@ async function runDocker(
   env: Readonly<Record<string, string>> = {},
 ): Promise<DockerResult> {
   const result = await execa("docker", args, { stdin: "ignore", env, reject: false });
+  if (result.code === "ENOENT") {
+    throw new LocalServerDockerMissingError(
+      "Docker is not reachable",
+      errorMessage(result).trim() || "no reason given",
+      result,
+    );
+  }
   if (result.code !== undefined) {
     throw result;
   }
@@ -429,13 +478,35 @@ async function requireDocker(
   action: string,
   env: Readonly<Record<string, string>> = {},
 ): Promise<DockerResult> {
-  const result = await runDocker(args, env).catch((error: unknown) => {
-    throw dockerError(action, args, error);
-  });
-  if (result.status !== 0) {
-    throw dockerError(action, args, result);
+  try {
+    const result = await runDocker(args, env);
+    if (result.status !== 0) {
+      throw new LocalServerDockerFailedError(
+        `${action} failed`,
+        ["docker", ...args],
+        result.stderr,
+      );
+    }
+    return result;
+  } catch (error) {
+    if (error instanceof LocalServerDockerFailedError) {
+      throw error;
+    }
+    if (error instanceof ExecaError) {
+      throw new LocalServerDockerFailedError(
+        `${action} failed`,
+        ["docker", ...args],
+        String(error.stderr),
+        error,
+      );
+    }
+    throw new LocalServerDockerFailedError(
+      `${action} failed`,
+      ["docker", ...args],
+      undefined,
+      error,
+    );
   }
-  return result;
 }
 
 /**
@@ -443,10 +514,25 @@ async function requireDocker(
  */
 async function imageExists(image: string): Promise<boolean> {
   const args = ["image", "inspect", image];
-  const result = await runDocker(args).catch((error: unknown) => {
-    throw dockerError(`Inspect Docker image ${image}`, args, error);
-  });
-  return result.status === 0;
+  try {
+    const result = await runDocker(args);
+    return result.status === 0;
+  } catch (error) {
+    if (error instanceof ExecaError) {
+      throw new LocalServerDockerFailedError(
+        `Inspect Docker image ${image} failed`,
+        ["docker", ...args],
+        String(error.stderr),
+        error,
+      );
+    }
+    throw new LocalServerDockerFailedError(
+      `Inspect Docker image ${image} failed`,
+      ["docker", ...args],
+      undefined,
+      error,
+    );
+  }
 }
 
 /**
@@ -458,21 +544,4 @@ async function ensureImage(image: string): Promise<"local" | "pulled"> {
   }
   await requireDocker(["pull", "--quiet", image], `Pull Docker image ${image}`);
   return "pulled";
-}
-
-/**
- * Wraps a failed `docker` call, keeping its command and stderr for whoever is debugging.
- */
-function dockerError(action: string, args: string[], cause: unknown): LocalServerError {
-  if (cause && typeof cause === "object" && "stderr" in cause) {
-    return new LocalServerError("docker-failed", "E_VALIDATION", `${action} failed`, {
-      command: ["docker", ...args],
-      stderr: String((cause as { stderr?: unknown }).stderr),
-    });
-  } else {
-    return new LocalServerError("docker-failed", "E_VALIDATION", `${action} failed`, {
-      command: ["docker", ...args],
-      cause,
-    });
-  }
 }

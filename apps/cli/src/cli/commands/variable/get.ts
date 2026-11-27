@@ -57,6 +57,8 @@ export default class VariableGet extends Telemetered(ReadCommand) {
    *
    * @param input - The flags and arguments the command accepts.
    * @returns The variable, as a record.
+   * @throws {BackendVariablePreviewMissingError} When `--preview` and the name holds no preview value.
+   * @throws {BackendVariablePrimaryMissingError} When the name holds no primary value.
    */
   protected async execute({ args, flags }: Admitted<typeof VariableGet>): Promise<CommandResult> {
     const variableService = await this.service(VariableService);

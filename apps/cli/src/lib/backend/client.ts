@@ -7,13 +7,25 @@ import {
 import { ApiError, apiErrorCode, apiErrorMessage, NetworkError } from "@zitadel/api/runtime/fetch";
 
 import {
+  BackendClaimChallengeNotFoundError,
+  BackendClaimWindowExpiredError,
+  BackendConflictError,
   type BackendError,
-  ConflictError,
-  ForbiddenError,
-  InvalidError,
-  NotFoundError,
-  UnauthorizedError,
-  UnavailableError,
+  BackendForbiddenError,
+  BackendGoneError,
+  BackendInternalError,
+  BackendNotFoundError,
+  BackendProofRejectedError,
+  BackendReleaseInUseError,
+  BackendReleaseRevokedError,
+  BackendRequestInvalidError,
+  BackendRequestMalformedError,
+  BackendTooManyRequestsError,
+  BackendUnauthorizedError,
+  BackendTimeoutError,
+  BackendUnavailableError,
+  BackendUnreachableError,
+  BackendUnreadableError,
 } from "./errors";
 
 /**
@@ -38,28 +50,51 @@ function refusalOf(error: ApiError): BackendError {
     cause: error,
   };
   const message = apiErrorMessage(error);
-  // A 410 is gone rather than never there — the claim window that closed, the
-  // flow that already completed — but either way what was asked for is not
-  // there, and neither is a request to correct and send again.
-  if (error.status === 404 || error.status === 410) {
-    return new NotFoundError(message, options);
+  const code = apiErrorCode(error);
+  // A 410 is gone rather than never there: it is its own class so a caller can tell it from a 404.
+  if (error.status === 410 && code === "proj.claim_window_expired") {
+    return new BackendClaimWindowExpiredError(message, options);
+  }
+  if (error.status === 410) {
+    return new BackendGoneError(message, options);
+  }
+  if (error.status === 404 && code === "claim_challenge.not_found") {
+    return new BackendClaimChallengeNotFoundError(message, options);
+  }
+  if (error.status === 404) {
+    return new BackendNotFoundError(message, options);
+  }
+  if (error.status === 409 && code === "rel.revoked") {
+    return new BackendReleaseRevokedError(message, options);
+  }
+  if (error.status === 409 && code === "rel.in_use") {
+    return new BackendReleaseInUseError(message, options);
+  }
+  if (error.status === 409 && code === "att.proof_rejected") {
+    return new BackendProofRejectedError(message, options);
   }
   if (error.status === 409) {
-    return new ConflictError(message, options);
+    return new BackendConflictError(message, options);
   }
   if (error.status === 401) {
-    return new UnauthorizedError(message, options);
+    return new BackendUnauthorizedError(message, options);
   }
-  if (error.status === 403 && apiErrorCode(error) !== "proj.origin_not_allowed") {
-    return new ForbiddenError(message, options);
+  if (error.status === 403 && code !== "proj.origin_not_allowed") {
+    return new BackendForbiddenError(message, options);
   }
   // Too many requests: the server is telling the caller to come back, not that
   // the request was wrong, so it joins the failures a caller may retry rather
   // than the ones it must fix.
-  if (error.status === 429 || error.status >= 500) {
-    return new UnavailableError(message, options);
+  if (error.status === 429) {
+    return new BackendTooManyRequestsError(message, options);
   }
-  return new InvalidError(message, options);
+  if (error.status >= 500) {
+    return new BackendUnavailableError(message, options);
+  }
+  if (code === "req.invalid") {
+    return new BackendRequestMalformedError(message, options);
+  }
+  return new BackendRequestInvalidError(message, options);
 }
 
 /**
@@ -72,9 +107,20 @@ function refusalOf(error: ApiError): BackendError {
  */
 export function translateFailure(error: unknown): unknown {
   if (error instanceof NetworkError) {
-    return new UnavailableError(error.message, {
+    if (error.reason === "timeout") {
+      return new BackendTimeoutError(error.message, {
+        url: error.url,
+        cause: error,
+      });
+    }
+    if (error.reason === "unreadable") {
+      return new BackendUnreadableError(error.message, {
+        url: error.url,
+        cause: error,
+      });
+    }
+    return new BackendUnreachableError(error.message, {
       url: error.url,
-      reason: error.reason,
       cause: error,
     });
   }
@@ -138,7 +184,9 @@ function bind(client: Client): ZitadelClient {
  */
 export function allowDestructive(client: ZitadelClient): ZitadelClient {
   if (!made.has(client)) {
-    throw new Error("Only a client createZitadelClient made can allow its destructive operations");
+    throw new BackendInternalError(
+      "Only a client createZitadelClient made can allow its destructive operations",
+    );
   }
   if (client.client.allowDestructive) {
     return client;
@@ -212,11 +260,11 @@ export type Connection = Readonly<{
  */
 export function connectionOf(client: ZitadelClient): Connection {
   if (!made.has(client)) {
-    throw new Error("Only a client createZitadelClient made has a connection");
+    throw new BackendInternalError("Only a client createZitadelClient made has a connection");
   }
   const { signal, timeoutMs } = client.client;
   if (signal === undefined || timeoutMs === undefined) {
-    throw new Error("Only a client createZitadelClient made has a connection");
+    throw new BackendInternalError("Only a client createZitadelClient made has a connection");
   }
   return {
     baseUrl: client.client.baseUrl,

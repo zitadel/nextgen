@@ -39,9 +39,9 @@ import {
   type Edit,
 } from "@/lib/zitadel/resources/document";
 import {
-  ClientIdMismatchError,
-  NotOidcConnectionError,
-  UnusableSettingError,
+  ZitadelConfigClientIdMismatchError,
+  ZitadelConfigConnectionNotOidcError,
+  ZitadelConfigSettingUnusableError,
 } from "@/lib/zitadel/errors";
 import { type ClaimName, claimName, type PropertyName, propertyName } from "@/lib/zitadel/names";
 import type { Issue, ValidationContext } from "@/lib/zitadel/rules/types";
@@ -69,8 +69,8 @@ export class Connection extends ConfigDocument<ConnectionValue> {
     kind: "connection",
     rule: "contract/connection",
     schema: idpConnectionConfigSchema,
-    explain: (file, refusals) => {
-      return Connection.findIssues(file, refusals);
+    explain: (file, refusals, paths) => {
+      return Connection.findIssues(file, refusals, paths);
     },
   };
 
@@ -117,7 +117,7 @@ export class Connection extends ConfigDocument<ConnectionValue> {
    *
    * @param file - The file.
    * @returns The connection, marked as read.
-   * @throws {@link BrokenFilesError} When the connection contract refuses the body.
+   * @throws {@link ZitadelConfigFilesBrokenError} When the connection contract refuses the body.
    */
   static of(file: DocumentFile): Connection {
     return Connection.build(file, "read");
@@ -129,7 +129,7 @@ export class Connection extends ConfigDocument<ConnectionValue> {
    *
    * @param file - Where it goes, and what it holds.
    * @returns The connection, marked as created.
-   * @throws {@link BrokenFilesError} When the connection contract refuses the body.
+   * @throws {@link ZitadelConfigFilesBrokenError} When the connection contract refuses the body.
    */
   static create(file: DocumentFile): Connection {
     return Connection.build(file, "created");
@@ -142,7 +142,7 @@ export class Connection extends ConfigDocument<ConnectionValue> {
    * @param file - The project-relative path and the body.
    * @param status - Where it stands against the file on disk.
    * @returns The connection.
-   * @throws {@link BrokenFilesError} When the connection contract refuses the body.
+   * @throws {@link ZitadelConfigFilesBrokenError} When the connection contract refuses the body.
    */
   private static build(file: DocumentFile, status: DocumentStatus): Connection {
     return new Connection(file, Connection.parseFile(Connection.CONTRACT, file), status);
@@ -160,9 +160,8 @@ export class Connection extends ConfigDocument<ConnectionValue> {
    * @param schema - The user schema its sign-ins fill.
    * @param endpoints - Where the provider answers, when not at its own issuer.
    * @returns The connection, marked as created.
-   * @throws {@link ConfigError} When the provider's document is not JSON.
-   * @throws {@link BrokenFilesError} When the connection contract refuses the
-   *   provider's document.
+   * @throws {@link ZitadelConfigFilesBrokenError} When the provider's document is
+   *   not JSON, or the connection contract refuses it.
    */
   static forProvider(
     provider: IdpProvider,
@@ -244,7 +243,7 @@ export class Connection extends ConfigDocument<ConnectionValue> {
    *   connection is sound.
    */
   override check(_context: ValidationContext): readonly Issue[] {
-    return Connection.findIssues(this.file, []);
+    return Connection.findIssues(this.file, [], []);
   }
 
   /**
@@ -261,10 +260,15 @@ export class Connection extends ConfigDocument<ConnectionValue> {
    * @param file - The connection file.
    * @param refusals - The `contract/connection` refusals; none for a file the
    *   contract takes.
+   * @param paths - The dotted path each refusal is at, in the order of `refusals`.
    * @returns The kept refusals, then the `connection/literal-secret`,
    *   `connection/endpoints` and `sso/unknown-connection-field` findings.
    */
-  private static findIssues(file: DocumentFile, refusals: readonly Issue[]): readonly Issue[] {
+  private static findIssues(
+    file: DocumentFile,
+    refusals: readonly Issue[],
+    paths: readonly string[],
+  ): readonly Issue[] {
     const body = file.body;
     const secret = stringAt(objectAt(body, "oidc"), "client_secret");
     const literalSecret = secret !== undefined && !isVariableReference(secret);
@@ -281,8 +285,8 @@ export class Connection extends ConfigDocument<ConnectionValue> {
     );
     const secretIssues = literalSecret ? [secretIssue] : [];
     const endpointsIssues = missing.length > 0 ? [endpointsIssue] : [];
-    const kept = refusals.filter((refusal) => {
-      return !(literalSecret && refusal.message.includes("client_secret"));
+    const kept = refusals.filter((_refusal, index) => {
+      return !(literalSecret && paths[index]?.split(".").includes("client_secret"));
     });
     const unknownFields = CHECKED_BLOCKS.flatMap((block) => {
       const allowed = Connection.readAllowedFields(block.path);
@@ -494,7 +498,7 @@ export class Connection extends ConfigDocument<ConnectionValue> {
    * A connection that references a variable holds no id to disagree with.
    *
    * @param clientId - The client id the developer gave.
-   * @throws {@link ClientIdMismatchError} When they differ.
+   * @throws {@link ZitadelConfigClientIdMismatchError} When they differ.
    */
   refuseDifferentClientId(clientId: string | undefined): void {
     const existing = this.credentials?.clientId;
@@ -504,18 +508,18 @@ export class Connection extends ConfigDocument<ConnectionValue> {
     if (existing.value === clientId) {
       return;
     }
-    throw new ClientIdMismatchError(this.path, existing.value, clientId);
+    throw new ZitadelConfigClientIdMismatchError(this.path, existing.value, clientId);
   }
 
   /**
    * Refuse a connection with no issuer, which is not an OIDC connection to
    * reuse at all, whatever issuer is given.
    *
-   * @throws {@link NotOidcConnectionError} When the file has no issuer.
+   * @throws {@link ZitadelConfigConnectionNotOidcError} When the file has no issuer.
    */
   refuseNonOidc(): void {
     if (this.issuer === undefined) {
-      throw new NotOidcConnectionError(this.path, this.slug);
+      throw new ZitadelConfigConnectionNotOidcError(this.path, this.slug);
     }
   }
 
@@ -523,8 +527,8 @@ export class Connection extends ConfigDocument<ConnectionValue> {
    * Read the display name, held to the rules a typed one is.
    *
    * @returns The display name.
-   * @throws {@link UnusableSettingError} When the platform would not take it,
-   *   naming the file.
+   * @throws {@link ZitadelConfigSettingUnusableError} When the platform would not
+   *   take it, naming the file.
    */
   readUsableDisplayName(): DisplayName {
     return this.readUsable("a display name", this.displayName, parseDisplayName);
@@ -534,14 +538,14 @@ export class Connection extends ConfigDocument<ConnectionValue> {
    * Read the issuer of an OIDC connection, held to the rules a typed one is.
    *
    * @returns The issuer.
-   * @throws {@link NotOidcConnectionError} When the file has no issuer.
-   * @throws {@link UnusableSettingError} When the platform would not take it,
-   *   naming the file.
+   * @throws {@link ZitadelConfigConnectionNotOidcError} When the file has no issuer.
+   * @throws {@link ZitadelConfigSettingUnusableError} When the platform would not
+   *   take it, naming the file.
    */
   readUsableIssuer(): Issuer {
     const issuer = this.issuer;
     if (issuer === undefined) {
-      throw new NotOidcConnectionError(this.path, this.slug);
+      throw new ZitadelConfigConnectionNotOidcError(this.path, this.slug);
     }
     return this.readUsable("an issuer", issuer, parseIssuer);
   }
@@ -554,12 +558,12 @@ export class Connection extends ConfigDocument<ConnectionValue> {
    * @param stored - The setting as the file holds it.
    * @param parse - The rules a typed answer is held to.
    * @returns The setting as parsed.
-   * @throws {@link UnusableSettingError} When the platform would not take it.
+   * @throws {@link ZitadelConfigSettingUnusableError} When the platform would not take it.
    */
   private readUsable<T>(what: string, stored: string, parse: (value: string) => Parsed<T>): T {
     const parsed = parse(stored);
     if (!parsed.ok) {
-      throw new UnusableSettingError(this.path, this.slug, what, parsed.problem);
+      throw new ZitadelConfigSettingUnusableError(this.path, this.slug, what, parsed.problem);
     }
     return parsed.value;
   }

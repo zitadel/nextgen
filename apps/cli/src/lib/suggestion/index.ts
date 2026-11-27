@@ -3,6 +3,7 @@ import type { Interfaces } from "@oclif/core";
 import { Cmd } from "@/lib/cmd";
 import { type ByName, type Named, named } from "@/lib/names";
 import type { PackageCommand } from "@/lib/pm";
+import { SuggestionInvalidError } from "./errors";
 import { Spelling } from "./spelling";
 
 import type { RELATIONS } from "./relations";
@@ -486,11 +487,13 @@ export function shellCommand(program: Program, ...words: readonly string[]): Sug
  * @param command - The package manager's command, as `lib/pm`
  *   builds it.
  * @returns The command.
- * @throws {Error} When it runs this CLI.
+ * @throws {@link SuggestionInvalidError} When it runs this CLI.
  */
 export function suggestedCommandOf(command: PackageCommand): SuggestedCommand {
   if (command.verb === "run" && command.operands[0] === Spelling.BINARY) {
-    throw new Error(`${command.display} runs the CLI: suggest it as { id, args, flags }`);
+    throw new SuggestionInvalidError(
+      `${command.display} runs the CLI: suggest it as { id, args, flags }`,
+    );
   }
 
   return command.display as SuggestedCommand;
@@ -520,11 +523,11 @@ const VARIABLE = /^[A-Z_][A-Z0-9_]*$/;
  * @param variable - The shell variable that holds the secret.
  * @param command - The command that reads it.
  * @returns The command with the pipe in front of it.
- * @throws {Error} When `variable` is no shell variable's name.
+ * @throws {@link SuggestionInvalidError} When `variable` is no shell variable's name.
  */
 export function pipedFrom(variable: string, command: SuggestedCommand): SuggestedCommand {
   if (!VARIABLE.test(variable)) {
-    throw new Error(`${variable} is no shell variable's name`);
+    throw new SuggestionInvalidError(`${variable} is no shell variable's name`);
   }
 
   return `printf '%s' "$${variable}" | ${command}` as SuggestedCommand;
@@ -670,7 +673,7 @@ function carried(scope: Scope, target: Declared, given: Readonly<Record<string, 
  * @param id - The target.
  * @param input - The suggestion's arguments and flags.
  * @param target - What the target declares.
- * @throws {Error} Naming the first thing that is wrong.
+ * @throws {@link SuggestionInvalidError} Naming the first thing that is wrong.
  */
 function refuseBroken(id: string, input: LooseInput, target: Declared): void {
   const given = new Set(
@@ -680,7 +683,7 @@ function refuseBroken(id: string, input: LooseInput, target: Declared): void {
   );
   for (const [name, flag] of target.flags) {
     if (flag.required === true && !given.has(name)) {
-      throw new Error(`${id} requires --${name}`);
+      throw new SuggestionInvalidError(`${id} requires --${name}`);
     }
     if (!given.has(name)) {
       continue;
@@ -689,20 +692,20 @@ function refuseBroken(id: string, input: LooseInput, target: Declared): void {
       return given.has(other);
     });
     if (clash !== undefined) {
-      throw new Error(`${id} refuses --${name} with --${clash}`);
+      throw new SuggestionInvalidError(`${id} refuses --${name} with --${clash}`);
     }
     const missing = flag.dependsOn?.find((other) => {
       return !given.has(other);
     });
     if (missing !== undefined) {
-      throw new Error(`${id} takes --${name} only with --${missing}`);
+      throw new SuggestionInvalidError(`${id} takes --${name} only with --${missing}`);
     }
   }
   const missingArg = target.requiredArgs?.find((arg) => {
     return input.args?.[named(arg)] === undefined;
   });
   if (missingArg !== undefined) {
-    throw new Error(`${id} requires its ${missingArg}`);
+    throw new SuggestionInvalidError(`${id} requires its ${missingArg}`);
   }
 }
 
@@ -725,7 +728,7 @@ function refuseBroken(id: string, input: LooseInput, target: Declared): void {
  * @param target - What the target declares.
  * @param scope - What the run puts back on it.
  * @returns The words, each as the shell should receive it.
- * @throws {Error} When the suggestion does not fit what the target declares.
+ * @throws {@link SuggestionInvalidError} When the suggestion does not fit what the target declares.
  */
 export function suggestionWords(
   id: string,
@@ -740,7 +743,7 @@ export function suggestionWords(
     // The target was looked up to get here, so the id is a command. Its help
     // reads nothing else, and is the same in every directory.
     if (input.args !== undefined || input.flags !== undefined || input.rest !== undefined) {
-      throw new Error(`${id}'s help takes no arguments or flags`);
+      throw new SuggestionInvalidError(`${id}'s help takes no arguments or flags`);
     }
 
     return [...words, "--help"];
@@ -751,7 +754,7 @@ export function suggestionWords(
     const flag = spelled(name);
     const declared = target.flags.get(flag);
     if (declared === undefined) {
-      throw new Error(`${id} declares no --${flag}`);
+      throw new SuggestionInvalidError(`${id} declares no --${flag}`);
     }
     if (value === undefined) {
       continue;
@@ -785,7 +788,9 @@ export function suggestionWords(
   const gap = present.indexOf(false);
   const after = gap === -1 ? -1 : present.indexOf(true, gap);
   if (after !== -1) {
-    throw new Error(`${id} takes its ${target.args[after]} only after its ${target.args[gap]}`);
+    throw new SuggestionInvalidError(
+      `${id} takes its ${target.args[after]} only after its ${target.args[gap]}`,
+    );
   }
   const positional = [
     ...target.args.flatMap((arg) => {
@@ -799,7 +804,7 @@ export function suggestionWords(
     });
   });
   if (unknown.length > 0) {
-    throw new Error(`${id} declares no argument ${unknown.join(", ")}`);
+    throw new SuggestionInvalidError(`${id} declares no argument ${unknown.join(", ")}`);
   }
   const delimited = positional.some((word) => {
     return word.startsWith("-");
@@ -855,11 +860,11 @@ export type Declaring = Readonly<{
  * @param id - The command, as oclif names it.
  * @param loaded - The command oclif found for it, if any.
  * @returns Its flags and arguments.
- * @throws {Error} When `loaded` is missing, so `id` is no command this CLI has.
+ * @throws {@link SuggestionInvalidError} When `loaded` is missing, so `id` is no command this CLI has.
  */
 export function declaredOf(id: string, loaded: Declaring | undefined): Declared {
   if (loaded === undefined) {
-    throw new Error(`${id} is not a command`);
+    throw new SuggestionInvalidError(`${id} is not a command`);
   }
 
   return {
@@ -905,3 +910,4 @@ export function renderSuggestion(
 
 export { Guidance } from "./guidance";
 export { Spelling } from "./spelling";
+export { SuggestionError, SuggestionInvalidError } from "./errors";

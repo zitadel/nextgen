@@ -1,6 +1,8 @@
-import { ZitadelError } from "@/lib/errors";
+import {
+  PublishApplicationSecretMissingError,
+  PublishApplicationSecretPlainError,
+} from "@/lib/publish/errors";
 import type { StepContext } from "@/lib/publish/pipeline";
-import type { Suggestion } from "@/lib/suggestion";
 
 import { heldVariables } from "./held-variables";
 
@@ -21,11 +23,11 @@ import { heldVariables } from "./held-variables";
  *
  * @param ctx - The step's context: the applications and the variables.
  * @returns Nothing when every client's secret variable is a secret the project holds.
- * @throws {@link ZitadelError} `E_CREDENTIAL_MISSING` When a client names a
+ * @throws {@link PublishApplicationSecretMissingError} When a client names a
  *   variable the project does not hold.
- * @throws {@link ZitadelError} `E_VALIDATION` When a client names a variable
+ * @throws {@link PublishApplicationSecretPlainError} When a client names a variable
  *   that is not a secret.
- * @throws `ForbiddenError` When a deploy's token may not read the
+ * @throws {@link BackendForbiddenError} When a deploy's token may not read the
  *   variables.
  */
 export async function validateApplications(ctx: StepContext): Promise<void> {
@@ -42,33 +44,13 @@ export async function validateApplications(ctx: StepContext): Promise<void> {
     return;
   }
   for (const { file, client, variable } of secrets) {
-    const setCommand: Suggestion = {
-      id: "variable:set",
-      args: { name: variable },
-      flags: { secret: true, preview: ctx.mode === "preview" },
-    };
+    const use = { variable, client, file, preview: ctx.mode === "preview" };
     const isSecret = held.get(variable);
     if (isSecret === undefined) {
-      throw new ZitadelError(
-        "E_CREDENTIAL_MISSING",
-        `${file}: client "${client}" names the variable ${variable} as its secret, which the project does not have`,
-        {
-          hint: "Publish it as a secret with the command below, then deploy again.",
-          nextCommands: [setCommand],
-          details: { variable, client, file },
-        },
-      );
+      throw new PublishApplicationSecretMissingError(use);
     }
     if (!isSecret) {
-      throw new ZitadelError(
-        "E_VALIDATION",
-        `${file}: client "${client}" names the variable ${variable} as its secret, which is not a secret`,
-        {
-          hint: "A client secret must be a secret variable: publish it with the command below.",
-          nextCommands: [setCommand],
-          details: { variable, client, file, secret: false },
-        },
-      );
+      throw new PublishApplicationSecretPlainError(use);
     }
   }
 }

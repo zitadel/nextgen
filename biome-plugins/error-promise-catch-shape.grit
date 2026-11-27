@@ -1,0 +1,21 @@
+language js
+
+// A value that falls back to a default uses one `.catch` that recognises the
+// error by class and rethrows the rest (apps/cli/AGENTS.md, Errors). A
+// `.then(ok, err)` pair, a chained `.catch` or a handler that swallows
+// everything is the same catch written another way.
+or {
+  `$promise.then($ok, $err)` as $call where {
+    register_diagnostic(span=$call, message="Do not catch with `.then(ok, err)`. Use one `.catch((error: unknown) => { if (error instanceof X) { return fallback; } throw error; })`.", severity="error")
+  },
+  `$promise.catch($first).catch($second)` as $call where {
+    register_diagnostic(span=$call, message="Do not chain `.catch`. Use one `.catch` with a flat check per class.", severity="error")
+  },
+  `$promise.catch($handler)` as $call where {
+    // The documented safety nets (apps/cli/AGENTS.md, Errors), which must never
+    // break a run, may swallow what they did not anticipate.
+    not $filename <: r".*/apps/cli/(?:src/cli/telemetry/telemetered|src/cli/hooks/version-notice|src/cli/commands/doctor/checks/types|src/cli/commands/setup/steps/claim-ownership|src/cli/commands/setup/steps/do-initial-deploy|src/lib/publish/steps/lockout|src/cli/core/run-context|src/cli/core/wrapped|src/lib/backend/services/origin|src/lib/browser/index|src/lib/git/repository|src/lib/idp/credentials|src/lib/skills/skills|src/lib/telemetry/mixpanel-sink|src/lib/wizard/wizard|src/lib/publish/publisher)\.ts$",
+    not $handler <: r"^\s*(?:async )?\(error: unknown\) => \{[\s\S]*\bthrow [^;]+;\s*\}\s*$",
+    register_diagnostic(span=$call, message="A `.catch` takes `(error: unknown) => { if (error instanceof X) { return fallback; } throw error; }`.", severity="error")
+  }
+}

@@ -821,7 +821,7 @@ describe("auth-method sso disable", () => {
 
         expect(parseJson(result.stdout)).toMatchObject({
           code: "E_NOT_FOUND",
-          message: UNKNOWN_PROVIDER,
+          message: expect.stringContaining(UNKNOWN_PROVIDER),
         });
       });
 

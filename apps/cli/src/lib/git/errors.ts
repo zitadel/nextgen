@@ -1,19 +1,17 @@
-/**
- * A git operation that failed, with a message ready to show the developer.
- *
- * What the module throws when git fails. The message is git's own (all of
- * its stderr, which often says how to fix the failure), or one of the
- * module's when git said nothing useful: output over 16 MB, a call that timed
- * out. The temporary staging area's file-system calls can still fail with
- * Node's own errors. Whether a failure is fatal is the caller's choice.
- */
-export class RepositoryError extends Error {
-  /** Creates the error from its message. */
-  constructor(message: string) {
-    super(message);
-    this.name = "RepositoryError";
-  }
+import { originalOf, ZitadelLibError } from "@/lib/errors";
+import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 
+/**
+ * Every error the git package throws.
+ *
+ * @remarks
+ * A caller catches this to handle anything from git, or one of its subclasses
+ * to handle one condition. The message is git's own (all of its stderr, which
+ * often says how to fix the failure), or one of the package's when git said
+ * nothing useful. The temporary staging area's file-system calls can still
+ * fail with Node's own errors. Whether a failure is fatal is the caller's choice.
+ */
+export abstract class GitError extends ZitadelLibError {
   /**
    * The one line of the message that says why git failed, for a one-line warning; never empty.
    *
@@ -38,6 +36,17 @@ export class RepositoryError extends Error {
     }
     return lines[0] ?? "git gave no reason";
   }
+
+  /**
+   * The failure as git, or the package, raised it.
+   *
+   * @returns It, as `original`.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      original: originalOf(this),
+    };
+  }
 }
 
 /**
@@ -47,10 +56,27 @@ export class RepositoryError extends Error {
  * {@link Repository.open} answers "no repository" for it, where any other
  * failure is thrown.
  */
-export class GitDidNotStartError extends RepositoryError {
-  /** Creates the error from the message Node gave. */
-  constructor(message: string) {
-    super(message);
-    this.name = "GitDidNotStartError";
-  }
+export class GitBinaryMissingError extends GitError {
+  override readonly category: ErrorCategory = "conflict";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}
+
+/**
+ * git ran and failed for a reason nothing here handles: it exited non-zero, was
+ * killed, timed out, or printed more than the buffer holds.
+ *
+ * Carries git's own words and no advice, because nothing knows why.
+ */
+export class GitCommandFailedError extends GitError {
+  override readonly category: ErrorCategory = "unknown";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+}
+
+/** A bug in this package: something that cannot happen unless the code is wrong. */
+export class GitInternalError extends GitError {
+  override readonly category: ErrorCategory = "fault";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }

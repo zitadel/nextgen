@@ -1,5 +1,15 @@
 import { existsSync } from "node:fs";
-import { chmod, lstat, mkdir, readdir, readFile, rm, stat, symlink } from "node:fs/promises";
+import {
+  chmod,
+  lstat,
+  mkdir,
+  readdir,
+  readFile,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { LocalRuntime } from "@/lib/server";
 import { join } from "node:path";
 
@@ -1209,14 +1219,16 @@ describe("FrameworkCheck", () => {
       });
     });
 
-    it("carries the error's code and remedy for the doctor envelope", async ({ dir }) => {
+    it("carries the error's code and the upgrade in its hint for the doctor envelope", async ({
+      dir,
+    }) => {
       await aDowngradedApp(dir);
 
       const outcome = await new FrameworkCheck().run(aCheckContext(dir));
 
       expect(outcome).toMatchObject({
         code: "E_UNSUPPORTED_PROJECT_SHAPE",
-        hint: expect.stringContaining("Upgrade"),
+        hint: expect.stringContaining("Upgrade the app to Next.js 15.2.3 or later and rerun."),
       });
     });
   });
@@ -2747,6 +2759,15 @@ describe("ClaimCheck", () => {
   it("skips, rather than throwing, when the secret cannot be read", async ({ dir }) => {
     await aNextProject(dir);
     await rm(join(dir, SECRET_FILE));
+
+    const outcome = await new ClaimCheck().run(aCheckContext(dir));
+
+    expect(outcome).toMatchObject({ status: "pass", message: expect.stringContaining("Skipped") });
+  });
+
+  it("skips, rather than throwing, when zitadel.json is not an object", async ({ dir }) => {
+    await aNextProject(dir);
+    await writeFile(join(dir, "zitadel.json"), "[]");
 
     const outcome = await new ClaimCheck().run(aCheckContext(dir));
 

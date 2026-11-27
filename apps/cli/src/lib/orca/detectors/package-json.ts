@@ -1,9 +1,9 @@
-import { readFile, realpath } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import semver from "semver";
 
+import { FsError, readFile, realpath } from "@/lib/fs";
 import { isObject, parseJsonOrUndefined } from "@/lib/json";
-import { PM, type PackageJson } from "@/lib/pm";
+import { PM, PmManifestInvalidError, type PackageJson } from "@/lib/pm";
 import { ancestors } from "@/lib/paths";
 
 export type { PackageJson } from "@/lib/pm";
@@ -150,22 +150,27 @@ export type InstalledPackage = { version: string; path: string };
 
 /** Whether `dir` is the root of a workspace, above which no app's dependencies are installed. */
 async function isWorkspaceRoot(dir: string): Promise<boolean> {
-  if (
-    await readFile(join(dir, "pnpm-workspace.yaml")).then(
-      () => {
-        return true;
-      },
-      () => {
-        return false;
-      },
-    )
-  ) {
+  const marker = await readFile(join(dir, "pnpm-workspace.yaml")).catch((error: unknown) => {
+    if (error instanceof FsError) {
+      return undefined;
+    }
+    throw error;
+  });
+  if (marker !== undefined) {
     return true;
   }
-  const pkg = await readPackageJson(dir).catch(() => {
-    return undefined;
-  });
-  return pkg?.workspaces !== undefined && pkg.workspaces !== null;
+  try {
+    const pkg = await readPackageJson(dir);
+    return pkg.workspaces !== undefined && pkg.workspaces !== null;
+  } catch (error) {
+    if (error instanceof FsError) {
+      return false;
+    }
+    if (error instanceof PmManifestInvalidError) {
+      return false;
+    }
+    throw error;
+  }
 }
 
 /**
@@ -181,13 +186,21 @@ export async function installedPackage(
   cwd: string,
   name: string,
 ): Promise<InstalledPackage | undefined> {
-  const start = await realpath(resolve(cwd)).catch(() => {
-    return resolve(cwd);
+  const resolved = resolve(cwd);
+  const real = await realpath(resolved).catch((error: unknown) => {
+    if (error instanceof FsError) {
+      return undefined;
+    }
+    throw error;
   });
+  const start = real ?? resolved;
   for (const dir of ancestors(start)) {
     const path = join(dir, "node_modules", name, "package.json");
-    const contents = await readFile(path, "utf8").catch(() => {
-      return undefined;
+    const contents = await readFile(path, "utf8").catch((error: unknown) => {
+      if (error instanceof FsError) {
+        return undefined;
+      }
+      throw error;
     });
     if (contents !== undefined) {
       const version = versionIn(contents);

@@ -5,7 +5,7 @@ import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
 
-import { ZitadelError } from "@/lib/errors";
+import { OrcaError, OrcaPatchFileMissingError } from "@/lib/orca";
 import { FileWriter } from "@/lib/orca/patchers/rule/file-writer/index";
 import type { ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
 import { rejectionOf } from "@tests/helpers/thrown-value";
@@ -166,8 +166,8 @@ describe("scaffold - write", () => {
         force: false,
       }),
     );
-    expect(caught).toBeInstanceOf(ZitadelError);
-    expect((caught as ZitadelError).code).toBe("E_CONFLICT");
+    expect(caught).toBeInstanceOf(OrcaError);
+    expect((caught as OrcaError).code).toBe("E_CONFLICT");
     // file left untouched
     expect(await readFile(join(dir, "page.tsx"), "utf8")).toBe("user-authored");
   });
@@ -584,8 +584,8 @@ describe("scaffold - add-dep", () => {
         force: false,
       }),
     );
-    expect(caught).toBeInstanceOf(ZitadelError);
-    expect((caught as ZitadelError).code).toBe("E_VALIDATION");
+    expect(caught).toBeInstanceOf(OrcaPatchFileMissingError);
+    expect((caught as OrcaError).code).toBe("E_VALIDATION");
   });
 
   it("records the dep but does not write on dry-run", async ({ dir }) => {

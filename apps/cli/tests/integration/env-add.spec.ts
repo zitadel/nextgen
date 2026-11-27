@@ -442,6 +442,31 @@ describe("env add", () => {
         );
       });
 
+      it.for<[string, string, string]>([
+        [
+          "has a line break",
+          "sk_one\nsk_two",
+          "A .env value is a single line; remove the newline or store the value another way.",
+        ],
+        [
+          "no .env quoting reads back unchanged",
+          "#'\"",
+          "Set it in the process environment instead of a .env file.",
+        ],
+      ])("refuses a project secret that %s", async ([_situation, secret, hint]) => {
+        const app = await aSetUpApp();
+
+        const result = await app.run([...ADD, "--project", "proj_existing"], {
+          ZITADEL_PROJECT_SECRET: secret,
+        });
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint,
+        });
+      });
+
       it("refuses a name that cannot name a file", async () => {
         const app = await aSetUpApp();
 

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import semver from "semver";
 import { describe, expect } from "vitest";
 
-import { ZitadelError } from "@/lib/errors";
+import { OrcaVersionBelowFloorError } from "@/lib/orca";
 import { detectors } from "@/lib/orca/detectors";
 import { enforceVersionFloor } from "@/lib/orca/detectors/version-floor";
 import { it } from "@tests/fixtures";
@@ -39,13 +39,13 @@ function around(floor: string) {
   };
 }
 
-async function refusal(promise: Promise<unknown>): Promise<ZitadelError> {
+async function refusal(promise: Promise<unknown>): Promise<OrcaVersionBelowFloorError> {
   const caught = await promise.then(
     () => undefined,
     (error: unknown) => error,
   );
-  expect(caught).toBeInstanceOf(ZitadelError);
-  return caught as ZitadelError;
+  expect(caught).toBeInstanceOf(OrcaVersionBelowFloorError);
+  return caught as OrcaVersionBelowFloorError;
 }
 
 describe.each(detectors.map((detector) => [detector.framework, detector] as const))(
@@ -62,9 +62,10 @@ describe.each(detectors.map((detector) => [detector.framework, detector] as cons
         `${detector.displayName} "${below}" is below the supported floor`,
       );
       expect(error.message).toContain(`${detector.displayName} ${detector.versionFloor} and newer`);
-      expect(error.hint).toContain(
-        `Upgrade the app to ${detector.displayName} ${detector.versionFloor} or later`,
-      );
+      expect(error).toMatchObject({
+        displayName: detector.displayName,
+        versionFloor: detector.versionFloor,
+      });
     });
 
     it("refuses a range that stays below the floor", async ({ dir }) => {
@@ -159,7 +160,7 @@ describe.each(detectors.map((detector) => [detector.framework, detector] as cons
 );
 
 describe("enforceVersionFloor note", () => {
-  it("appends the detector's note to the upgrade hint", async ({ dir }) => {
+  it("carries the detector's note for the upgrade hint", async ({ dir }) => {
     const error = await refusal(
       enforceVersionFloor(
         {
@@ -172,8 +173,6 @@ describe("enforceVersionFloor note", () => {
         dir,
       ),
     );
-    expect(error.hint).toBe(
-      "Upgrade the app to Fake 2 or later and rerun. Older releases are insecure.",
-    );
+    expect(error.note).toBe("Older releases are insecure.");
   });
 });

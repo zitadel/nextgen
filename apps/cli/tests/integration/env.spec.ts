@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { asTerminal, offTerminal, RENDERINGS } from "@tests/fixtures/terminal";
 import { usePlatformMock } from "@tests/helpers/platform";
-import { aSetUpApp } from "@tests/helpers/project";
-import { cliVersion } from "@tests/helpers/run-cli";
+import { aSetUpApp, type ScaffoldedApp } from "@tests/helpers/project";
+import { cliVersion, expectedPublicCliCommand } from "@tests/helpers/run-cli";
+import { Cmd } from "@/lib/cmd";
 
 const platform = usePlatformMock();
 
@@ -326,6 +327,117 @@ describe("env", () => {
           warnings: [],
         });
       });
+
+      it("refuses a server in an env file that is not a URL, and says where to fix it", async () => {
+        const app = await aSetUpApp();
+        await app.writeInvalidServerToEnvFile();
+
+        const result = await app.runWithoutServer(["env", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint: "Fix or remove ZITADEL_URL in .env.development.local; it must be a URL such as https://preview.zitadel.com.",
+        });
+      });
+
+      it("refuses a server in an env file that is not a URL, and says why it is not one", async () => {
+        const app = await aSetUpApp();
+        await app.writeInvalidServerToEnvFile();
+
+        const result = await app.runWithoutServer(["env", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          details: { cause: 'Invalid server "not-a-url"' },
+        });
+      });
+
+      it.for<
+        [string, (app: ScaffoldedApp) => Promise<ScaffoldedApp>, (app: ScaffoldedApp) => string]
+      >([
+        [
+          "started in this folder",
+          async (app) => {
+            await app.writeStoppedServerRecord();
+            return app;
+          },
+          (app) => {
+            return `No healthy local server responded at ${app.stoppedServerUrl}. Run ${expectedPublicCliCommand("start")} to bring it back.`;
+          },
+        ],
+        [
+          "started in a parent folder",
+          async (app) => {
+            await app.writeStoppedServerRecord();
+            return app.appInside("my-app");
+          },
+          (app) => {
+            return `No healthy local server responded at ${app.stoppedServerUrl}. It was started in ${Cmd.quote(app.path)}, so run ${expectedPublicCliCommand(`start --cwd ${Cmd.quote(app.path)}`)} to bring it back.`;
+          },
+        ],
+      ])(
+        "refuses a local server %s that does not answer, and says how to bring it back",
+        async ([_situation, arrange, hint]) => {
+          const app = await aSetUpApp();
+          const inside = await arrange(app);
+
+          const result = await inside.runWithoutServer(["env", "--server", "local", "--json"]);
+
+          expect(inside.envelopeOf(result)).toMatchObject({
+            status: "error",
+            code: "E_LOCAL_SERVER_NOT_RUNNING",
+            hint: hint(app),
+          });
+        },
+      );
+
+      it.for<
+        [
+          string,
+          (app: ScaffoldedApp) => Promise<ScaffoldedApp>,
+          (app: ScaffoldedApp) => Record<string, unknown>,
+        ]
+      >([
+        [
+          "started in this folder",
+          async (app) => {
+            await app.writeStoppedServerRecord();
+            return app;
+          },
+          (app) => {
+            return { server_url: app.stoppedServerUrl };
+          },
+        ],
+        [
+          "started in a parent folder",
+          async (app) => {
+            await app.writeStoppedServerRecord();
+            return app.appInside("my-app");
+          },
+          (app) => {
+            return {
+              server_url: app.stoppedServerUrl,
+              suggested_args: [["start", "--cwd", app.path]],
+            };
+          },
+        ],
+      ])(
+        "refuses a local server %s that does not answer, and names the address it tried",
+        async ([_situation, arrange, details]) => {
+          const app = await aSetUpApp();
+          const inside = await arrange(app);
+
+          const result = await inside.runWithoutServer(["env", "--server", "local", "--json"]);
+
+          expect(inside.envelopeOf(result)).toMatchObject({
+            status: "error",
+            code: "E_LOCAL_SERVER_NOT_RUNNING",
+            details: details(app),
+          });
+        },
+      );
 
       it("refuses --env together with --env-file", async () => {
         const app = await aSetUpApp();

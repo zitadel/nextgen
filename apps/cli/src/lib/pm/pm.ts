@@ -1,8 +1,9 @@
 import { dirname, join, resolve } from "node:path";
 
-import { pathExists } from "@/lib/fs";
+import { FsError, pathExists } from "@/lib/fs";
 import { Output } from "@/lib/ui/output";
 
+import { PmManifestInvalidError } from "./errors";
 import { Manifest, type PackageJson } from "./manifest";
 import { PackageCommand, type Runner, type Verb } from "./package-command";
 
@@ -115,8 +116,8 @@ export class PM {
    *
    * @param dir - The project directory that holds the `package.json`.
    * @returns The parsed file.
-   * @throws An `ENOENT` error when there is none, a `SyntaxError` when it is
-   *   not valid JSON, and an `Error` when its root is not an object.
+   * @throws An `ENOENT` error when there is none, and a {@link PmManifestInvalidError} when it
+   *   is not valid JSON or its root is not an object.
    */
   static async manifest(dir: string): Promise<PackageJson> {
     return (await Manifest.read(dir)).json;
@@ -342,16 +343,24 @@ export class PM {
    *   manifest or it names none.
    */
   private static async declaredIn(dir: string): Promise<PMName | undefined> {
-    const manifest = await Manifest.read(dir).catch(() => {
-      return undefined;
-    });
-    const declared = manifest?.json.packageManager;
-    if (typeof declared !== "string") {
-      return undefined;
+    try {
+      const manifest = await Manifest.read(dir);
+      const declared = manifest.json.packageManager;
+      if (typeof declared !== "string") {
+        return undefined;
+      }
+      const name = declared.split("@")[0];
+      return name === "npm" || name === "pnpm" || name === "yarn" || name === "bun"
+        ? name
+        : undefined;
+    } catch (error) {
+      if (error instanceof FsError) {
+        return undefined;
+      }
+      if (error instanceof PmManifestInvalidError) {
+        return undefined;
+      }
+      throw error;
     }
-    const name = declared.split("@")[0];
-    return name === "npm" || name === "pnpm" || name === "yarn" || name === "bun"
-      ? name
-      : undefined;
   }
 }

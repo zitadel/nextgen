@@ -6,6 +6,7 @@ import { describe, expect } from "vitest";
 
 import { it, type Serve } from "@tests/fixtures";
 
+import { LocalServerRecordMalformedError, LocalServerRecordUnreadableError } from "@/lib/server";
 import {
   LOCAL_RUNTIME_FILE,
   checkLocalServerHealth,
@@ -113,6 +114,17 @@ describe("local server runtime metadata", () => {
     });
   });
 
+  it("refuses a record it cannot read as unreadable", async ({ dir: cwd }) => {
+    const paths = await ensureLocalState(cwd);
+    await mkdir(paths.runtimeFile);
+
+    const rejection = expect(readRuntimeMetadata(cwd)).rejects;
+    await rejection.toBeInstanceOf(LocalServerRecordUnreadableError);
+    await rejection.toMatchObject({
+      path: paths.runtimeFile,
+    });
+  });
+
   it("writes container identity files for host-user Docker runs", async ({ dir: cwd }) => {
     const identity = await ensureContainerIdentity(cwd, { uid: 501, gid: 20 });
 
@@ -170,24 +182,22 @@ describe("readNearestRuntimeMetadata", () => {
     await writeFile(join(dir, LOCAL_RUNTIME_FILE), JSON.stringify({ backend: "nope" }));
   }
 
-  it("names a malformed record in a parent by kind, aimed at nothing", async ({ dir: cwd }) => {
+  it("names a malformed record in a parent by kind", async ({ dir: cwd }) => {
     await malformedRecordAt(cwd);
     const app = join(cwd, "my-app");
     await mkdir(app);
 
-    await expect(readNearestRuntimeMetadata(app)).rejects.toMatchObject({
-      kind: "record-malformed",
-      nextCommands: undefined,
-    });
+    await expect(readNearestRuntimeMetadata(app)).rejects.toBeInstanceOf(
+      LocalServerRecordMalformedError,
+    );
   });
 
   it("names a malformed record in the working directory by kind", async ({ dir: cwd }) => {
     await malformedRecordAt(cwd);
 
-    await expect(readNearestRuntimeMetadata(cwd)).rejects.toMatchObject({
-      kind: "record-malformed",
-      nextCommands: undefined,
-    });
+    await expect(readNearestRuntimeMetadata(cwd)).rejects.toBeInstanceOf(
+      LocalServerRecordMalformedError,
+    );
   });
 });
 

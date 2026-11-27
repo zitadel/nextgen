@@ -1,3 +1,4 @@
+import { isCancellation } from "@/lib/errors";
 import {
   type Deployment,
   DeploymentService,
@@ -14,11 +15,11 @@ import {
   type ZitadelClient,
 } from "@/lib/backend";
 import { BuildReleaseBody as BuildReleaseBodySchema } from "@/lib/backend/schemas";
-import { isCancellation, ZitadelError } from "@/lib/errors";
 import { Output } from "@/lib/ui";
 import { type ConfigurationBundle, DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { SSO_RULES } from "@/lib/zitadel/rules/sso";
 
+import { PublishReleaseBodyInvalidError } from "./errors";
 import { bundleIsDirty, headSha } from "./git";
 import {
   type ConfigurationType,
@@ -226,7 +227,7 @@ export class Publisher {
    * @param store - Where the configuration is kept.
    * @returns The configuration, and whether the listing was needed but could
    *   not be read.
-   * @throws {@link ZitadelError} `E_CANCELLED` when the person stops the command.
+   * @throws The run's cancellation, when the person stops the command.
    */
   private async loadKnowingDeployed(store: DiskStore): Promise<KnownConfig> {
     const unknown = await ZitadelConfig.loadUnchecked(store);
@@ -241,7 +242,14 @@ export class Publisher {
         deployedUnknown: false,
       };
     }
-    const deployed = await this.listDeployed();
+    // A safety net: a listing that fails for any reason other than the person
+    // stopping the command means not knowing, so it never hides what the files say.
+    const deployed = await this.connections.deployedSlugs().catch((error: unknown) => {
+      if (isCancellation(error)) {
+        throw error;
+      }
+      return undefined;
+    });
     if (deployed === undefined) {
       return {
         config: unknown,
@@ -256,26 +264,6 @@ export class Publisher {
   }
 
   /**
-   * List the connections the project has, treating any listing failure other
-   * than the person stopping the command as not knowing, so it never hides
-   * what the local files say.
-   *
-   * @returns The slugs, or undefined when the listing could not be read.
-   * @throws {@link ZitadelError} `E_CANCELLED` when the person stops the command.
-   */
-  private async listDeployed(): Promise<ReadonlySet<string> | undefined> {
-    try {
-      return await this.connections.deployedSlugs();
-    } catch (error) {
-      if (isCancellation(error)) {
-        throw error;
-      }
-
-      return undefined;
-    }
-  }
-
-  /**
    * Build the bundle and run the steps that check it.
    *
    * @remarks
@@ -287,7 +275,7 @@ export class Publisher {
    *
    * @param request - The directory, the mode, and how to show what the steps say.
    * @returns The bundle, what the steps reported, and the commit it was built from.
-   * @throws {@link ZitadelError} `E_VALIDATION` naming each file a step refuses.
+   * @throws {@link PublishConfigInvalidError} naming each file a step refuses.
    */
   async prepare(request: PrepareRequest): Promise<PreparedRelease> {
     const store = new DiskStore(request.cwd);
@@ -355,7 +343,7 @@ export class Publisher {
    *
    * @param request - The prepared bundle and the release's message.
    * @returns The release, new or the one the content already built.
-   * @throws ConflictError when the content matches a release that was revoked.
+   * @throws BackendConflictError when the content matches a release that was revoked.
    */
   async createRelease(request: ReleaseRequest): Promise<Release> {
     return this.releases.create({
@@ -456,7 +444,7 @@ export class Publisher {
    *
    * @param bundle - The bundle read from disk.
    * @returns The same bundle, typed as the API takes it.
-   * @throws {@link ZitadelError} `E_VALIDATION` naming each field the API does
+   * @throws {@link PublishReleaseBodyInvalidError} naming each field the API does
    *   not take.
    */
   private static narrow(bundle: ConfigurationBundle): ReleaseBundle {
@@ -469,14 +457,9 @@ export class Publisher {
       const field = issue.path.join(".") || "(root)";
       return `  - bundle.${field} ${issue.message}`;
     });
-    throw new ZitadelError(
-      "E_VALIDATION",
+    throw new PublishReleaseBodyInvalidError(
       `The release body does not match what the API takes, so nothing was sent:\n${lines.join("\n")}`,
-      {
-        details: {
-          issues,
-        },
-      },
+      issues,
     );
   }
 }

@@ -1,15 +1,21 @@
-import { writeFile } from "node:fs/promises";
+import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { password, text } from "@clack/prompts";
 import { Config } from "@oclif/core";
-import { describe, expect, vi } from "vitest";
+import { describe, expect, onTestFinished, vi } from "vitest";
 
 import { it } from "@tests/fixtures";
 
 import { connectionOf, REQUEST_TIMEOUT_MS } from "@/lib/backend/client";
 import type { ZitadelClient } from "@/lib/backend";
 import { Consent } from "@/lib/consent";
+import {
+  EnvironmentValueMissingError,
+  EnvironmentValueUnboundError,
+  type ServerAddresses,
+} from "@/lib/environment";
+import { LocalServerRecordMalformedError, ZitadelRuntime } from "@/lib/server";
 import { CREDENTIALS } from "@/cli/core/credentials";
 import { EnvironmentCommand, PreviewCommand } from "@/cli/core/environment-command";
 import type { ConnectOptions } from "@/cli/core/types";
@@ -32,6 +38,36 @@ class ProjectProbe extends ServerCommand(EnvironmentCommand) {
     const { flags } = await this.parse(ProjectProbe);
     await this.toMeta(flags);
     return { connection: await this.connect(), telemetry: this.describe() };
+  }
+}
+
+/** Resolves its server from a local record that is malformed. */
+class MalformedRecordProbe extends ServerCommand(EnvironmentCommand) {
+  protected async execute(): Promise<never> {
+    throw new Error("unused");
+  }
+
+  override log(): void {}
+
+  protected override servers(): ServerAddresses {
+    return {
+      resolve: () => {
+        return Promise.reject(
+          new LocalServerRecordMalformedError("the record is malformed", "/work"),
+        );
+      },
+      parse: (value) => {
+        return ZitadelRuntime.parse(value);
+      },
+      origin: (value) => {
+        return ZitadelRuntime.origin(value);
+      },
+    };
+  }
+
+  async probe() {
+    const { flags } = await this.parse(MalformedRecordProbe);
+    await this.toMeta(flags);
   }
 }
 
@@ -332,6 +368,73 @@ describe("EnvironmentCommand.connect", () => {
       code: "E_VALIDATION",
       message: expect.stringContaining("ZITADEL_PROJECT_SECRET"),
     });
+  });
+
+  it("refuses a development environment with no project as unbound", async ({ dir }) => {
+    await expect(new ProjectProbe(["--cwd", dir], config).probe()).rejects.toBeInstanceOf(
+      EnvironmentValueUnboundError,
+    );
+  });
+
+  it("refuses any other environment with no project as unbound", async ({ dir }) => {
+    await expect(
+      new ProjectProbe(["--cwd", dir, "--env", "staging"], config).probe(),
+    ).rejects.toBeInstanceOf(EnvironmentValueUnboundError);
+  });
+
+  it.skipIf(process.getuid?.() === 0 || process.platform === "win32")(
+    "refuses a malformed record even when no folder above can be read",
+    async ({ dir }) => {
+      const locked = join(dir, "locked");
+      await mkdir(join(locked, "inner"), { recursive: true });
+      await chmod(locked, 0o000);
+      onTestFinished(async () => {
+        await chmod(locked, 0o700);
+      });
+
+      await expect(
+        new MalformedRecordProbe(
+          ["--cwd", join(locked, "inner"), "--server", "local"],
+          config,
+        ).probe(),
+      ).rejects.toBeInstanceOf(LocalServerRecordMalformedError);
+    },
+  );
+
+  it("points an --env-file run at that file and never at setup", async ({ dir }) => {
+    await writeFile(join(dir, "ci.env"), "ZITADEL_URL=https://ci.example\n");
+
+    await expect(
+      new ProjectProbe(["--cwd", dir, "--env-file", join(dir, "ci.env")], config).probe(),
+    ).rejects.toSatisfy((error: unknown) => {
+      return error instanceof EnvironmentValueMissingError && error.file === join(dir, "ci.env");
+    });
+  });
+
+  it("points an environment env add already bound at its own file", async ({ dir }) => {
+    await writeFile(
+      join(dir, ".env.production.local"),
+      "ZITADEL_URL=https://production.example\nZITADEL_PROJECT_ID=proj_production\n",
+    );
+
+    await expect(
+      new ProjectProbe(["--cwd", dir, "--env", "production"], config).probe(),
+    ).rejects.toSatisfy((error: unknown) => {
+      return (
+        error instanceof EnvironmentValueMissingError && error.file === ".env.production.local"
+      );
+    });
+  });
+
+  it("sends no one to env add when the process environment already names the project", async ({
+    dir,
+  }) => {
+    await writeFile(join(dir, ".env.production.local"), "ZITADEL_URL=https://production.example\n");
+    vi.stubEnv("ZITADEL_PROJECT_ID", "proj_ci");
+
+    await expect(
+      new ProjectProbe(["--cwd", dir, "--env", "production"], config).probe(),
+    ).rejects.toBeInstanceOf(EnvironmentValueMissingError);
   });
 
   it("never asks for a missing value on a dry run, even on a terminal", async ({ dir }) => {

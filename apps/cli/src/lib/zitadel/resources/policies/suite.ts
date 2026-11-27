@@ -72,7 +72,7 @@ export class PolicyTest extends ConfigDocument<PolicyTestValue> {
    *
    * @param file - The file.
    * @returns The test file, marked as read.
-   * @throws {@link BrokenFilesError} When the policy test contract refuses the body.
+   * @throws {@link ZitadelConfigError} When the policy test contract refuses the body.
    */
   static of(file: DocumentFile): PolicyTest {
     return new PolicyTest(file, PolicyTest.parseFile(PolicyTest.CONTRACT, file), "read");
@@ -84,7 +84,7 @@ export class PolicyTest extends ConfigDocument<PolicyTestValue> {
    *
    * @param file - Where it goes, and what it holds.
    * @returns The test file, marked as created.
-   * @throws {@link BrokenFilesError} When the policy test contract refuses the body.
+   * @throws {@link ZitadelConfigError} When the policy test contract refuses the body.
    */
   static create(file: DocumentFile): PolicyTest {
     return new PolicyTest(file, PolicyTest.parseFile(PolicyTest.CONTRACT, file), "created");

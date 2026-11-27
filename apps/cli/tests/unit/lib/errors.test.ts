@@ -1,16 +1,33 @@
+import { mkdir as nodeMkdir, mkdtemp, readFile as nodeReadFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
+import { mkdir, readFile } from "@/lib/fs";
+
 import { responseFailure } from "@/lib/backend";
-import { ForbiddenError, UnauthorizedError, UnavailableError } from "@/lib/backend/errors";
+import {
+  BackendForbiddenError,
+  BackendUnauthorizedError,
+  BackendTimeoutError,
+  BackendUnreachableError,
+  BackendUnreadableError,
+} from "@/lib/backend";
 import {
   EXIT_CODES,
+  PromptCancelled,
   ZitadelError,
   errorMessage,
   failureText,
   isCancellation,
   toZitadelError,
 } from "@/lib/errors";
-import { BrokenFlowsError, ConfigError, ConflictError, NotFoundError } from "@/lib/zitadel";
+import {
+  ZitadelConfigFileUnreadableError,
+  ZitadelConfigError,
+  ZitadelConfigResourceClashError,
+} from "@/lib/zitadel";
 
 describe("EXIT_CODES", () => {
   it("maps every error code to its documented exit number", () => {
@@ -64,7 +81,58 @@ describe("ZitadelError", () => {
   });
 });
 
+describe("ZitadelLibError", () => {
+  it("names a failure by its class and keeps the failure it wraps", () => {
+    const cause = new Error("the file is locked");
+    const error = new ZitadelConfigError("not valid", cause);
+
+    expect(error.name).toBe("ZitadelConfigError");
+    expect(error.cause).toBe(cause);
+  });
+
+  it("is reported by toZitadelError with the code and message it states", () => {
+    const error = new ZitadelConfigError("not valid");
+    const result = toZitadelError(error);
+
+    expect(result).toBeInstanceOf(ZitadelError);
+    expect([result.code, result.message]).toEqual([error.code, error.message]);
+  });
+});
+
 describe("toZitadelError", () => {
+  it.each([
+    ["a missing file", "missing.txt", "E_VALIDATION"],
+    ["a directory read as a file", ".", "E_VALIDATION"],
+    ["a file read as a directory", "file.txt/child", "E_VALIDATION"],
+  ])("reports %s with the code a Node error got before", async (_what, relative, code) => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-errors-"));
+    await writeFile(join(dir, "file.txt"), "x");
+    const path = join(dir, relative);
+    const wrapped = await readFile(path, "utf8").catch((error: unknown) => {
+      return error;
+    });
+    const raw = await nodeReadFile(path, "utf8").catch((error: unknown) => {
+      return error;
+    });
+
+    expect([toZitadelError(wrapped).code, toZitadelError(raw).code]).toEqual([code, code]);
+  });
+
+  it("reports an existing path with the code a Node error got before", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-errors-"));
+    const wrapped = await mkdir(dir).catch((error: unknown) => {
+      return error;
+    });
+    const raw = await nodeMkdir(dir).catch((error: unknown) => {
+      return error;
+    });
+
+    expect([toZitadelError(wrapped).code, toZitadelError(raw).code]).toEqual([
+      "E_CONFLICT",
+      "E_CONFLICT",
+    ]);
+  });
+
   it("passes an existing ZitadelError through unchanged", () => {
     const original = new ZitadelError("E_AUTH", "already normalised");
     expect(toZitadelError(original)).toBe(original);
@@ -91,7 +159,7 @@ describe("toZitadelError", () => {
     const result = toZitadelError(errno);
     expect(result.code).toBe("E_CONFLICT");
     expect(result.message).toBe("file exists");
-    expect(result.hint).toBe("A file already exists. Use --force to overwrite or remove it first.");
+    expect(result.hint).toBe("A file already exists. Remove it first.");
   });
 
   it("maps ENOENT errno errors to E_VALIDATION", () => {
@@ -103,75 +171,22 @@ describe("toZitadelError", () => {
   });
 
   it.each([
-    ["a ConflictError", new ConflictError("two with one slug"), "E_CONFLICT"],
-    ["a NotFoundError", new NotFoundError("no such connection"), "E_NOT_FOUND"],
-    ["any other ConfigError", new ConfigError("not valid"), "E_VALIDATION"],
+    ["a ZitadelConfigResourceClashError", new ZitadelConfigResourceClashError("two with one slug")],
+    ["a ZitadelConfigError", new ZitadelConfigError("not valid")],
     [
-      "a ConfigError for a file the OS refused to read",
-      new ConfigError("x.json cannot be read (EACCES)", { details: { code: "EACCES" } }),
-      "E_AUTH",
+      "a ZitadelConfigFileUnreadableError",
+      new ZitadelConfigFileUnreadableError("x.json", "EACCES"),
     ],
-    [
-      "a ConfigError for a file the OS would not let it touch",
-      new ConfigError("x.json cannot be read (EPERM)", { details: { code: "EPERM" } }),
-      "E_AUTH",
-    ],
-    [
-      "a ConfigError for any other errno",
-      new ConfigError("x.json cannot be read (EIO)", { details: { code: "EIO" } }),
-      "E_VALIDATION",
-    ],
-  ])("maps %s to %s", (_name, err, code) => {
-    expect(toZitadelError(err).code).toBe(code);
-  });
+  ])("reports %s by the code and message its class states", (_name, error) => {
+    const result = toZitadelError(error);
 
-  it("passes a ConfigError's message, hint and details on", () => {
-    const err = new ConfigError("boom", { hint: "do this", details: { file: "a.json" } });
-    const result = toZitadelError(err);
-    expect([result.message, result.hint, result.details]).toEqual([
-      "boom",
-      "do this",
-      { file: "a.json" },
-    ]);
+    expect(result).toBeInstanceOf(ZitadelError);
+    expect([result.code, result.message]).toEqual([error.code, error.message]);
   });
 
   it.each([
-    [
-      "a method still in use",
-      { kind: "method-in-use", uses: [], hint: "`zitadel deploy --dry-run` checks the edit." },
-      [{ id: "deploy", flags: { dryRun: true } }],
-    ],
-    [
-      "flows already broken on disk",
-      { kind: "broken", hint: "Fix those errors first (`zitadel deploy --dry-run` reports them)." },
-      [{ id: "deploy", flags: { dryRun: true } }],
-    ],
-    [
-      "an edit that would break a flow, which is never saved",
-      { kind: "broken", hint: "Fix the steps named above, then run the command again." },
-      undefined,
-    ],
-  ] as const)("gives %s its follow-up", (_name, report, next) => {
-    const result = toZitadelError(
-      new BrokenFlowsError({
-        ...report,
-        file: "default-human-user.json",
-        heading: "A login flow would break:",
-        issues: [],
-      }),
-    );
-
-    expect(result.nextCommands).toEqual(next);
-  });
-
-  it("leaves out the hint and details a ConfigError has none of", () => {
-    const result = toZitadelError(new ConfigError("boom"));
-    expect([result.hint, result.details]).toEqual([undefined, undefined]);
-  });
-
-  it.each([
-    ["UnauthorizedError", new UnauthorizedError("the credential was not accepted")],
-    ["ForbiddenError", new ForbiddenError("the credential may not do this")],
+    ["BackendUnauthorizedError", new BackendUnauthorizedError("the credential was not accepted")],
+    ["BackendForbiddenError", new BackendForbiddenError("the credential may not do this")],
   ])("maps a %s the backend raised to E_AUTH", (_name, err) => {
     const result = toZitadelError(err);
 
@@ -180,25 +195,30 @@ describe("toZitadelError", () => {
   });
 
   it("maps a request that got no response to E_NETWORK", () => {
-    const err = new UnavailableError(
+    const err = new BackendUnreachableError(
       "GET http://localhost:8080/idps got no response (ECONNREFUSED)",
       {
         url: "http://localhost:8080/idps",
-        reason: "unreachable",
       },
     );
     const result = toZitadelError(err);
     expect(result.code).toBe("E_NETWORK");
     expect(result.exitCode).toBe(4);
     expect(result.message).toBe("GET http://localhost:8080/idps got no response (ECONNREFUSED)");
-    expect(result.hint).toBe("Check your connection and the server URL (ZITADEL_URL or --server).");
     expect(result.details).toEqual({ url: "http://localhost:8080/idps", reason: "unreachable" });
   });
 
-  it("maps a request that timed out to E_NETWORK with a hint about the server", () => {
-    const err = new UnavailableError("GET … timed out", {
+  it("leaves the hint of a request that got no response to the CLI, which names --server", () => {
+    const err = new BackendUnreachableError("GET http://localhost:8080/idps got no response", {
       url: "http://localhost:8080/idps",
-      reason: "timeout",
+    });
+
+    expect(toZitadelError(err).hint).toBeUndefined();
+  });
+
+  it("maps a request that timed out to E_NETWORK with a hint about the server", () => {
+    const err = new BackendTimeoutError("GET … timed out", {
+      url: "http://localhost:8080/idps",
     });
     const result = toZitadelError(err);
     expect(result.code).toBe("E_NETWORK");
@@ -208,11 +228,10 @@ describe("toZitadelError", () => {
   });
 
   it("maps a response whose body could not be read to E_NETWORK with a hint about proxies", () => {
-    const err = new UnavailableError(
+    const err = new BackendUnreadableError(
       "GET http://localhost:8080/idps answered 200, but its body could not be read",
       {
         url: "http://localhost:8080/idps",
-        reason: "unreadable",
       },
     );
     const result = toZitadelError(err);
@@ -672,6 +691,17 @@ describe("a failure as a person is shown it", () => {
         sentence: "Bad port\nUse 1 to 65535.",
         misuse: false,
       });
+    });
+  });
+});
+
+describe("PromptCancelled", () => {
+  it("states a cancelled prompt with no hint or details", () => {
+    expect(new PromptCancelled()).toMatchObject({
+      message: "Cancelled by user",
+      code: "E_CANCELLED",
+      hint: undefined,
+      details: undefined,
     });
   });
 });

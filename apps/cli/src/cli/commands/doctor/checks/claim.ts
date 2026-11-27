@@ -2,7 +2,8 @@ import { Claim } from "@/lib/claim";
 import { ZitadelRuntime } from "@/lib/server";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
-import { Project } from "@/lib/project";
+import { FsError } from "@/lib/fs";
+import { Project, ProjectError } from "@/lib/project";
 
 /**
  * What a project on a local or self-hosted server is told: it has no team to
@@ -49,59 +50,65 @@ export class ClaimCheck implements SanityCheck {
    * @returns The outcome of the check.
    */
   async run(ctx: CheckContext): Promise<CheckOutcome> {
-    const state = await Project.at(ctx.cwd)
-      .secret()
-      .then(async (secret) => {
-        return Claim.state({
-          secret: secret.data,
-          cloud: ZitadelRuntime.fromUrl(
-            (await Project.at(ctx.cwd).config()).server ?? ZitadelRuntime.DEFAULT,
-          ).isCloud(),
-        });
-      })
-      .catch(() => {
-        return undefined;
+    try {
+      const secret = await Project.at(ctx.cwd).secret();
+      const state = Claim.state({
+        secret: secret.data,
+        cloud: ZitadelRuntime.fromUrl(
+          (await Project.at(ctx.cwd).config()).server ?? ZitadelRuntime.DEFAULT,
+        ).isCloud(),
       });
-    if (state === undefined) {
+
+      if (state.kind === "detached") {
+        const claim = ctx.suggest({ id: "claim" });
+        const message = state.claimable
+          ? `Claim your project within ${Claim.WINDOW_DAYS} days of creation to make it ` +
+            "permanent and start collaborating with your team. Until then, your project " +
+            `is temporary and its data may be lost. Run ${claim}.`
+          : `The local record says this project's ${Claim.WINDOW_DAYS}-day claim window has ` +
+            `closed. Run ${claim} to reconcile: a project claimed from another ` +
+            "machine confirms its team, and one never claimed can no longer be claimed. " +
+            `${ctx.suggest({
+              id: "setup",
+              flags: { cwd: Claim.FRESH_DIRECTORY },
+            })} in a fresh directory gets you a new project you can claim.`;
+        return {
+          name: this.name,
+          status: "warn",
+          message,
+          details: { claimable: state.claimable },
+          path: this.path,
+        };
+      }
+
       return {
         name: this.name,
         status: "pass",
-        message: "Skipped: could not read the project files that record the owning team",
+        message:
+          state.kind === "attached"
+            ? `Project is attached to team ${state.team_id}`
+            : NO_TEAMS_MESSAGE,
         path: this.path,
       };
+    } catch (error) {
+      if (error instanceof ProjectError) {
+        return {
+          name: this.name,
+          status: "pass",
+          message: "Skipped: could not read the project files that record the owning team",
+          path: this.path,
+        };
+      }
+      if (error instanceof FsError) {
+        return {
+          name: this.name,
+          status: "pass",
+          message: "Skipped: could not read the project files that record the owning team",
+          path: this.path,
+        };
+      }
+      throw error;
     }
-
-    if (state.kind === "detached") {
-      const claim = ctx.suggest({ id: "claim" });
-      const message = state.claimable
-        ? `Claim your project within ${Claim.WINDOW_DAYS} days of creation to make it ` +
-          "permanent and start collaborating with your team. Until then, your project " +
-          `is temporary and its data may be lost. Run ${claim}.`
-        : `The local record says this project's ${Claim.WINDOW_DAYS}-day claim window has ` +
-          `closed. Run ${claim} to reconcile: a project claimed from another ` +
-          "machine confirms its team, and one never claimed can no longer be claimed. " +
-          `${ctx.suggest({
-            id: "setup",
-            flags: { cwd: Claim.FRESH_DIRECTORY },
-          })} in a fresh directory gets you a new project you can claim.`;
-      return {
-        name: this.name,
-        status: "warn",
-        message,
-        details: { claimable: state.claimable },
-        path: this.path,
-      };
-    }
-
-    return {
-      name: this.name,
-      status: "pass",
-      message:
-        state.kind === "attached"
-          ? `Project is attached to team ${state.team_id}`
-          : NO_TEAMS_MESSAGE,
-      path: this.path,
-    };
   }
 
   /**

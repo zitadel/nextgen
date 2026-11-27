@@ -1,5 +1,13 @@
 import type { Consent, Gate } from "@/lib/consent";
-import { errorMessage, ZitadelError, type ZitadelErrorCode } from "@/lib/errors";
+import { wordedError } from "@/cli/core/error-support";
+import {
+  ZitadelError,
+  ZitadelLibError,
+  type ZitadelErrorCode,
+  errorMessage,
+  toZitadelError,
+} from "@/lib/errors";
+import { FsNotFoundError } from "@/lib/fs";
 import type { Orca } from "@/lib/orca";
 import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
 
@@ -85,10 +93,11 @@ export class CheckFailure extends Error {
 
   /**
    * @param message - What is wrong, in one sentence.
-   * @param details - The facts behind it, for the report.
+   * @param details - The facts behind it, for the report, if any.
+   * @param options - The error that caused it, if any.
    */
-  constructor(message: string, details: CheckOutcome["details"]) {
-    super(message);
+  constructor(message: string, details?: CheckOutcome["details"], options?: ErrorOptions) {
+    super(message, options);
     this.details = details;
   }
 }
@@ -99,13 +108,18 @@ export abstract class AbstractSanityCheck implements SanityCheck {
    * failure it threw as `failureStatus`, with the details a {@link CheckFailure}
    * carries.
    *
+   * A lib error it threw is worded as a command's failure is, so the row says
+   * what the run would have said.
+   *
+   * @param cwd - The folder the run acts on.
    * @param name - The check's name.
-   * @param fallback - The message when what was thrown is not an error.
+   * @param fallback - The message when the error it threw carries none.
    * @param run - The probe; it returns the passing message and throws to fail.
    * @param failureStatus - What a failure counts as.
    * @returns The check's outcome.
    */
   static async attempt(
+    cwd: string,
     name: string,
     fallback: string,
     run: () => Promise<string>,
@@ -126,10 +140,27 @@ export abstract class AbstractSanityCheck implements SanityCheck {
           details: error.details,
         };
       }
+      if (error instanceof ZitadelLibError) {
+        const worded = toZitadelError(wordedError(error, cwd));
+        return {
+          name,
+          status: failureStatus,
+          message: worded.message === "" ? fallback : worded.message,
+        };
+      }
+      if (error instanceof ZitadelError) {
+        return {
+          name,
+          status: failureStatus,
+          message: error.message === "" ? fallback : error.message,
+        };
+      }
+      // A safety net: a check that fails in a way nobody anticipated is reported
+      // as a failing check, never as a crash of the whole doctor run.
       return {
         name,
         status: failureStatus,
-        message: error instanceof Error ? error.message : fallback,
+        message: errorMessage(error) === "" ? fallback : errorMessage(error),
       };
     }
   }
@@ -151,17 +182,58 @@ export abstract class AbstractSanityCheck implements SanityCheck {
         path: this.path,
       };
     } catch (error) {
+      if (error instanceof CheckFailure) {
+        return {
+          name: this.name,
+          status: "fail",
+          message: error.message,
+          path: this.path,
+        };
+      }
+      if (error instanceof FsNotFoundError) {
+        return {
+          name: this.name,
+          status: "fail",
+          message: `${this.path} was not found`,
+          path: this.path,
+        };
+      }
+      if (error instanceof ZitadelLibError) {
+        const worded = toZitadelError(wordedError(error, ctx.cwd));
+        return {
+          name: this.name,
+          status: "fail",
+          message: worded.message,
+          path: this.path,
+          code: worded.code,
+          hint: worded.hint,
+        };
+      }
+      if (error instanceof SyntaxError) {
+        return {
+          name: this.name,
+          status: "fail",
+          message: error.message,
+          path: this.path,
+        };
+      }
+      if (error instanceof ZitadelError) {
+        return {
+          name: this.name,
+          status: "fail",
+          message: error.message,
+          path: this.path,
+          code: error.code,
+          hint: error.hint,
+        };
+      }
+      // A safety net: a check that fails in a way nobody anticipated is reported
+      // as a failing check, never as a crash of the whole doctor run.
       return {
         name: this.name,
         status: "fail",
-        message: isMissingFile(error) ? `${this.path} was not found` : errorMessage(error),
+        message: errorMessage(error),
         path: this.path,
-        ...(error instanceof ZitadelError
-          ? {
-              code: error.code,
-              ...(error.hint === undefined ? {} : { hint: error.hint }),
-            }
-          : {}),
       };
     }
   }
@@ -169,9 +241,4 @@ export abstract class AbstractSanityCheck implements SanityCheck {
   async fix(_ctx: CheckContext): Promise<void> {
     return;
   }
-}
-
-/** A read that found no file: named by the check's own path, not the system's error and absolute path. */
-function isMissingFile(error: unknown): boolean {
-  return error instanceof Error && (error as NodeJS.ErrnoException).code === "ENOENT";
 }

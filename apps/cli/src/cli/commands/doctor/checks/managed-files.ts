@@ -1,15 +1,16 @@
-import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import { loadPatchContext } from "@/cli/commands/doctor/patch-context";
-import { readIfReadable } from "@/lib/fs";
+import { FsError, readIfReadable, rm } from "@/lib/fs";
 import type { ConfigWiringStatus, EjectActions } from "@/lib/orca/patchers/types";
 import { updateScaffold } from "@/lib/sync/state";
 import type { ScaffoldFileClass, ScaffoldFileEntry, ScaffoldManifest } from "@/lib/sync/types";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
-import { Project } from "@/lib/project";
-import { Orca } from "@/lib/orca";
+import { Project, ProjectError } from "@/lib/project";
+import { Orca, OrcaError } from "@/lib/orca";
+import { PmError } from "@/lib/pm";
+import { ZitadelConfigError } from "@/lib/zitadel";
 
 /**
  * Per-file classification reported in the check's `details`:
@@ -355,8 +356,23 @@ async function probeConfigWiring(ctx: CheckContext): Promise<ReadonlyArray<Confi
   try {
     const patchCtx = await loadPatchContext(ctx.cwd, ctx.orca, ctx.cliVersion);
     return await ctx.orca.patcherFor(patchCtx.framework.id).verify(patchCtx, { cwd: ctx.cwd });
-  } catch {
-    return [];
+  } catch (error) {
+    if (error instanceof ProjectError) {
+      return [];
+    }
+    if (error instanceof OrcaError) {
+      return [];
+    }
+    if (error instanceof FsError) {
+      return [];
+    }
+    if (error instanceof ZitadelConfigError) {
+      return [];
+    }
+    if (error instanceof PmError) {
+      return [];
+    }
+    throw error;
   }
 }
 
@@ -411,8 +427,23 @@ async function materializeManifest(
       actions,
       written: marked,
     });
-  } catch {
-    return;
+  } catch (error) {
+    if (error instanceof ProjectError) {
+      return;
+    }
+    if (error instanceof OrcaError) {
+      return;
+    }
+    if (error instanceof FsError) {
+      return;
+    }
+    if (error instanceof ZitadelConfigError) {
+      return;
+    }
+    if (error instanceof PmError) {
+      return;
+    }
+    throw error;
   }
 }
 
@@ -485,8 +516,23 @@ export async function resolveArtifacts(ctx: CheckContext): Promise<EjectActions 
       framework,
       rendererId: config.rendererId,
     });
-  } catch {
-    return undefined;
+  } catch (error) {
+    if (error instanceof ProjectError) {
+      return undefined;
+    }
+    if (error instanceof OrcaError) {
+      return undefined;
+    }
+    if (error instanceof FsError) {
+      return undefined;
+    }
+    if (error instanceof ZitadelConfigError) {
+      return undefined;
+    }
+    if (error instanceof PmError) {
+      return undefined;
+    }
+    throw error;
   }
 }
 

@@ -418,6 +418,50 @@ describe("Wizard", () => {
   });
 
   describe("watching a run", () => {
+    it("still undoes the steps that finished when the watcher of a failure throws", async () => {
+      const log: Log = [];
+      const wizard = started()
+        .step(new Adds(log, "first", 1))
+        .step(new Fails())
+        .finish(() => "done");
+
+      await wizard
+        .run(
+          { input: "x" },
+          {
+            watch: {
+              failed: () => {
+                throw new Error("the watcher broke");
+              },
+            },
+          },
+        )
+        .catch(() => undefined);
+
+      expect(log).toEqual(["run first", "undo first"]);
+    });
+
+    it("runs every step when the watcher of a start throws", async () => {
+      const log: Log = [];
+      const wizard = started()
+        .step(new Adds(log, "first", 1))
+        .step(new Adds(log, "second", 2))
+        .finish(() => "done");
+
+      const answer = await wizard.run(
+        { input: "x" },
+        {
+          watch: {
+            started: () => {
+              throw new Error("the watcher broke");
+            },
+          },
+        },
+      );
+
+      expect(answer).toBe("done");
+    });
+
     it("reports each step as it starts and finishes, in order", async () => {
       const seen: string[] = [];
       const wizard = started()

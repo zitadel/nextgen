@@ -1,4 +1,4 @@
-import { ZitadelError } from "@/lib/errors";
+import { OrcaVersionBelowFloorError } from "@/lib/orca/errors";
 
 import {
   dependencySpecProvablyBelow,
@@ -13,7 +13,7 @@ import type { Detector } from "./types";
  * once it has recognised the project, so `setup` and `doctor` share a single
  * loud gate and no detector carries its own checking logic.
  *
- * Throws `E_UNSUPPORTED_PROJECT_SHAPE` only for a provable violation: a
+ * Throws {@link OrcaVersionBelowFloorError} only for a provable violation: a
  * declared spec that cannot resolve to the floor or newer, or an installed
  * release older than the floor (a range such as `^15.0.0` can still be locked
  * to an older one). Protocol specs and dist-tags pass, a prerelease of a
@@ -26,26 +26,25 @@ export async function enforceVersionFloor(
   cwd: string,
 ): Promise<void> {
   const { displayName, versionPackage, versionFloor, versionFloorNote } = detector;
-  const hint = [`Upgrade the app to ${displayName} ${versionFloor} or later and rerun.`]
-    .concat(versionFloorNote ?? [])
-    .join(" ");
   const supported = `the CLI integrates ${displayName} ${versionFloor} and newer`;
 
   const declared = dependencySpecProvablyBelow(pkg, versionPackage, versionFloor);
   if (declared !== undefined) {
-    throw new ZitadelError(
-      "E_UNSUPPORTED_PROJECT_SHAPE",
+    throw new OrcaVersionBelowFloorError(
       `${displayName} "${declared}" is below the supported floor — ${supported}`,
-      { hint },
+      displayName,
+      versionFloor,
+      versionFloorNote,
     );
   }
 
   const installed = await installedVersionBelow(cwd, versionPackage, versionFloor);
   if (installed !== undefined) {
-    throw new ZitadelError(
-      "E_UNSUPPORTED_PROJECT_SHAPE",
+    throw new OrcaVersionBelowFloorError(
       `${displayName} ${installed.version} is installed (${installed.path}), below the supported floor — ${supported}`,
-      { hint },
+      displayName,
+      versionFloor,
+      versionFloorNote,
     );
   }
 }

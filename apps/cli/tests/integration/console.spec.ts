@@ -111,6 +111,160 @@ describe("console", () => {
         });
       });
 
+      it("refuses when the server it started was stopped, and says to start it", async () => {
+        const app = await aSetUpApp();
+        await app.startLocalServer();
+        await app.run(["stop", "--json"]);
+
+        const result = await app.run(["console", "--no-open", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          hint: expect.any(String),
+          next_commands: [expectedPublicCliCommand(`start --cwd ${app.path}`)],
+        });
+      });
+
+      it("refuses a malformed runtime record, and says to reset and start again", async () => {
+        const app = await aSetUpApp();
+        await app.startLocalServer();
+        await app.run(["stop", "--json"]);
+        await app.writeMalformedServerRecord();
+
+        const result = await app.run(["console", "--no-open", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint: expect.stringContaining("reset --force"),
+          next_commands: [
+            expectedPublicCliCommand(`reset --force --cwd ${app.path}`),
+            expectedPublicCliCommand(`start --cwd ${app.path}`),
+          ],
+        });
+      });
+
+      it("refuses a malformed local admin with the hint that names it", async () => {
+        const app = await aSetUpApp();
+        await app.writeMalformedLocalAdmin();
+
+        const result = await app.run(["console", "--no-open", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint: `Delete ${app.localAdminFile} and run ${expectedPublicCliCommand("reset --force")}, then ${expectedPublicCliCommand("start")}. Both are needed: reset keeps the file, and deleting it alone leaves the server holding the old password.`,
+        });
+      });
+
+      it("refuses a malformed local admin with the removal, reset and start that repair it", async () => {
+        const app = await aSetUpApp();
+        await app.writeMalformedLocalAdmin();
+
+        const result = await app.run(["console", "--no-open", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          next_commands: [
+            `rm ${app.localAdminFile}`,
+            expectedPublicCliCommand(app.againAsRun("reset --force")),
+            expectedPublicCliCommand(app.againAsRun("start")),
+          ],
+        });
+      });
+
+      it("refuses when the recorded server does not answer, and says to start it", async () => {
+        const app = await aSetUpApp();
+        await app.startLocalServer();
+        await app.run(["stop", "--json"]);
+        await app.writeStoppedServerRecord();
+
+        const result = await app.run(["console", "--no-open", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          hint: expect.any(String),
+          next_commands: [expectedPublicCliCommand(`start --cwd ${app.path}`)],
+        });
+      });
+
+      it("refuses when the recorded server does not answer, and names the address it tried", async () => {
+        const app = await aSetUpApp();
+        await app.leaveAStoppedServerWithItsAdmin();
+
+        const result = await app.run(["console", "--no-open", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_LOCAL_SERVER_NOT_RUNNING",
+          hint: `No healthy local server responded at ${app.stoppedServerUrl}. Run ${expectedPublicCliCommand("start")} to bring it back.`,
+        });
+      });
+
+      it("refuses when the recorded server does not answer, with the address in its details", async () => {
+        const app = await aSetUpApp();
+        await app.leaveAStoppedServerWithItsAdmin();
+
+        const result = await app.run(["console", "--no-open", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_LOCAL_SERVER_NOT_RUNNING",
+          details: { server_url: app.stoppedServerUrl },
+        });
+      });
+
+      it("refuses a server that does not know the local admin, and says to read its logs first", async () => {
+        const app = await aSetUpApp();
+        await app.startLocalServer({ shape: "without-the-admin" });
+
+        const result = await app.run(["console", "--no-open", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_AUTH",
+          hint: `Check ${expectedPublicCliCommand("logs")} first: a server that failed the lookup reports it the same way. If the logs show no error, the local data directory predates the local admin — ${expectedPublicCliCommand("reset --force")} deletes the local data so ${expectedPublicCliCommand("start")} can import it again.`,
+        });
+      });
+
+      it("refuses a server that does not know the local admin, and offers its logs", async () => {
+        const app = await aSetUpApp();
+        await app.startLocalServer({ shape: "without-the-admin" });
+
+        const result = await app.run(["console", "--no-open", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_AUTH",
+          next_commands: [expectedPublicCliCommand(app.againAsRun("logs"))],
+        });
+      });
+
+      it("refuses a server in an env file that is not a URL, and says where to fix it", async () => {
+        const app = await aSetUpApp();
+        await app.writeInvalidServerToEnvFile();
+
+        const result = await app.runWithoutServer(["console", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint: "Fix or remove ZITADEL_URL in .env.development.local; it must be a URL such as https://preview.zitadel.com.",
+        });
+      });
+
+      it("refuses a server in an env file that is not a URL, and says why it is not one", async () => {
+        const app = await aSetUpApp();
+        await app.writeInvalidServerToEnvFile();
+
+        const result = await app.runWithoutServer(["console", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          details: { cause: 'Invalid server "not-a-url"' },
+        });
+      });
+
       it("opens the console of a project on the hosted cloud, not a local one", async () => {
         const app = await aSetUpApp();
 

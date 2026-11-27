@@ -1,6 +1,7 @@
 import { configuredIssuer } from "@/cli/commands/doctor/patch-context";
 import { ZitadelRuntime } from "@/lib/server";
 import {
+  BackendError,
   createZitadelClient,
   DeploymentService,
   OriginService,
@@ -12,7 +13,8 @@ import { Runtime } from "@/lib/runtime";
 import { warnings } from "@/lib/ui";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
-import { Project, type ProjectSecret } from "@/lib/project";
+import { FsError } from "@/lib/fs";
+import { Project, ProjectError, type ProjectSecret } from "@/lib/project";
 
 /** What {@link inspect} found: a pass, or the preview issuer `fix` makes primary. */
 type Finding =
@@ -111,18 +113,27 @@ export class IssuerOriginCheck implements SanityCheck {
         }),
       })
       .write();
-    const extended = await new DeploymentService(client, held.project_id)
-      .extendPrimary(pattern, `Made ${pattern} a primary origin`)
-      .catch((error: unknown) => {
-        if (isCancellation(error)) {
-          throw error;
-        }
-        return undefined;
-      });
-    if (extended?.outcome !== "deployed" && extended?.outcome !== "unchanged") {
+    try {
+      const extension = await new DeploymentService(client, held.project_id).extendPrimary(
+        pattern,
+        `Made ${pattern} a primary origin`,
+      );
+      if (extension.outcome !== "deployed" && extension.outcome !== "unchanged") {
+        warnings.report(
+          `${pattern} is a primary origin now, but it serves nothing until a deployment names it: deploy in the app.`,
+        );
+      }
+    } catch (error) {
+      if (isCancellation(error)) {
+        throw error;
+      }
       warnings.report(
         `${pattern} is a primary origin now, but it serves nothing until a deployment names it: deploy in the app.`,
       );
+      if (error instanceof BackendError) {
+        return;
+      }
+      throw error;
     }
   }
 }
@@ -141,92 +152,85 @@ export class IssuerOriginCheck implements SanityCheck {
  * @throws The cancellation, when the person stopped the run.
  */
 async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
-  const records = await Project.at(cwd)
-    .secret()
-    .then(async (secret) => {
+  try {
+    const secret = await Project.at(cwd).secret();
+    const server = (await Project.at(cwd).config()).server ?? ZitadelRuntime.DEFAULT;
+    const issuer = await configuredIssuer(cwd);
+    if (issuer === undefined) {
       return {
-        secret,
-        server: (await Project.at(cwd).config()).server ?? ZitadelRuntime.DEFAULT,
+        status: "pass",
+        message: "Skipped: no file sets ZITADEL_ISSUER",
       };
-    })
-    .catch(() => {
-      return undefined;
-    });
-  if (records === undefined) {
-    return {
-      status: "pass",
-      message: "Skipped: could not read the project files that record its origins",
-    };
-  }
-  const { secret, server } = records;
-  const issuer = await configuredIssuer(cwd);
-  if (issuer === undefined) {
-    return {
-      status: "pass",
-      message: "Skipped: no file sets ZITADEL_ISSUER",
-    };
-  }
-  const recorded = Origins.wrap([
-    ...secret.data.primary_origins.map((pattern) => {
+    }
+    const recorded = Origins.wrap([
+      ...secret.data.primary_origins.map((pattern) => {
+        return {
+          pattern,
+          kind: "primary",
+        };
+      }),
+      ...secret.data.preview_origins.map((pattern) => {
+        return {
+          pattern,
+          kind: "preview",
+        };
+      }),
+    ]);
+    if (recorded.heldAsPreview(issuer) === undefined) {
       return {
-        pattern,
-        kind: "primary",
+        status: "pass",
+        message: `${issuer} is not recorded as a preview origin`,
       };
-    }),
-    ...secret.data.preview_origins.map((pattern) => {
-      return {
-        pattern,
-        kind: "preview",
-      };
-    }),
-  ]);
-  if (recorded.heldAsPreview(issuer) === undefined) {
-    return {
-      status: "pass",
-      message: `${issuer} is not recorded as a preview origin`,
-    };
-  }
+    }
 
-  const client = createZitadelClient({
-    userAgent: Runtime.current().userAgent(),
-    baseUrl: server,
-    token: secret.data.project_secret,
-    signal,
-  });
-  const originService = new OriginService(client, secret.data.project_id);
-  const read = await originService
-    .list()
-    .then((origins) => {
-      return { origins };
-    })
-    .catch((error: unknown) => {
-      if (isCancellation(error)) {
-        throw error;
-      }
-      return { failure: error };
+    const client = createZitadelClient({
+      userAgent: Runtime.current().userAgent(),
+      baseUrl: server,
+      token: secret.data.project_secret,
+      signal,
     });
-  if ("failure" in read) {
-    return {
-      status: "pass",
-      message: `Skipped: could not read the project's origins from ${server}: ${errorMessage(read.failure)}`,
-    };
+    const originService = new OriginService(client, secret.data.project_id);
+    try {
+      const origins = await originService.list();
+      const pattern = origins.heldAsPreview(issuer);
+      if (pattern !== undefined) {
+        return {
+          status: "warn",
+          pattern,
+          server,
+          secret,
+          client,
+        };
+      }
+      return {
+        status: "pass",
+        message:
+          origins.primary.length > 0
+            ? "The project has a primary origin to deploy to"
+            : `${issuer} is not a preview origin of the project`,
+      };
+    } catch (error) {
+      if (error instanceof BackendError) {
+        return {
+          status: "pass",
+          message: `Skipped: could not read the project's origins from ${server}: ${errorMessage(error)}`,
+        };
+      }
+      throw error;
+    }
+  } catch (error) {
+    if (error instanceof ProjectError) {
+      return {
+        status: "pass",
+        message: "Skipped: could not read the project files that record its origins",
+      };
+    }
+    if (error instanceof FsError) {
+      return {
+        status: "pass",
+        message: "Skipped: could not read the project files that record its origins",
+      };
+    }
+    throw error;
   }
-  const { origins } = read;
-  const pattern = origins.heldAsPreview(issuer);
-  if (pattern !== undefined) {
-    return {
-      status: "warn",
-      pattern,
-      server,
-      secret,
-      client,
-    };
-  }
-  return {
-    status: "pass",
-    message:
-      origins.primary.length > 0
-        ? "The project has a primary origin to deploy to"
-        : `${issuer} is not a preview origin of the project`,
-  };
 }

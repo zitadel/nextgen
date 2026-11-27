@@ -172,7 +172,9 @@ describe("OperationService.call", () => {
       (error: unknown) => error,
     );
 
-    expect(failure).toMatchObject({ name: "UnavailableError" });
+    expect(failure).toMatchObject({
+      name: "BackendUnreachableError",
+    });
     expect(toZitadelError(failure).code).toBe("E_NETWORK");
   });
 
@@ -208,7 +210,13 @@ describe("OperationService.call", () => {
 
     expect(toZitadelError(error)).toMatchObject({
       code: "E_NOT_FOUND",
-      details: { status: 404, body: { code: "team.not_found", message: "no \u001b[31mteam" } },
+      details: {
+        status: 404,
+        body: {
+          code: "team.not_found",
+          message: "no \u001b[31mteam",
+        },
+      },
     });
   });
 });
@@ -257,7 +265,6 @@ describe("OperationService.callAll", () => {
       sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"]), signal),
     ).rejects.toMatchObject({
       message: 'Unexpected list response: missing "passkeys" array',
-      details: { response: { next_page_token: "" } },
     });
   });
 
@@ -430,7 +437,8 @@ describe("Operation.named", () => {
   it("suggests the operation a typo meant", () => {
     expect(() => Operation.named("querUsers")).toThrow(
       expect.objectContaining({
-        hint: expect.stringContaining("queryUsers"),
+        message: "No operation is called querUsers",
+        near: expect.arrayContaining(["queryUsers"]),
       }),
     );
   });

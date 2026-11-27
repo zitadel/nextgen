@@ -1,0 +1,24 @@
+language js
+
+// Every catch in the CLI reads the same (apps/cli/AGENTS.md, Errors): it names
+// its error `error`, recognises what it handles with one flat
+// `if (error instanceof X)` per class, and ends by rethrowing what it did not
+// anticipate (or, at a boundary, by throwing one of our classes around it). A
+// catch that swallows everything hides the bugs nobody anticipated.
+or {
+  JsCatchClause() as $catch where {
+    // The documented safety nets (apps/cli/AGENTS.md, Errors), which must never
+    // break a run, may swallow what they did not anticipate.
+    not $filename <: r".*/apps/cli/(?:src/cli/telemetry/telemetered|src/cli/hooks/version-notice|src/cli/commands/doctor/checks/types|src/cli/commands/setup/steps/claim-ownership|src/cli/commands/setup/steps/do-initial-deploy|src/lib/publish/steps/lockout|src/cli/core/run-context|src/cli/core/wrapped|src/lib/backend/services/origin|src/lib/browser/index|src/lib/git/repository|src/lib/idp/credentials|src/lib/skills/skills|src/lib/telemetry/mixpanel-sink|src/lib/wizard/wizard|src/lib/publish/publisher)\.ts$",
+    not $catch <: r"^catch \(error\) \{[\s\S]*\bthrow [^;]+;\s*\}$",
+    register_diagnostic(span=$catch, message="Catch as `catch (error) { if (error instanceof X) { ... } throw error; }`: name it `error` and end by rethrowing what it did not anticipate.", severity="error")
+  },
+  JsCatchClause() as $catch where {
+    // The documented safety nets (apps/cli/AGENTS.md, Errors), which must never
+    // break a run, may swallow what they did not anticipate.
+    not $filename <: r".*/apps/cli/(?:src/cli/telemetry/telemetered|src/cli/hooks/version-notice|src/cli/commands/doctor/checks/types|src/cli/commands/setup/steps/claim-ownership|src/cli/commands/setup/steps/do-initial-deploy|src/lib/publish/steps/lockout|src/cli/core/run-context|src/cli/core/wrapped|src/lib/backend/services/origin|src/lib/browser/index|src/lib/git/repository|src/lib/idp/credentials|src/lib/skills/skills|src/lib/telemetry/mixpanel-sink|src/lib/wizard/wizard|src/lib/publish/publisher)\.ts$",
+    $catch <: r"^catch \(error\) \{[\s\S]*\breturn\b[\s\S]*",
+    not $catch <: r"^catch \(error\) \{[\s\S]*\binstanceof\b[\s\S]*",
+    register_diagnostic(span=$catch, message="A catch returns a fallback only for a class it names: `if (error instanceof X) { return fallback; }`.", severity="error")
+  }
+}

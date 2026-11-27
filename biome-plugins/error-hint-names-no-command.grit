@@ -1,0 +1,18 @@
+language js
+
+// A lib error's hint is advice about the world: a file, a permission, a port,
+// a value (apps/cli/AGENTS.md, Errors). Advice that names a command or a flag
+// of the CLI is the CLI's, in src/cli/core/error-support/, so a hint under
+// src/lib never holds `zitadel …`, a `--flag`, a backticked command or a
+// command of the CLI named in plain words ("run setup", "auth-method").
+// A hint is a `readonly hint` field, a `get hint()`, `this.hint = …` or a
+// `hint:` property of an object literal.
+or {
+  JsPropertyClassMember() as $hint where { $hint <: r"^(?:override\s+)?readonly\s+hint\b[\s\S]*" },
+  JsGetterClassMember() as $hint where { $hint <: r"^(?:override\s+)?get\s+hint\s*\([\s\S]*" },
+  JsPropertyObjectMember() as $hint where { $hint <: r"^hint\s*:[\s\S]*" },
+  `this.hint = $_` as $hint
+} where {
+  $hint <: r"[\s\S]*(?:zitadel |--[a-z]|\\`|[:=]\s*\"[^\"\n]*`|[:=]\s*'[^'\n]*`|return\s+\"[^\"\n]*`|return\s+'[^'\n]*`|[^-\w]auth-method\b|\b(?:[Rr]e-?)?[Rr]un\s+(?:setup|deploy|deployment|pull|eject|upgrade|doctor|login|logout|preview|release|server|skills|tests|claim|invitation|origin|policy|variable|env|branding|resources|api)\b)[\s\S]*",
+  register_diagnostic(span=$hint, message="A lib error's hint names no command, flag or backticked command of the CLI; put that advice in src/cli/core/error-support/.", severity="error")
+}

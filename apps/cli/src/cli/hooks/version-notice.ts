@@ -33,6 +33,7 @@ const hook: Hook<"finally"> = async ({ config }) => {
       process.stderr.write(`${notice}\n`);
     }
   } catch {
+    // A safety net: advice about the version must never break printing it.
     return;
   }
 };

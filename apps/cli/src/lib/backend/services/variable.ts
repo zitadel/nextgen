@@ -2,7 +2,13 @@ import type { GetVariable200, ListVariables200 } from "@zitadel/api/generated/mo
 
 import { ApiService } from "@/lib/backend/api-service";
 import { isCancelled, type ZitadelClient } from "@/lib/backend/client";
-import { ForbiddenError, NotFoundError } from "@/lib/backend/errors";
+import {
+  BackendError,
+  BackendForbiddenError,
+  BackendNotFoundError,
+  BackendVariablePreviewMissingError,
+  BackendVariablePrimaryMissingError,
+} from "@/lib/backend/errors";
 
 /** The kinds of value a name can hold: what primary deploys freeze, and what preview deploys freeze. */
 export type VariableKind = "primary" | "preview";
@@ -394,7 +400,8 @@ export class VariableService extends ApiService {
    * @param name - The variable to read.
    * @param kind - The kind to read it in.
    * @returns The variable. A secret is found but not disclosed.
-   * @throws NotFoundError when the name holds no value of that kind.
+   * @throws BackendVariablePreviewMissingError when the name holds no preview value.
+   * @throws BackendVariablePrimaryMissingError when the name holds no primary value.
    */
   async get(name: string, kind: VariableKind): Promise<Variable> {
     const response = await this.client.getVariable(name, {
@@ -402,13 +409,11 @@ export class VariableService extends ApiService {
       kind,
     });
     const value = response[kind];
+    if (value === undefined && kind === "preview") {
+      throw new BackendVariablePreviewMissingError(`Variable ${name} has no ${kind} value.`);
+    }
     if (value === undefined) {
-      throw new NotFoundError(`Variable ${name} has no ${kind} value.`, {
-        hint:
-          kind === "preview"
-            ? "A name has a preview value only once one is set with `--preview`."
-            : "Set one with `variable set`.",
-      });
+      throw new BackendVariablePrimaryMissingError(`Variable ${name} has no ${kind} value.`);
     }
     return Variable.of(name, value);
   }
@@ -418,7 +423,7 @@ export class VariableService extends ApiService {
    *
    * @param kind - The kind to read.
    * @returns The names mapped to whether they are secret.
-   * @throws ForbiddenError `403` for a token that may not read the values of that kind.
+   * @throws BackendForbiddenError `403` for a token that may not read the values of that kind.
    */
   async heldByName(kind: VariableKind): Promise<ReadonlyMap<string, boolean>> {
     const held = await this.read(kind);
@@ -539,17 +544,17 @@ export class VariableService extends ApiService {
         read: true,
         variable: held === undefined ? undefined : Variable.of(name, held),
       };
-    } catch (cause) {
+    } catch (error) {
       // A cancellation is not a kind that could not be read: the person asked
       // the command to stop, so it stops rather than reporting what it found.
-      if (isCancelled(this.client)) {
-        throw cause;
+      if (error instanceof BackendError && !isCancelled(this.client)) {
+        return {
+          kind,
+          read: false,
+          cause: error,
+        };
       }
-      return {
-        kind,
-        read: false,
-        cause,
-      };
+      throw error;
     }
   }
 
@@ -578,18 +583,21 @@ export class VariableService extends ApiService {
    * @returns True when the name's primary value is a secret.
    */
   private async secretHeldAsPrimary(name: string): Promise<boolean> {
-    const held = await this.client
-      .getVariable(name, {
+    try {
+      const held = await this.client.getVariable(name, {
         project_id: this.projectId,
         kind: "primary",
-      })
-      .catch((error: unknown): GetVariable200 => {
-        if (error instanceof NotFoundError || error instanceof ForbiddenError) {
-          return {};
-        }
-        throw error;
       });
-    return typeof held.primary === "object" && held.primary !== null;
+      return typeof held.primary === "object" && held.primary !== null;
+    } catch (error) {
+      if (error instanceof BackendNotFoundError) {
+        return false;
+      }
+      if (error instanceof BackendForbiddenError) {
+        return false;
+      }
+      throw error;
+    }
   }
 
   /**

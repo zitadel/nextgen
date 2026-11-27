@@ -1,8 +1,9 @@
 import { existsSync } from "node:fs";
-import { lstat, realpath, rm } from "node:fs/promises";
+import { realpath, rm } from "@/lib/fs";
 import { join } from "node:path";
 
-import { GitDidNotStartError, RepositoryError } from "./errors";
+import { entryExists, FsError } from "@/lib/fs";
+import { GitBinaryMissingError, GitCommandFailedError } from "./errors";
 import { Git } from "./git";
 import type { Operation } from "./operation";
 import { CommitAll } from "./operations/commit-all";
@@ -27,7 +28,7 @@ import type {
  * In a monorepo the repository may start several levels up; everything here
  * is limited to the directory and names paths relative to it, except
  * {@link isDirty}, which looks at the whole repository. When git fails, a
- * method throws a `RepositoryError` carrying git's own message.
+ * method throws a `GitError` carrying git's own message.
  *
  * Each method is one {@link Operation}: its checks run first, and the first
  * one that fails decides the answer through the operation's `refused`.
@@ -61,25 +62,23 @@ export class Repository {
       return null;
     }
     const real = await realpath(dir);
-    const result = await new Git(real)
-      .with({ LC_ALL: "C" })
-      .run(["rev-parse", "--show-prefix"], [128])
-      .catch((error: unknown) => {
-        if (error instanceof GitDidNotStartError) {
-          return null;
-        }
-        throw error;
-      });
-    if (result === null) {
-      return null;
+    try {
+      const result = await new Git(real)
+        .with({ LC_ALL: "C" })
+        .run(["rev-parse", "--show-prefix"], [128]);
+      if (/^fatal: not a git repository/m.test(result.stderr)) {
+        return null;
+      }
+      if (!result.succeeded()) {
+        throw new GitCommandFailedError(result.reason());
+      }
+      return new Repository(real, result.text());
+    } catch (error) {
+      if (error instanceof GitBinaryMissingError) {
+        return null;
+      }
+      throw error;
     }
-    if (/^fatal: not a git repository/m.test(result.stderr)) {
-      return null;
-    }
-    if (!result.succeeded()) {
-      throw new RepositoryError(result.reason());
-    }
-    return new Repository(real, result.text());
   }
 
   /**
@@ -102,6 +101,8 @@ export class Repository {
       }
       return await question(repository);
     } catch {
+      // The question is the caller's code and may fail in any way; the
+      // contract is to give the default instead.
       return otherwise;
     }
   }
@@ -124,20 +125,17 @@ export class Repository {
   static async create(dir: string): Promise<Repository> {
     const real = await realpath(dir);
     const gitDir = join(real, ".git");
-    const hadOne = await lstat(gitDir).then(
-      () => {
-        return true;
-      },
-      () => {
-        return false;
-      },
-    );
+    const hadOne = await entryExists(gitDir);
     try {
       await new Git(real).run(["init", "--quiet"]);
     } catch (error) {
       if (!hadOne) {
-        await rm(gitDir, { recursive: true, force: true }).catch(() => {
-          return undefined;
+        const failure = error;
+        await rm(gitDir, { recursive: true, force: true }).catch((error: unknown) => {
+          if (error instanceof FsError) {
+            throw failure;
+          }
+          throw error;
         });
       }
       throw error;

@@ -35,7 +35,7 @@ export type Placeholders = Readonly<Record<string, unknown>>;
  * {@link Placeholders}, which takes any value, so a `next` entry can never be
  * filled with a string written by hand.
  */
-type NextPlaceholders = Readonly<Record<string, Suggested | readonly Suggested[]>>;
+export type NextPlaceholders = Readonly<Record<string, Suggested | readonly Suggested[]>>;
 
 /**
  * The names a refusal's wording would leave unfilled, given the values it
@@ -212,7 +212,8 @@ function isPlain(value: object): boolean {
  * `details` with each string it holds, in a list or a plain object as deep as
  * it goes, replaced by what `change` makes of it. Only a plain object is
  * rebuilt: anything else — a Date, a Map, a class — would come apart into its
- * entries and lose what it held, so it is kept as it is.
+ * entries and lose what it held, so it is kept as it is. A key whose string
+ * `change` makes nothing of is left out of its object.
  *
  * @param details - A refusal's details.
  * @param change - What becomes of each string.
@@ -229,8 +230,9 @@ function eachText(details: unknown, change: (text: string) => unknown): unknown 
   }
   if (typeof details === "object" && details !== null && isPlain(details)) {
     return Object.fromEntries(
-      Object.entries(details).map(([key, one]) => {
-        return [key, eachText(one, change)];
+      Object.entries(details).flatMap(([key, one]) => {
+        const changed = eachText(one, change);
+        return changed === undefined ? [] : [[key, changed]];
       }),
     );
   }
@@ -239,7 +241,9 @@ function eachText(details: unknown, change: (text: string) => unknown): unknown 
 
 /**
  * `details` with each string filled in. A string that is only a placeholder
- * takes the value as it is, so a list stays a list in the error's details.
+ * takes the value as it is, so a list stays a list in the error's details,
+ * and a key whose placeholder nothing fills is left out rather than reported
+ * as the placeholder.
  *
  * @param details - A refusal's details.
  * @param values - What its placeholders are filled from.
@@ -248,7 +252,7 @@ function eachText(details: unknown, change: (text: string) => unknown): unknown 
 function fill(details: unknown, values: Placeholders): unknown {
   return eachText(details, (text) => {
     const whole = WHOLE_PLACEHOLDER.exec(text);
-    if (whole?.[1] !== undefined && values[whole[1]] !== undefined) {
+    if (whole?.[1] !== undefined) {
       return values[whole[1]];
     }
     return interpolate(text, values);

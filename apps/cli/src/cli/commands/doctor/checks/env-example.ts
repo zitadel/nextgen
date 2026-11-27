@@ -1,7 +1,8 @@
-import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { AbstractSanityCheck, type CheckContext } from "./types";
+import { FsNotFoundError, readFile, writeFile } from "@/lib/fs";
+
+import { AbstractSanityCheck, CheckFailure, type CheckContext } from "./types";
 
 /** The keys `.env.example` must document for a Zitadel-managed project. */
 const REQUIRED_KEYS = ["ZITADEL_PROJECT_ID", "ZITADEL_ENVIRONMENT", "ZITADEL_ISSUER"];
@@ -16,30 +17,44 @@ export class EnvExampleCheck extends AbstractSanityCheck {
     const contents = await readFile(join(ctx.cwd, ".env.example"), "utf8");
     for (const key of REQUIRED_KEYS) {
       if (!contents.includes(`${key}=`)) {
-        throw new Error(`missing ${key}`);
+        throw new CheckFailure(`missing ${key}`);
       }
     }
   }
 
   override async fix(ctx: CheckContext): Promise<void> {
     const path = join(ctx.cwd, ".env.example");
-    const existing = await readFile(path, "utf8").catch(() => {
-      return "";
-    });
-    const missing = REQUIRED_KEYS.filter((key) => {
-      return !existing.includes(`${key}=`);
-    });
-    if (missing.length === 0 || ctx.dryRun) {
-      return;
+    try {
+      const existing = await readFile(path, "utf8");
+      const missing = REQUIRED_KEYS.filter((key) => {
+        return !existing.includes(`${key}=`);
+      });
+      if (missing.length === 0 || ctx.dryRun) {
+        return;
+      }
+      const prefix = existing.length > 0 && !existing.endsWith("\n") ? "\n" : "";
+      await writeFile(
+        path,
+        `${existing}${prefix}${missing
+          .map((key) => {
+            return `${key}=`;
+          })
+          .join("\n")}\n`,
+      );
+    } catch (error) {
+      if (error instanceof FsNotFoundError) {
+        if (ctx.dryRun) {
+          return;
+        }
+        await writeFile(
+          path,
+          `${REQUIRED_KEYS.map((key) => {
+            return `${key}=`;
+          }).join("\n")}\n`,
+        );
+        return;
+      }
+      throw error;
     }
-    const prefix = existing.length > 0 && !existing.endsWith("\n") ? "\n" : "";
-    await writeFile(
-      path,
-      `${existing}${prefix}${missing
-        .map((key) => {
-          return `${key}=`;
-        })
-        .join("\n")}\n`,
-    );
   }
 }

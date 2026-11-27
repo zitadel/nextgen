@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 
 import { ReactDetector } from "@/lib/orca/detectors/react";
-import { ZitadelError } from "@/lib/errors";
+import { OrcaError } from "@/lib/orca";
 import { it } from "@tests/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
@@ -56,9 +56,9 @@ describe("ReactDetector", () => {
     const caught = await rejectionOf(async () =>
       new ReactDetector().detect(await project(dir, { react: "^17.0.2", vite: "^5" })),
     );
-    expect(caught).toBeInstanceOf(ZitadelError);
-    expect((caught as ZitadelError).code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
-    expect((caught as ZitadelError).message).toContain("below the supported floor");
+    expect(caught).toBeInstanceOf(OrcaError);
+    expect((caught as OrcaError).code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
+    expect((caught as OrcaError).message).toContain("below the supported floor");
   });
 
   it("lets an unparseable react version through the floor", async ({ dir }) => {

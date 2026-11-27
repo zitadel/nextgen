@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ZitadelError } from "@/lib/errors";
+import { IdpError } from "@/lib/idp";
 import AuthMethodSsoEnable from "@/cli/commands/auth-method/sso/enable";
 import Setup from "@/cli/commands/setup";
 import {
@@ -33,12 +33,12 @@ function custom(values: Parameters<typeof selectionFromFlags>[1], names = flag) 
   return selection.connection;
 }
 
-function refusal(run: () => unknown): ZitadelError {
+function refusal(run: () => unknown): IdpError {
   try {
     run();
   } catch (error) {
-    expect(error).toBeInstanceOf(ZitadelError);
-    return error as ZitadelError;
+    expect(error).toBeInstanceOf(IdpError);
+    return error as IdpError;
   }
   throw new Error("expected a refusal");
 }
@@ -71,8 +71,11 @@ describe("selectionFromFlags for a custom connection", () => {
     const error = refusal(() => selectionFromFlags("custom", {}, flag, "--provider custom ..."));
 
     expect(error.code).toBe("E_VALIDATION");
-    expect(error.message).toBe("A custom connection needs --slug, --display-name, --issuer");
-    expect(error.hint).toContain("--provider custom ...");
+    expect(error).toMatchObject({
+      message: "A custom connection needs --slug, --display-name, --issuer",
+      missing: ["--slug", "--display-name", "--issuer"],
+      example: "--provider custom ...",
+    });
   });
 
   it.each([
@@ -129,8 +132,11 @@ describe("selectionFromFlags for a catalog provider", () => {
       selectionFromFlags("google", { issuer: "https://x.example", scopes: "openid" }, flag, "e.g."),
     );
 
-    expect(error.message).toBe("--issuer, --scopes only applies to a custom connection");
-    expect(error.hint).toBe("Add --provider custom, or remove them.");
+    expect(error).toMatchObject({
+      message: "--issuer, --scopes only applies to a custom connection",
+      flags: ["--issuer", "--scopes"],
+      providerFlag: "--provider",
+    });
   });
 
   it("refuses a name nothing answers to", () => {

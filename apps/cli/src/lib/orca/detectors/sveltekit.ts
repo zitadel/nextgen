@@ -1,3 +1,5 @@
+import { FsError } from "@/lib/fs";
+import { PmManifestInvalidError } from "@/lib/pm";
 import { hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
@@ -22,24 +24,32 @@ export class SvelteKitDetector implements Detector {
   readonly versionFloor = "3";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
-    const pkg = await readPackageJson(cwd).catch(() => {
-      return undefined;
-    });
-    if (!pkg || !hasDependency(pkg, "@sveltejs/kit")) {
-      return null;
+    try {
+      const pkg = await readPackageJson(cwd);
+      if (!hasDependency(pkg, "@sveltejs/kit")) {
+        return null;
+      }
+
+      await enforceVersionFloor(this, pkg, cwd);
+
+      // The widgets come from @zitadel/sdk-svelte, which peers Svelte 5 and is
+      // written with runes; a Svelte 4 app cannot install or compile it.
+      await enforceVersionFloor(
+        { displayName: "Svelte", versionPackage: "svelte", versionFloor: "5" },
+        pkg,
+        cwd,
+      );
+
+      const devPort = await detectDevPort(cwd, pkg);
+      return { id: "sveltekit", appDir: "src", devPort, url: issuerFromPort(devPort) };
+    } catch (error) {
+      if (error instanceof FsError) {
+        return null;
+      }
+      if (error instanceof PmManifestInvalidError) {
+        return null;
+      }
+      throw error;
     }
-
-    await enforceVersionFloor(this, pkg, cwd);
-
-    // The widgets come from @zitadel/sdk-svelte, which peers Svelte 5 and is
-    // written with runes; a Svelte 4 app cannot install or compile it.
-    await enforceVersionFloor(
-      { displayName: "Svelte", versionPackage: "svelte", versionFloor: "5" },
-      pkg,
-      cwd,
-    );
-
-    const devPort = await detectDevPort(cwd, pkg);
-    return { id: "sveltekit", appDir: "src", devPort, url: issuerFromPort(devPort) };
   }
 }

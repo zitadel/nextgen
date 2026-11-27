@@ -42,6 +42,17 @@ export function kebab(name: string): string {
     .toLowerCase();
 }
 
+/**
+ * `lockFile` and `release-id` as `lock_file` and `release_id`, the way a key
+ * is spelled on the wire.
+ *
+ * @param name - A name spelled in snake_case, camelCase or kebab-case.
+ * @returns The name in snake_case.
+ */
+export function snake(name: string): string {
+  return kebab(name).replaceAll("-", "_");
+}
+
 /** `values` keyed as {@link Named} spells each of its names. */
 export function byName<Values extends object>(values: Values): ByName<Values> {
   return Object.fromEntries(

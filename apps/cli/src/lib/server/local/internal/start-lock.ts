@@ -1,9 +1,9 @@
-import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-import { LocalServerError } from "../local-server-error";
-import { isErrno } from "@/lib/errno";
+import { FsError, FsExistsError, mkdir, readFile, rm, stat, writeFile } from "@/lib/fs";
+import { LocalServerBusyError } from "@/lib/server/errors";
 import { type Clock, SystemClock } from "@/lib/clock";
+import { BinaryLauncher } from "./binary-launcher";
 
 type LockOptions = Readonly<{
   /** How long to wait for another start to finish. */
@@ -55,16 +55,17 @@ export async function tryLock(lockFile: string): Promise<(() => Promise<void>) |
         }
       };
     } catch (error) {
-      if (!isErrno(error, "EEXIST")) {
-        throw error;
+      if (error instanceof FsExistsError) {
+        const owner = await readOwner(lockFile);
+        const abandoned =
+          (owner === undefined && (await isUnwritten(lockFile))) ||
+          (owner !== undefined && !BinaryLauncher.isPidRunning(owner));
+        if (!abandoned || !(await clearStale(lockFile, owner))) {
+          return undefined;
+        }
+        continue;
       }
-    }
-    const owner = await readOwner(lockFile);
-    const abandoned =
-      (owner === undefined && (await isUnwritten(lockFile))) ||
-      (owner !== undefined && !isAlive(owner));
-    if (!abandoned || !(await clearStale(lockFile, owner))) {
-      return undefined;
+      throw error;
     }
   }
 }
@@ -74,7 +75,7 @@ async function createOwned(file: string): Promise<void> {
   try {
     await writeFile(file, String(process.pid), { flag: "wx", mode: 0o600 });
   } catch (error) {
-    if (!isErrno(error, "EEXIST")) {
+    if (!(error instanceof FsExistsError)) {
       await rm(file, { force: true });
     }
     throw error;
@@ -92,8 +93,11 @@ export const UNWRITTEN_LOCK_MS = 10_000;
 async function isUnwritten(lockFile: string): Promise<boolean> {
   try {
     return Date.now() - (await stat(lockFile)).mtimeMs > UNWRITTEN_LOCK_MS;
-  } catch {
-    return false;
+  } catch (error) {
+    if (error instanceof FsError) {
+      return false;
+    }
+    throw error;
   }
 }
 
@@ -152,16 +156,17 @@ async function takeGuard(guardFile: string): Promise<(() => Promise<void>) | und
         await rm(file, { force: true });
       };
     } catch (error) {
-      if (!isErrno(error, "EEXIST")) {
-        throw error;
+      if (error instanceof FsExistsError) {
+        const holder = await readOwner(file);
+        if (
+          (holder === undefined && !(await isUnwritten(file))) ||
+          (holder !== undefined && BinaryLauncher.isPidRunning(holder))
+        ) {
+          return undefined;
+        }
+        continue;
       }
-    }
-    const holder = await readOwner(file);
-    if (
-      (holder === undefined && !(await isUnwritten(file))) ||
-      (holder !== undefined && isAlive(holder))
-    ) {
-      return undefined;
+      throw error;
     }
   }
   return undefined;
@@ -177,11 +182,10 @@ async function acquireLock(lockFile: string, options: LockOptions): Promise<() =
       return release;
     }
     if (clock.now() >= deadline) {
-      throw new LocalServerError(
-        "start-in-progress",
-        "E_CONFLICT",
+      throw new LocalServerBusyError(
         "Another `zitadel start` is still running in this directory",
-        { lock_file: lockFile, owner_pid: await readOwner(lockFile) },
+        lockFile,
+        await readOwner(lockFile),
       );
     }
     await clock.wait(pollMs);
@@ -201,16 +205,10 @@ async function readOwner(lockFile: string): Promise<number | undefined> {
     } else {
       return undefined;
     }
-  } catch {
-    return undefined;
-  }
-}
-
-function isAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
   } catch (error) {
-    return isErrno(error, "EPERM");
+    if (error instanceof FsError) {
+      return undefined;
+    }
+    throw error;
   }
 }

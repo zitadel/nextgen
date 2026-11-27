@@ -25,7 +25,9 @@ describe("lib/upgrade", () => {
   it("imports only itself, node, its two libraries and the utilities it is allowed", () => {
     const offending = readdirSync(LIBRARY).flatMap((file) => {
       return importsIn(readFileSync(join(LIBRARY, file), "utf8"))
-        .filter((source) => !ALLOWED.test(source))
+        .filter(
+          (source) => !ALLOWED.test(source) && !(file === "errors.ts" && source === "@/lib/errors"),
+        )
         .map((source) => `${file} imports ${source}`);
     });
 
@@ -40,9 +42,9 @@ describe("lib/upgrade", () => {
  * the CLI.
  */
 const TRANSITIVE: Readonly<Record<string, readonly string[]>> = {
-  "pm/manifest.ts": ["@/lib/fs", "@/lib/json"],
-  "pm/pm.ts": ["@/lib/fs", "@/lib/ui/output", "./manifest", "./package-command"],
-  "pm/package-command.ts": ["@/lib/cmd", "@/lib/ui/output", "./pm"],
+  "pm/manifest.ts": ["@/lib/errors", "@/lib/fs", "@/lib/json", "./errors"],
+  "pm/pm.ts": ["@/lib/fs", "@/lib/ui/output", "./errors", "./manifest", "./package-command"],
+  "pm/package-command.ts": ["@/lib/cmd", "@/lib/ui/output", "./errors", "./pm"],
 };
 
 describe("what lib/upgrade reaches through lib/pm", () => {

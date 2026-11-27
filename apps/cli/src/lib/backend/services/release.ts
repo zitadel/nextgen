@@ -13,7 +13,7 @@ import { z } from "zod";
 
 import { ApiService } from "@/lib/backend/api-service";
 import type { ZitadelClient } from "@/lib/backend/client";
-import { ConflictError } from "@/lib/backend/errors";
+import { BackendReleaseContentRevokedError, BackendReleaseInUseError } from "@/lib/backend/errors";
 
 /**
  * One origin that serves a release.
@@ -130,7 +130,7 @@ export class ReleaseService extends ApiService {
    *
    * @param input - The bundle, a message and the commit it was built from.
    * @returns The release, new or the one that already carried the bundle.
-   * @throws ConflictError when the content matches a release that was
+   * @throws BackendReleaseContentRevokedError when the content matches a release that was
    * revoked. The server dedupes on content, so the same tree always builds back
    * to that release, and a revoked release can never be served.
    */
@@ -139,15 +139,10 @@ export class ReleaseService extends ApiService {
       project_id: this.projectId,
     });
     if (release.revoked_at) {
-      throw new ConflictError(
+      throw new BackendReleaseContentRevokedError(
         `This content was already released as ${release.id}, which is revoked`,
-        {
-          hint: "A revoked release can never be served again. Change the configuration so it builds a new release.",
-          details: {
-            release_id: release.id,
-            content_hash: release.content_hash,
-          },
-        },
+        release.id,
+        release.content_hash,
       );
     }
     return release;
@@ -159,7 +154,7 @@ export class ReleaseService extends ApiService {
    * @param releaseId - The release to revoke.
    * @returns `revoked` with the release, or `in-use` with each origin that still
    * serves it.
-   * @throws ConflictError for any other conflict, and any other failure as the
+   * @throws BackendConflictError for any other conflict, and any other failure as the
    * client raised it, including a `rel.in_use` answer that names no origin the
    * API documents.
    */
@@ -170,7 +165,7 @@ export class ReleaseService extends ApiService {
       });
       return { outcome: "revoked", release };
     } catch (error) {
-      if (error instanceof ConflictError && error.serverCode === "rel.in_use") {
+      if (error instanceof BackendReleaseInUseError) {
         const served = InUseBody.safeParse(error.body);
         if (served.success) {
           return { outcome: "in-use", origins: served.data.details.origins };

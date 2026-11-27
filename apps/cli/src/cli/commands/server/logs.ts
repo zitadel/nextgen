@@ -87,6 +87,7 @@ export default class Logs extends Telemetered(LocalServerCommand(BaseCommand, "n
    * @param input.flags - The run's `--follow`, `--level` and `--tail`.
    * @returns The lines shown.
    * @throws {ZitadelError} When following under `--json`, or when no server was started here.
+   * @throws {LocalServerError} When the record names no start, or Docker cannot read the log.
    */
   protected async execute({ flags }: Admitted<typeof Logs>): Promise<CommandResult> {
     if (flags.follow && Output.json) {

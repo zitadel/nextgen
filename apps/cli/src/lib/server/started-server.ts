@@ -22,7 +22,7 @@ export class StartedServer<T> {
    * @param cwd - The directory asked about.
    * @returns What it records, read at most once while the read succeeds.
    */
-  of(cwd: string): Promise<T | undefined> {
+  async of(cwd: string): Promise<T | undefined> {
     const already = this.found.get(cwd);
     if (already !== undefined) {
       return already;
@@ -30,11 +30,13 @@ export class StartedServer<T> {
     // Only an answer is worth keeping: a read that failed may have failed on
     // a half-written file or a busy machine, and the next caller deserves
     // its own attempt rather than this one's failure.
-    const reading = this.read(cwd).catch((error: unknown) => {
+    const reading = this.read(cwd);
+    this.found.set(cwd, reading);
+    try {
+      return await reading;
+    } catch (error) {
       this.found.delete(cwd);
       throw error;
-    });
-    this.found.set(cwd, reading);
-    return reading;
+    }
   }
 }

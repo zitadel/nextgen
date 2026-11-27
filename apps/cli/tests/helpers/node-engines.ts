@@ -233,19 +233,14 @@ export function describeNodeEngines(c: NodeEnginesCase): void {
         },
       );
 
-      it.each(c.refused)(
-        "recommends the accepted majors, not the raw range, when it refuses Node %s",
-        async (node) => {
-          npmPublishes(c.fallback);
+      it.each(c.refused)("recommends the accepted majors when it refuses Node %s", async (node) => {
+        npmPublishes(c.fallback);
 
-          await expect(c.make(node).scaffold("/tmp/proj", c.framework)).rejects.toMatchObject({
-            hint: expect.stringContaining(`Switch to Node ${describeAcceptedNode(c.fallback)} and`),
-          });
-          await expect(c.make(node).scaffold("/tmp/proj", c.framework)).rejects.toMatchObject({
-            hint: expect.not.stringContaining(c.fallback),
-          });
-        },
-      );
+        await expect(c.make(node).scaffold("/tmp/proj", c.framework)).rejects.toMatchObject({
+          accepted: describeAcceptedNode(c.fallback),
+          required: c.fallback,
+        });
+      });
     } else {
       it("refuses no Node, however far outside the range", async () => {
         npmPublishes(c.fallback);

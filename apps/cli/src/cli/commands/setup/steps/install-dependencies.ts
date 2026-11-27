@@ -1,7 +1,14 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
 import { log, warnings, type BoxAction } from "@/lib/ui";
-import { ZitadelError } from "@/lib/errors";
-import { type DependencyInstall, type InstallContext, PM, type Runner } from "@/lib/pm";
+import { ZitadelError, ZitadelLibError } from "@/lib/errors";
+import {
+  type DependencyInstall,
+  type InstallContext,
+  PM,
+  PmCommandFailedError,
+  PmError,
+  type Runner,
+} from "@/lib/pm";
 import { Guidance, suggestedCommandOf, type SuggestedCommand } from "@/lib/suggestion";
 import { WizardStep } from "@/lib/wizard";
 
@@ -135,6 +142,21 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
       },
       log,
       failed: (error, installCommand) => {
+        const original =
+          error instanceof PmCommandFailedError
+            ? {
+                name: error.name,
+                message: error.message,
+                code: error.status,
+              }
+            : error instanceof ZitadelLibError
+              ? {
+                  name: error.name,
+                  message: error.message,
+                }
+              : {
+                  message: String(error),
+                };
         return new ZitadelError(
           "E_VALIDATION",
           `Dependency install failed: ${installCommand.display}`,
@@ -144,16 +166,7 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
             details: {
               command: installCommand.display,
               cwd: this.deps.cwd,
-              original:
-                error instanceof Error
-                  ? {
-                      name: error.name,
-                      message: error.message,
-                      code: "code" in error ? error.code : undefined,
-                    }
-                  : {
-                      message: String(error),
-                    },
+              original,
             },
           },
         );
@@ -170,8 +183,8 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
     );
     if (install.status === "completed" && afterInstallScript !== undefined) {
       const command = packageManager.script(afterInstallScript);
-      try {
-        await this.deps.ui.task(
+      await this.deps.ui
+        .task(
           `Running ${command.display}`,
           async () => {
             const options = {
@@ -186,23 +199,30 @@ export class InstallDependencies extends WizardStep<"install", Fact<"installOutc
           () => {
             return `Ran ${command.display}`;
           },
-        );
-      } catch (error) {
-        if (this.deps.signal.aborted) {
-          throw this.deps.signal.reason;
-        }
-        const output =
-          typeof error === "object" && error !== null && "output" in error
-            ? error.output
-            : undefined;
-        warnings.report(
-          `${suggestedCommandOf(command.inDirectory(flags.cwd, this.deps.cwd))} failed after the install, so setup's commit may leave out the files it writes; run it, then commit them: ${error instanceof Error ? error.message : String(error)}${
-            typeof output === "string" && output.trim() !== ""
-              ? `\n${output.trimEnd().split("\n").slice(-QUOTED_OUTPUT_LINES).join("\n")}`
-              : ""
-          }`,
-        );
-      }
+        )
+        .catch((error: unknown) => {
+          if (this.deps.signal.aborted) {
+            throw this.deps.signal.reason;
+          }
+          if (error instanceof PmCommandFailedError) {
+            const output = error.output ?? "";
+            const quoted =
+              output.trim() === ""
+                ? ""
+                : `\n${output.trimEnd().split("\n").slice(-QUOTED_OUTPUT_LINES).join("\n")}`;
+            warnings.report(
+              `${suggestedCommandOf(command.inDirectory(flags.cwd, this.deps.cwd))} failed after the install, so setup's commit may leave out the files it writes; run it, then commit them: ${error.message}${quoted}`,
+            );
+            return;
+          }
+          if (error instanceof PmError) {
+            warnings.report(
+              `${suggestedCommandOf(command.inDirectory(flags.cwd, this.deps.cwd))} failed after the install, so setup's commit may leave out the files it writes; run it, then commit them: ${error.message}`,
+            );
+            return;
+          }
+          throw error;
+        });
     }
     const includeInstallCommand = install.status === "would-run" || install.status === "skipped";
     const planCommand = this.deps.suggest({

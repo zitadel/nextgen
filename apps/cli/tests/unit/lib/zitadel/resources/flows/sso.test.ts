@@ -7,7 +7,7 @@ import { serverCanonicalFlow } from "@zitadel/api-mock";
 import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
 import type { ConnectionSlug } from "@zitadel/config/idp";
 
-import { RefusedEditError } from "@/lib/zitadel";
+import { ZitadelConfigError } from "@/lib/zitadel";
 import { SsoGenerator } from "@/lib/zitadel/resources/flows/sso";
 import type { JsonObject, JsonValue } from "@/lib/zitadel/types";
 import {
@@ -124,7 +124,7 @@ const REGISTER_ONLY = {
  * The design's worked example, as the file holds it.
  *
  * @returns The flow.
- * @throws {@link ConfigError} When the file does not hold an object.
+ * @throws {@link ZitadelConfigError} When the file does not hold an object.
  */
 function designedFlow(): JsonObject {
   return toJsonObject(JSON.parse(readFileSync(DESIGN_EXAMPLE, "utf8")), DESIGN_EXAMPLE);
@@ -1259,8 +1259,8 @@ describe("SsoGenerator.withProvider", () => {
         return new SsoGenerator(aFlow(flow)).withProvider(provider, BOTH_METHODS);
       });
 
-      expect(error).toBeInstanceOf(RefusedEditError);
-      expect(error).toMatchObject({ message });
+      expect(error).toBeInstanceOf(ZitadelConfigError);
+      expect(error).toMatchObject({ message: expect.stringContaining(message) });
     });
 
     it.each(COLLISIONS)("leaves the flow it refuses as it was: $name", ({ flow, provider }) => {

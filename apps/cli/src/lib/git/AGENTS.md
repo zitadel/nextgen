@@ -10,17 +10,17 @@ Zitadel: callers say what to leave out and whom to name as author.
 
 - Start git only through `Git.run`, which applies the same safety to every
   call; nothing else in `apps/cli` spawns `git`.
-- Export only `Repository`, `RepositoryError` and types from `index.ts`;
+- Export only `Repository`, the git errors and types from `index.ts`;
   callers never see git's arguments or output, so a git detail is fixed in one place.
 - Add a capability as an `Operation` in `operations/` (`checks`, `refused`,
   `run`) plus a one-line `Repository` method that calls `perform`.
 - Add a precondition as a `Check` in `checks/`, one class per condition, so
   each is unit-tested against every answer git can give.
 - Keep Zitadel out: pass knowledge in (`except`, `authorIfGitHasNone`), never
-  import from the rest of the CLI.
+  import from the rest of the CLI except the shared error base in `errors.ts`.
 - Assume a modern git (2.25 or later); add no fallbacks or workarounds for
   older versions.
-- Throw `RepositoryError` with git's own message; the caller decides whether a
+- Throw a `GitError` subclass with git's own message; the caller decides whether a
   failure is fatal, and uses `Repository.answer` when it should mean no answer.
 
 ## Gotchas

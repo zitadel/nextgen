@@ -16,15 +16,19 @@ import { publishedIds } from "@/lib/sync/state";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Output, warnings } from "@/lib/ui";
 import {
-  AmbiguousSchemaError,
-  BrokenFilesError,
+  type BrokenFile,
+  ZitadelConfigFilesBrokenError,
+  ZitadelConfigSchemaAmbiguousError,
   type Change,
   CONFIG_DIRECTORIES,
   type ConfigStore,
   DiskStore,
   type ForceOptions,
-  NoSignInLeftError,
-  SchemaNotFoundError,
+  ZitadelConfigEditLockoutError,
+  ZitadelConfigFlowMethodInUseError,
+  ZitadelConfigSchemaMissingError,
+  type JsonObject,
+  PASSWORD_FIELD,
   type Schemas,
   type ToggleableMethod,
   type UserSchema,
@@ -74,6 +78,124 @@ type SchemaFlags = {
    */
   readonly schema?: string | undefined;
 };
+
+/**
+ * What a change that turns off a method a login flow still uses is refused for.
+ */
+const FLOW_METHOD_IN_USE_REFUSAL = {
+  message: "{message}",
+  hint: "Edit those steps first; login flows are not edited for you. From each step, remove its {removed}.{deletion} `zitadel deploy --dry-run` checks the edited flow; then run the command again.",
+  details: {
+    file: "{file}",
+    issues: "{issues}",
+    steps: "{steps}",
+  },
+  next: [
+    {
+      id: "deploy",
+      flags: {
+        dryRun: true,
+      },
+    },
+  ],
+} as const satisfies Refusal;
+
+/**
+ * What a step that uses a method holds once the method is gone: the part of
+ * the step a person removes from it.
+ */
+const REMOVED_PART = {
+  password: `${PASSWORD_FIELD} field`,
+  passkey: "passkey actions and their transitions",
+} as const satisfies Record<ToggleableMethod, string>;
+
+/**
+ * What a refusal to turn off a method a login flow still uses says beyond its
+ * message: the part to remove from each step, what to do about a step left
+ * with nothing, and each issue and step in the shape `--json` reports.
+ *
+ * @remarks
+ * Only the edits these steps need are named: a step left with nothing goes, so
+ * what leads to it changes too.
+ *
+ * @param error - The refusal the configuration raised.
+ * @returns The values {@link FLOW_METHOD_IN_USE_REFUSAL} is filled from.
+ */
+function methodInUseFacts(error: ZitadelConfigFlowMethodInUseError): {
+  readonly removed: string;
+  readonly deletion: string;
+  readonly issues: readonly JsonObject[];
+  readonly steps: readonly JsonObject[];
+} {
+  const emptied = error.uses.filter((use) => {
+    return use.keeps.length === 0;
+  });
+  const incoming = emptied.flatMap((use) => {
+    return use.staying;
+  });
+  const viaPurpose = incoming.some((item) => {
+    return item.purpose !== undefined;
+  });
+  const isEntry = emptied.some((use) => {
+    return use.entryFor.length > 0;
+  });
+  const fixes = [
+    ...(incoming.length > 0
+      ? [
+          viaPurpose
+            ? "retarget the transitions listed for it (one marked via purposes.<key> follows that key instead)"
+            : "retarget the transitions listed for it",
+        ]
+      : []),
+    ...(isEntry ? ["point the purposes key it is the entry step of at another step"] : []),
+  ];
+  const deletion =
+    emptied.length === 0
+      ? ""
+      : fixes.length > 0
+        ? ` Delete a step left with no field or sign-in method: ${fixes.join(", and ")}.`
+        : " Delete a step left with no field or sign-in method.";
+  return {
+    removed: REMOVED_PART[error.method],
+    deletion,
+    issues: error.issues.map((item): JsonObject => {
+      if (item.issue.step === undefined) {
+        return {
+          path: item.path,
+          rule: item.issue.rule,
+          message: item.issue.message,
+        };
+      }
+      return {
+        path: item.path,
+        rule: item.issue.rule,
+        message: item.issue.message,
+        step: item.issue.step,
+      };
+    }),
+    steps: error.uses.map((use): JsonObject => {
+      return {
+        path: use.path,
+        step: use.step,
+        keeps: use.keeps,
+        entry_for: use.entryFor,
+        targeted_by: use.targetedBy.map((item): JsonObject => {
+          if (item.purpose === undefined) {
+            return {
+              step: item.step,
+              transition: item.transition,
+            };
+          }
+          return {
+            step: item.step,
+            transition: item.transition,
+            purpose: item.purpose,
+          };
+        }),
+      };
+    }),
+  };
+}
 
 /**
  * What a schema pointing at an external URL is refused for.
@@ -166,7 +288,12 @@ const AMBIGUOUS_SCHEMA_REFUSAL = {
  * @returns What the run read.
  * @throws {@link ZitadelError} When no schema, or more than one, fits
  *   `--schema`, or the one that does points at an external schema.
- * @throws {@link BrokenFilesError} Naming every file the contract rules refuse.
+ * @throws {@link ZitadelConfigFilesBrokenError} Naming every file the contract
+ *   rules refuse.
+ * @throws {@link ZitadelConfigPathUnreadableError} When a configuration file
+ *   cannot be read.
+ * @throws {@link SyncStateMalformedError} When `.zitadel/state.json` does not
+ *   read as a record of what was synced.
  */
 export async function readSchemaTarget(input: {
   cwd: string;
@@ -174,32 +301,7 @@ export async function readSchemaTarget(input: {
 }): Promise<SchemaTarget> {
   const store = new DiskStore(input.cwd);
   const loaded = await ZitadelConfig.loadUnchecked(store);
-  try {
-    loaded.schemas.resolve(input.schema);
-  } catch (error) {
-    if (error instanceof SchemaNotFoundError) {
-      const brokenSchemas = loaded.broken.filter((file) => {
-        return file.kind === "schema";
-      });
-      const name = input.schema?.endsWith(".json")
-        ? input.schema.slice(0, -".json".length)
-        : input.schema;
-      const broken =
-        input.schema === undefined
-          ? brokenSchemas
-          : brokenSchemas.filter((file) => {
-              return file.path === `${CONFIG_DIRECTORIES.schemas}/${name}.json`;
-            });
-      if (broken.length > 0) {
-        throw new BrokenFilesError(
-          broken.flatMap((file) => {
-            return file.problems;
-          }),
-        );
-      }
-    }
-  }
-  const schema = chosenSchema(loaded.schemas, input.schema);
+  const schema = chosenSchema(loaded.schemas, input.schema, loaded.broken);
   if (schema.isExternal) {
     throw refusalError(EXTERNAL_SCHEMA_REFUSAL, {
       file: schema.path,
@@ -257,7 +359,7 @@ const HIDDEN_ENVIRONMENT_FLAGS: Pick<typeof environmentFlags, "env" | "env-file"
  * What {@link refuseNoSignInLeft} words its refusal from.
  */
 type NoSignInLeftRefusal = {
-  readonly error: NoSignInLeftError;
+  readonly error: ZitadelConfigEditLockoutError;
   readonly question: string;
   /** The exact re-run first, then enabling each method the schema could take instead, then a provider. */
   readonly suggested: FollowUps;
@@ -344,16 +446,40 @@ function namesOf(schemas: readonly UserSchema[]): readonly string[] {
  *
  * @param schemas - Every schema.
  * @param requested - What `--schema` named, if anything.
+ * @param brokenFiles - The files the configuration's contract refused, so a
+ *   missing schema whose file is broken is reported as broken.
  * @returns The schema.
+ * @throws {@link ZitadelConfigFilesBrokenError} When the schema is missing
+ *   because its file is broken.
  * @throws {@link ZitadelError} When there is none, the name matches none or
  *   several, or several exist and none is named.
  */
-function chosenSchema(schemas: Schemas, requested: string | undefined): UserSchema {
+function chosenSchema(
+  schemas: Schemas,
+  requested: string | undefined,
+  brokenFiles: readonly BrokenFile[],
+): UserSchema {
   try {
     return schemas.resolve(requested);
   } catch (error) {
-    if (error instanceof SchemaNotFoundError) {
-      const { requested } = error;
+    if (error instanceof ZitadelConfigSchemaMissingError) {
+      const brokenSchemas = brokenFiles.filter((file) => {
+        return file.kind === "schema";
+      });
+      const name = requested?.endsWith(".json") ? requested.slice(0, -".json".length) : requested;
+      const broken =
+        requested === undefined
+          ? brokenSchemas
+          : brokenSchemas.filter((file) => {
+              return file.path === `${CONFIG_DIRECTORIES.schemas}/${name}.json`;
+            });
+      if (broken.length > 0) {
+        throw new ZitadelConfigFilesBrokenError(
+          broken.flatMap((file) => {
+            return file.problems;
+          }),
+        );
+      }
       if (error.known.length === 0 || requested === undefined) {
         throw refusalError(NO_SCHEMA_REFUSAL, {});
       }
@@ -364,8 +490,7 @@ function chosenSchema(schemas: Schemas, requested: string | undefined): UserSche
         schemas: detailsOf(error.known),
       });
     }
-    if (error instanceof AmbiguousSchemaError) {
-      const { requested } = error;
+    if (error instanceof ZitadelConfigSchemaAmbiguousError) {
       if (requested === undefined) {
         throw refusalError(UNNAMED_SCHEMA_REFUSAL, {
           labels: error.candidates.map(labelOf).join(", "),
@@ -799,17 +924,24 @@ export abstract class AuthMethodDisableCommand extends Destructive(
         dryRun: true,
       });
     } catch (error) {
-      if (!(error instanceof NoSignInLeftError)) {
-        throw error;
+      if (error instanceof ZitadelConfigFlowMethodInUseError) {
+        throw refusalError(FLOW_METHOD_IN_USE_REFUSAL, {
+          ...error,
+          message: error.message,
+          ...methodInUseFacts(error),
+        });
       }
-      if (this.nonInteractive && !this.force) {
-        refuseNoSignInLeft((await this.refusalOf(error, target, naming)).refusal);
-      }
+      if (error instanceof ZitadelConfigEditLockoutError) {
+        if (this.nonInteractive && !this.force) {
+          refuseNoSignInLeft((await this.refusalOf(error, target, naming)).refusal);
+        }
 
-      return make({
-        force: true,
-        dryRun: true,
-      });
+        return make({
+          force: true,
+          dryRun: true,
+        });
+      }
+      throw error;
     }
   }
 
@@ -819,7 +951,7 @@ export abstract class AuthMethodDisableCommand extends Destructive(
    *
    * @remarks
    * It is made without `force` first; when the configuration refuses it with
-   * {@link NoSignInLeftError}, the person is asked, and a yes makes it again
+   * {@link ZitadelConfigEditLockoutError}, the person is asked, and a yes makes it again
    * with `force`. `--force` answers for them, and with nobody to ask and no
    * `--force` the run is refused. Either way the change carries the
    * {@link Consent} that answered, which {@link write} requires.
@@ -847,30 +979,37 @@ export abstract class AuthMethodDisableCommand extends Destructive(
         consent: undefined,
       };
     } catch (error) {
-      if (!(error instanceof NoSignInLeftError)) {
-        throw error;
+      if (error instanceof ZitadelConfigFlowMethodInUseError) {
+        throw refusalError(FLOW_METHOD_IN_USE_REFUSAL, {
+          ...error,
+          message: error.message,
+          ...methodInUseFacts(error),
+        });
       }
-      const { question, retry, refusal } = await this.refusalOf(error, target, naming);
-      const consent = await this.consent({
-        verb: "disable",
-        name: `disable ${error.disabling}, the last way to sign in to ${error.schema}`,
-        message: question,
-        retry,
-        refuse: () => {
-          return refuseNoSignInLeft(refusal);
-        },
-      });
-      if (consent === undefined) {
-        return undefined;
-      }
+      if (error instanceof ZitadelConfigEditLockoutError) {
+        const { question, retry, refusal } = await this.refusalOf(error, target, naming);
+        const consent = await this.consent({
+          verb: "disable",
+          name: `disable ${error.disabling}, the last way to sign in to ${error.schema}`,
+          message: question,
+          retry,
+          refuse: () => {
+            return refuseNoSignInLeft(refusal);
+          },
+        });
+        if (consent === undefined) {
+          return undefined;
+        }
 
-      return {
-        change: make({
-          force: true,
-          dryRun: false,
-        }),
-        consent: consent,
-      };
+        return {
+          change: make({
+            force: true,
+            dryRun: false,
+          }),
+          consent: consent,
+        };
+      }
+      throw error;
     }
   }
 
@@ -888,7 +1027,7 @@ export abstract class AuthMethodDisableCommand extends Destructive(
    * @returns The question, the re-run and the refusal.
    */
   private async refusalOf(
-    error: NoSignInLeftError,
+    error: ZitadelConfigEditLockoutError,
     target: SchemaTarget,
     naming: Readonly<{ provider?: string }>,
   ) {
@@ -960,7 +1099,7 @@ export abstract class MethodEnableCommand extends AuthMethodCommand {
   protected async preview({ flags }: Admitted<typeof MethodEnableCommand>): Promise<CommandResult> {
     const target = await this.loadSchemaTarget(flags);
 
-    return this.previewToggle(
+    return await this.previewToggle(
       target,
       target.config.schemas.enable(target.schema, this.method),
       this.method,
@@ -977,7 +1116,7 @@ export abstract class MethodEnableCommand extends AuthMethodCommand {
   protected async apply({ flags }: Admitted<typeof MethodEnableCommand>): Promise<CommandResult> {
     const target = await this.loadSchemaTarget(flags);
 
-    return this.applyToggle(
+    return await this.applyToggle(
       target,
       target.config.schemas.enable(target.schema, this.method),
       this.method,

@@ -1,4 +1,5 @@
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { OrcaFrameworkMismatchError } from "@/lib/orca";
 import { LocalRuntime } from "@/lib/server";
 import { basename, dirname, join } from "node:path";
 
@@ -128,7 +129,6 @@ describe("Orca detection", () => {
     await expect(orca.detect(dir)).rejects.toMatchObject({
       code: "E_FRAMEWORK_NOT_DETECTED",
       message: "Could not detect a supported app framework",
-      hint: "Run setup from your app project directory, pass --cwd <path-to-app>, or run setup from an empty directory to scaffold a new app.",
     });
   });
 
@@ -141,11 +141,13 @@ describe("Orca detection", () => {
   // Not detected would read as a directory to scaffold into, and setup's
   // --force would then scaffold a new app over this one.
   it("refuses a requested framework other than the app's own", async ({ dir }) => {
-    await expect(orca.detect(await nextProject(dir), "react")).rejects.toMatchObject({
+    const rejection = expect(orca.detect(await nextProject(dir), "react")).rejects;
+    await rejection.toBeInstanceOf(OrcaFrameworkMismatchError);
+    await rejection.toMatchObject({
       code: "E_CONFLICT",
       message: "Setup detects Next.js here, not React (Vite)",
-      hint: expect.stringContaining("--framework next"),
-      details: { requested: "react", detected: "next" },
+      requested: "react",
+      detected: "next",
     });
   });
 
@@ -627,6 +629,7 @@ describe("Orca.planScaffold", () => {
     const withoutPatchers = new Orca(detectors, scaffolders, [], LocalRuntime.DIR);
 
     await expect(withoutPatchers.planScaffold(cwd, "next")).rejects.toMatchObject({
+      name: "OrcaPatcherMissingError",
       code: "E_VALIDATION",
       message: 'No patcher supports "next"',
     });

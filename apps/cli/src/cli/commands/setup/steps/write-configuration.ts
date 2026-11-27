@@ -15,8 +15,13 @@ import {
   setupRetryFlags,
   signInOf,
 } from "@/cli/commands/setup/shared";
-import { createZitadelClient, InvalidError, PolicyService } from "@/lib/backend";
-import { isCancellation, toZitadelError, ZitadelError } from "@/lib/errors";
+import {
+  BackendError,
+  createZitadelClient,
+  BackendRequestMalformedError,
+  PolicyService,
+} from "@/lib/backend";
+import { toZitadelError, ZitadelError, ZitadelLibError } from "@/lib/errors";
 import { Spelling, WHAT_CHANGED } from "@/lib/suggestion";
 import { Runtime } from "@/lib/runtime";
 import { warnings } from "@/lib/ui";
@@ -25,9 +30,11 @@ import {
   CONFIG_DIRECTORIES,
   Connection,
   DiskStore,
-  FileExistsError,
+  ZitadelConfigConnectionExistsError,
+  ZitadelConfigFileExistsError,
   SignupPolicy,
 } from "@/lib/zitadel";
+import { wordedError } from "@/cli/core/error-support";
 
 /**
  * What the step reads from what is known.
@@ -109,7 +116,7 @@ export class WriteConfiguration extends WizardStep<"configuration", Fact<"scaffo
           },
         };
       }
-      const signupPolicy = await new PolicyService(
+      const evaluated = await new PolicyService(
         createZitadelClient({
           userAgent: Runtime.current().userAgent(),
           baseUrl: answers.server,
@@ -123,17 +130,19 @@ export class WriteConfiguration extends WizardStep<"configuration", Fact<"scaffo
           config: {},
           input: { solved_challenge: "zitadel_pow" },
         })
-        .then(
-          () => {
+        .catch((error: unknown) => {
+          if (this.deps.signal.aborted) {
+            throw error;
+          }
+          if (error instanceof BackendRequestMalformedError) {
+            return false;
+          }
+          if (error instanceof BackendError) {
             return true;
-          },
-          (error: unknown) => {
-            if (isCancellation(error) || this.deps.signal.aborted) {
-              throw error;
-            }
-            return !(error instanceof InvalidError && error.serverCode === "req.invalid");
-          },
-        );
+          }
+          throw error;
+        });
+      const signupPolicy = evaluated !== false;
       const scaffold = await scaffoldOf(this.deps.cwd, this.deps.force, answers, signupPolicy);
       if (!signupPolicy) {
         warnings.report(
@@ -148,60 +157,75 @@ export class WriteConfiguration extends WizardStep<"configuration", Fact<"scaffo
         );
       }
       const store = new DiskStore(this.deps.cwd);
-      const saved = await scaffold.change
-        .save(store, {
+      try {
+        const saved = await scaffold.change.save(store, {
           overwrite: this.deps.force,
           createOnly: (document) => {
             return document instanceof Connection;
           },
-        })
-        .catch((error: unknown) => {
-          throw setupRefusal(error, scaffold.connections);
         });
-      const readmes = await Promise.all(
-        [
-          {
-            directory: CONFIG_DIRECTORIES.schemas,
-            text: schemasReadmeContent(),
-          },
-          {
-            directory: CONFIG_DIRECTORIES.flows,
-            text: flowsReadmeContent(),
-          },
-          {
-            directory: CONFIG_DIRECTORIES.policies,
-            text: policiesReadmeContent(),
-          },
-        ].map(async (readme): Promise<readonly string[]> => {
-          const path = `${readme.directory}/${README}`;
-          const text = Spelling.at(this.deps.cliVersion).normalizeProse(readme.text);
-          try {
-            await store.writeText(path, text, "create");
-            return [path];
-          } catch (error) {
-            if (error instanceof FileExistsError) {
-              return [];
+        const readmes = await Promise.all(
+          [
+            {
+              directory: CONFIG_DIRECTORIES.schemas,
+              text: schemasReadmeContent(),
+            },
+            {
+              directory: CONFIG_DIRECTORIES.flows,
+              text: flowsReadmeContent(),
+            },
+            {
+              directory: CONFIG_DIRECTORIES.policies,
+              text: policiesReadmeContent(),
+            },
+          ].map(async (readme): Promise<readonly string[]> => {
+            const path = `${readme.directory}/${README}`;
+            const text = Spelling.at(this.deps.cliVersion).normalizeProse(readme.text);
+            try {
+              await store.writeText(path, text, "create");
+              return [path];
+            } catch (error) {
+              if (error instanceof ZitadelConfigFileExistsError) {
+                return [];
+              }
+              throw error;
             }
-            throw error;
-          }
-        }),
-      );
-      return {
-        scaffolded: {
-          filesWritten: [...saved, ...readmes.flat()].map((path) => {
-            return join(this.deps.cwd, path);
           }),
-          passwordMinLength: scaffold.policy.minLength ?? null,
-        },
-      };
+        );
+        return {
+          scaffolded: {
+            filesWritten: [...saved, ...readmes.flat()].map((path) => {
+              return join(this.deps.cwd, path);
+            }),
+            passwordMinLength: scaffold.policy.minLength ?? null,
+          },
+        };
+      } catch (error) {
+        if (error instanceof ZitadelConfigConnectionExistsError) {
+          throw setupRefusal(error, scaffold.connections);
+        }
+        if (error instanceof ZitadelConfigFileExistsError) {
+          throw setupRefusal(error, scaffold.connections);
+        }
+        throw error;
+      }
     } catch (error) {
-      const cause = toZitadelError(error);
+      const cause =
+        error instanceof ZitadelError
+          ? error
+          : error instanceof ZitadelLibError
+            ? toZitadelError(wordedError(error, this.deps.cwd))
+            : undefined;
+      if (cause === undefined) {
+        throw error;
+      }
       const rerun = setupRetryFlags({
         ...retry,
         server: this.deps.serverFlag ?? null,
       });
       patching?.fail();
-      throw new ZitadelError(cause.code, `Default configuration setup failed: ${cause.message}`, {
+      const message = `Default configuration setup failed: ${cause.message}`;
+      const options = {
         hint:
           newApp === undefined
             ? (cause.hint ??
@@ -231,7 +255,8 @@ export class WriteConfiguration extends WizardStep<"configuration", Fact<"scaffo
               ]
             : []),
         details: cause.details,
-      });
+      };
+      throw new ZitadelError(cause.code, message, options);
     }
   }
 }

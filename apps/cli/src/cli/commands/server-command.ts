@@ -256,6 +256,8 @@ export function LocalServerCommand<TBase extends CommandClass<BaseCommand>>(
      * @param cwd - The folder the command runs in.
      * @returns The server's address, or the default one when none was started;
      *   with no rule, what the command itself says.
+     * @throws {LocalServerRecordMalformedError} When the nearest record is not in its shape.
+     * @throws {LocalServerRecordUnreadableError} When the nearest record cannot be read.
      */
     protected override async sourceOf(
       flags: Record<string, unknown>,
@@ -264,12 +266,7 @@ export function LocalServerCommand<TBase extends CommandClass<BaseCommand>>(
       if (folderRule === undefined) {
         return super.sourceOf(flags, cwd);
       } else if (folderRule === "nearest") {
-        const server = await this.serverInNearestFolder(cwd);
-        if (server === undefined) {
-          return LocalRuntime.DEFAULT_URL;
-        } else {
-          return server.url();
-        }
+        return (await (await this.serverInNearestFolder(cwd))?.url()) ?? LocalRuntime.DEFAULT_URL;
       } else {
         return this.serverInThisFolder(cwd).url();
       }

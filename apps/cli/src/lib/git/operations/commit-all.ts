@@ -3,7 +3,7 @@ import { HeadIsOnABranch } from "@/lib/git/checks/head-is-on-a-branch";
 import { NoOperationUnderWay } from "@/lib/git/checks/no-operation-under-way";
 import { NothingExcludedIsStaged } from "@/lib/git/checks/nothing-excluded-is-staged";
 import { SomethingIsStaged } from "@/lib/git/checks/something-is-staged";
-import { RepositoryError } from "@/lib/git/errors";
+import { GitError, GitInternalError } from "@/lib/git/errors";
 import type { Git } from "@/lib/git/git";
 import type { Check, Operation } from "@/lib/git/operation";
 import { StagingArea } from "@/lib/git/staging-area";
@@ -80,25 +80,34 @@ export class CommitAll implements Operation<CommitOutcome> {
       if (problem !== null) {
         return this.refused(problem);
       }
-      try {
-        if (identity.source === "fallback") {
-          await staging.commit(this.message, this.options.authorIfGitHasNone);
-        } else {
-          await staging.commit(this.message, null);
+      const author = identity.source === "fallback" ? this.options.authorIfGitHasNone : null;
+      await staging.commit(this.message, author).catch(async (error: unknown) => {
+        if (error instanceof GitError && (await new CurrentCommit().run(git)) !== before) {
+          return;
         }
-      } catch (error) {
-        if ((await new CurrentCommit().run(git)) === before) {
-          throw error;
-        }
-      }
+        throw error;
+      });
       const sha = await new CurrentCommit().run(git);
       if (sha === null) {
-        throw new RepositoryError("the commit left no HEAD to record");
+        throw new GitInternalError("the commit left no HEAD to record");
       }
-      await git.run(["reset", "--quiet", "--", "."]).catch(() => {
-        return undefined;
-      });
-      return { committed: true, sha, author: identity.source };
+      try {
+        await git.run(["reset", "--quiet", "--", "."]);
+      } catch (error) {
+        if (error instanceof GitError) {
+          return {
+            committed: true,
+            sha,
+            author: identity.source,
+          };
+        }
+        throw error;
+      }
+      return {
+        committed: true,
+        sha,
+        author: identity.source,
+      };
     });
   }
 }

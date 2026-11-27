@@ -4,6 +4,7 @@ import { afterEach, describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
 
+import { LocalServerAdminNotFoundError, LocalServerPlatformMissingError } from "@/lib/server";
 import type { LocalAdmin } from "@/lib/server/local/admin-credential";
 import { EXIT_CODES, toZitadelError, type ZitadelError } from "@/lib/errors";
 import { adminSessionCookie, consoleSignInUrl } from "@/lib/server/local/sign-in";
@@ -168,7 +169,7 @@ describe("local admin sign-in", () => {
 
     expect(failure.code).toBe("E_NETWORK");
     expect(failure.exitCode).toBe(EXIT_CODES.E_NETWORK);
-    expect(failure.hint).toContain("connection");
+    expect(failure.details).toMatchObject({ reason: "unreachable" });
   });
 
   // A server reached over https sets the prefixed name, and takes it back.
@@ -221,10 +222,10 @@ describe("local admin sign-in", () => {
 
     const error = await consoleSignInUrl(SERVER, admin, signal).catch((caught: unknown) => caught);
 
+    expect(error).toBeInstanceOf(LocalServerPlatformMissingError);
     expect(error).toMatchObject({
       code: "E_VALIDATION",
       message: expect.stringContaining("does not host the platform project") as string,
-      kind: "platform-missing",
     });
     // Nothing is attempted against a server that cannot sign the admin in.
     expect(calls).toEqual([]);
@@ -242,10 +243,10 @@ describe("local admin sign-in", () => {
 
     const error = await consoleSignInUrl(SERVER, admin, signal).catch((caught: unknown) => caught);
 
+    expect(error).toBeInstanceOf(LocalServerAdminNotFoundError);
     expect(error).toMatchObject({
       code: "E_AUTH",
       message: "The local server could not find the local admin",
-      kind: "admin-not-found",
     });
   });
 

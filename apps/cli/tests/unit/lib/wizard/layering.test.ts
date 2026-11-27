@@ -1,3 +1,5 @@
+import { posix } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { importsUnder } from "@tests/helpers/source-imports";
@@ -7,7 +9,11 @@ describe("lib/wizard layering", () => {
     const imports = await importsUnder("lib/wizard");
 
     const leaving = imports.filter((entry) => {
-      return !entry.target.startsWith("lib/wizard/") && entry.target !== "lib/wizard";
+      return (
+        !entry.target.startsWith("lib/wizard/") &&
+        entry.target !== "lib/wizard" &&
+        !(entry.target === "lib/errors" && entry.file === posix.join("lib/wizard", "errors.ts"))
+      );
     });
 
     expect(leaving).toEqual([]);

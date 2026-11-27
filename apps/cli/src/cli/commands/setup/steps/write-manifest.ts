@@ -1,5 +1,5 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
-import { toZitadelError } from "@/lib/errors";
+import { ZitadelLibError } from "@/lib/errors";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 import { Orca } from "@/lib/orca";
@@ -66,9 +66,13 @@ export class WriteManifest extends WizardStep<"manifest", object, Needs> {
           posture,
         });
       } catch (error) {
-        warnings.report(
-          `Could not record what setup scaffolded, so doctor will check this app against the current templates: ${toZitadelError(error).message}`,
-        );
+        if (error instanceof ZitadelLibError) {
+          warnings.report(
+            `Could not record what setup scaffolded, so doctor will check this app against the current templates: ${error.message}`,
+          );
+          return {};
+        }
+        throw error;
       }
     }
     return {};

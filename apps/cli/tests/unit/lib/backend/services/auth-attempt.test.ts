@@ -74,12 +74,12 @@ describe("AuthAttemptService.prove", () => {
     server,
   }) => {
     await expect(
-      proving(server, refusal(401, "att.proof_rejected")).prove("att_1", "password", {
+      proving(server, refusal(409, "att.proof_rejected")).prove("att_1", "password", {
         password: "wrong",
       }),
     ).resolves.toMatchObject({
       outcome: "rejected",
-      cause: { status: 401, body: { code: "att.proof_rejected" } },
+      cause: { status: 409, body: { code: "att.proof_rejected" } },
     });
   });
 

@@ -7,6 +7,7 @@ import { byName, type ByName } from "@/lib/names";
 import { nonBlankString } from "./flags";
 import { inputFlag } from "./input";
 import { Documented } from "./documented";
+import { ErrorSupport } from "./error-support";
 import { Failure } from "./failure";
 import { Interruptible } from "./interruptible";
 import { Loggable } from "./loggable";
@@ -88,7 +89,9 @@ export type Admitted<C extends typeof BaseCommand> = ReadonlyDeep<{
  * contract (ADR 004) is preserved — oclif only replaces parsing, dispatch,
  * help, and JSON emission.
  */
-export abstract class BaseCommand extends Loggable(Documented(Interruptible(Command))) {
+export abstract class BaseCommand extends ErrorSupport(
+  Loggable(Documented(Interruptible(Command))),
+) {
   /** Opt into oclif's native `--json` flag and JSON serialisation of the result. */
   static override enableJsonFlag = true;
 
@@ -309,12 +312,13 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
    * the command is here: only {@link execute} is handed the names and types
    * its own command declared, which is why {@link admit} asserts them.
    */
-  protected parseOnce(): ReturnType<BaseCommand["parse"]> {
-    this.reading ??= this.parse(this.command).catch((error: unknown) => {
+  protected async parseOnce(): ReturnType<BaseCommand["parse"]> {
+    this.reading ??= this.parse(this.command);
+    try {
+      return await this.reading;
+    } catch (error) {
       throw asRaised(error);
-    });
-
-    return this.reading;
+    }
   }
 
   /**
@@ -688,7 +692,7 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
         : this.suggest(helpOf(meta.command));
     const failure = new Failure(
       this.suggestions.renderedFailure(
-        cancelled ? reason : toZitadelError(Failure.advised(error, meta.cwd)),
+        cancelled ? reason : toZitadelError(this.worded(error, meta.cwd)),
       ),
       meta,
       help,
@@ -731,7 +735,10 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
  * itself rather than matched out of oclif's wording, which is not ours.
  */
 function asRaised(error: unknown): unknown {
-  if (!(error instanceof ZitadelError) || error.message === error.raised) {
+  if (!(error instanceof ZitadelError)) {
+    return error;
+  }
+  if (error.message === error.raised) {
     return error;
   }
 

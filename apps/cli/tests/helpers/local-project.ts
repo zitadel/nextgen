@@ -146,7 +146,7 @@ export async function writeJson(cwd: string, path: string, body: unknown): Promi
  * @param cwd - The Project's directory.
  * @param path - The file's project-relative path.
  * @returns The object the file holds.
- * @throws {@link ConfigError} When the file holds JSON that is not an object.
+ * @throws {@link ZitadelConfigError} When the file holds JSON that is not an object.
  */
 export async function readJson(cwd: string, path: string): Promise<JsonObject> {
   const parsed: unknown = JSON.parse(await readFile(join(cwd, path), "utf8"));

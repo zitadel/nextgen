@@ -1,4 +1,9 @@
-import { ZitadelError } from "@/lib/errors";
+import {
+  OrcaInvalidError,
+  OrcaSolidStartConfigMissingError,
+  OrcaSolidStartOptionsError,
+  OrcaSolidStartPluginMissingError,
+} from "@/lib/orca/errors";
 
 const MIDDLEWARE_PATH = "./src/middleware.ts";
 
@@ -21,23 +26,15 @@ const MIDDLEWARE_PATH = "./src/middleware.ts";
 export function solidStartConfigEdit(): (source: string | undefined) => string {
   return (source) => {
     if (source === undefined) {
-      throw new ZitadelError(
-        "E_VALIDATION",
+      throw new OrcaSolidStartConfigMissingError(
         "Cannot edit the SolidStart Vite config: file not found",
-        {
-          hint: "Run setup from a SolidStart project that has a vite.config.ts.",
-        },
       );
     }
 
     const callIndex = source.indexOf("solidStart(");
     if (callIndex === -1) {
-      throw new ZitadelError(
-        "E_VALIDATION",
+      throw new OrcaSolidStartPluginMissingError(
         "Cannot wire middleware: no solidStart() plugin call found in the Vite config",
-        {
-          hint: "Ensure vite.config.ts registers the solidStart() plugin from @solidjs/start/config.",
-        },
       );
     }
 
@@ -54,12 +51,8 @@ export function solidStartConfigEdit(): (source: string | undefined) => string {
     const option = `middleware: ${JSON.stringify(MIDDLEWARE_PATH)}`;
     if (inner !== "" && !inner.startsWith("{")) {
       // Unusual: a non-object argument (e.g. a variable). Don't guess — fail loud.
-      throw new ZitadelError(
-        "E_VALIDATION",
+      throw new OrcaSolidStartOptionsError(
         "Cannot wire middleware: solidStart() is called with a non-object argument",
-        {
-          hint: 'Pass an options object to solidStart(), e.g. solidStart({ middleware: "./src/middleware.ts" }).',
-        },
       );
     }
     // solidStart()  ->  solidStart({ middleware: "./src/middleware.ts" })
@@ -115,5 +108,5 @@ function readBalanced(source: string, openParenIndex: number): { text: string; e
       }
     }
   }
-  throw new ZitadelError("E_VALIDATION", "Malformed Vite config: unbalanced solidStart() call");
+  throw new OrcaInvalidError("Malformed Vite config: unbalanced solidStart() call");
 }

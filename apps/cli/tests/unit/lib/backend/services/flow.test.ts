@@ -2,7 +2,7 @@ import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
 
-import { NotFoundError } from "@/lib/backend/errors";
+import { BackendNameUnknownError } from "@/lib/backend";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { FlowService } from "@/lib/backend/services/flow";
@@ -103,11 +103,10 @@ describe("FlowService.get", () => {
 
     const error = await rejectionOf(() => service().get("typo"));
 
-    expect(error).toBeInstanceOf(NotFoundError);
+    expect(error).toBeInstanceOf(BackendNameUnknownError);
     expect(error).toMatchObject({
-      name: "NotFoundError",
+      code: "E_NOT_FOUND",
       message: 'No flow definition named "typo"',
-      hint: "Run `flow-definition list` to see the flows this project has.",
     });
   });
 });

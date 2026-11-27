@@ -4,11 +4,17 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 
 import {
-  entryExists,
-  isFile,
   pathExists,
   pathExistsStrict,
+  FsDeniedError,
+  FsFailedError,
+  fsFailure,
+  FsIsDirectoryError,
+  FsNotDirectoryError,
+  isFile,
+  entryExists,
   readDirIfExists,
+  readFile,
   readIfExists,
   readIfReadable,
 } from "@/lib/fs";
@@ -44,7 +50,7 @@ describe("readIfExists", () => {
   it("throws for a path that exists but cannot be read as a file", async ({ dir }) => {
     await mkdir(join(dir, "folder"));
 
-    await expect(readIfExists(join(dir, "folder"))).rejects.toMatchObject({ code: "EISDIR" });
+    await expect(readIfExists(join(dir, "folder"))).rejects.toBeInstanceOf(FsIsDirectoryError);
   });
 
   it.skipIf(process.getuid?.() === 0 || process.platform === "win32")(
@@ -54,7 +60,7 @@ describe("readIfExists", () => {
       await writeFile(file, "x");
       await chmod(file, 0o000);
 
-      await expect(readIfExists(file)).rejects.toMatchObject({ code: "EACCES" });
+      await expect(readIfExists(file)).rejects.toBeInstanceOf(FsDeniedError);
     },
   );
 });
@@ -70,9 +76,9 @@ describe("pathExistsStrict", () => {
   it("throws when the parent is a file rather than a directory", async ({ dir }) => {
     await writeFile(join(dir, "a.txt"), "x");
 
-    await expect(pathExistsStrict(join(dir, "a.txt", "child"))).rejects.toMatchObject({
-      code: "ENOTDIR",
-    });
+    await expect(pathExistsStrict(join(dir, "a.txt", "child"))).rejects.toBeInstanceOf(
+      FsNotDirectoryError,
+    );
   });
 });
 
@@ -105,7 +111,7 @@ describe("readDirIfExists", () => {
   it("rethrows when the path is a file rather than a directory", async ({ dir }) => {
     await writeFile(join(dir, "a.txt"), "x");
 
-    await expect(readDirIfExists(join(dir, "a.txt"))).rejects.toMatchObject({ code: "ENOTDIR" });
+    await expect(readDirIfExists(join(dir, "a.txt"))).rejects.toBeInstanceOf(FsNotDirectoryError);
   });
 });
 
@@ -123,6 +129,25 @@ describe("isFile", () => {
   it("is false for a path that does not exist", async ({ dir }) => {
     expect(await isFile(join(dir, "missing"))).toBe(false);
   });
+
+  it.skipIf(process.platform === "win32")("is false for a symlink loop", async ({ dir }) => {
+    await symlink(join(dir, "b"), join(dir, "a"));
+    await symlink(join(dir, "a"), join(dir, "b"));
+
+    expect(await isFile(join(dir, "a"))).toBe(false);
+  });
+});
+
+describe("readFile", () => {
+  it.skipIf(process.platform === "win32")(
+    "throws an FsFailedError for a failure with no class of its own",
+    async ({ dir }) => {
+      await symlink(join(dir, "b"), join(dir, "a"));
+      await symlink(join(dir, "a"), join(dir, "b"));
+
+      await expect(readFile(join(dir, "a"), "utf8")).rejects.toBeInstanceOf(FsFailedError);
+    },
+  );
 });
 
 describe("entryExists", () => {
@@ -138,5 +163,34 @@ describe("entryExists", () => {
 
     expect(await entryExists(join(dir, "a.txt"))).toBe(true);
     expect(await entryExists(join(dir, "missing"))).toBe(false);
+  });
+});
+
+describe("fsFailure", () => {
+  it.each([
+    [
+      "ENOENT",
+      "ENOENT: no such file or directory, open '/a'",
+      "ENOENT: no such file or directory, open '/a'",
+    ],
+    [
+      "EACCES",
+      "EACCES: permission denied, open '/a'",
+      "Permission denied: EACCES: permission denied, open '/a'",
+    ],
+    [
+      "EPERM",
+      "EPERM: operation not permitted, unlink '/a'",
+      "Permission denied: EPERM: operation not permitted, unlink '/a'",
+    ],
+    [
+      "ELOOP",
+      "ELOOP: too many symbolic links encountered, open '/a'",
+      "ELOOP: too many symbolic links encountered, open '/a'",
+    ],
+  ])("says what Node said of %s", (code, said, message) => {
+    const failure = fsFailure(Object.assign(new Error(said), { code, syscall: "open" }));
+
+    expect(failure).toMatchObject({ message });
   });
 });

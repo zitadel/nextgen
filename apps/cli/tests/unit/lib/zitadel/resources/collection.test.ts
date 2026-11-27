@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   CONFIG_DIRECTORIES,
-  ConflictError,
-  InvalidHandleError,
+  ZitadelConfigResourceClashError,
+  ZitadelConfigError,
   Policy,
   ZitadelConfig,
 } from "@/lib/zitadel";
@@ -174,7 +174,7 @@ describe("Collection.locate", () => {
 
       expect(() => {
         return config.schemas.locate("human-user");
-      }).toThrow(ConflictError);
+      }).toThrow(ZitadelConfigResourceClashError);
     });
 
     it("names both files", () => {
@@ -209,7 +209,7 @@ describe("Collection.locate with a handle that is not a file name", () => {
 
       expect(() => {
         return config.schemas.locate(handle);
-      }).toThrow(InvalidHandleError);
+      }).toThrow(ZitadelConfigError);
     },
   );
 
@@ -218,7 +218,7 @@ describe("Collection.locate with a handle that is not a file name", () => {
 
     expect(() => {
       return config.schemas.placeRevision("../idps/x", HUMAN_USER_SCHEMA);
-    }).toThrow(InvalidHandleError);
+    }).toThrow(ZitadelConfigError);
   });
 
   it("keeps a dotted name that stays one segment", () => {

@@ -1,4 +1,3 @@
-import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import {
@@ -7,8 +6,7 @@ import {
   relativeDisplayPath as relativeDisplay,
   type SetupServices,
 } from "@/cli/commands/setup/shared";
-import { errorMessage } from "@/lib/errors";
-import { isErrno } from "@/lib/errno";
+import { FsError, FsNotFoundError, readFile, rm, writeFile } from "@/lib/fs";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
@@ -95,10 +93,10 @@ export class PatchApp extends WizardStep<
           try {
             return [file, await readFile(join(this.deps.cwd, file))];
           } catch (error) {
-            if (!isErrno(error, "ENOENT")) {
-              throw error;
+            if (error instanceof FsNotFoundError) {
+              return [file, undefined];
             }
-            return [file, undefined];
+            throw error;
           }
         }),
       ),
@@ -186,9 +184,13 @@ export class PatchApp extends WizardStep<
         try {
           await rm(join(this.deps.cwd, marker), { force: true });
         } catch (error) {
-          warnings.report(
-            `Could not remove ${marker} after the failed setup (${errorMessage(error)}); a rerun may refuse to start until it is removed.`,
-          );
+          if (error instanceof FsError) {
+            warnings.report(
+              `Could not remove ${marker} after the failed setup (${error.message}); a rerun may refuse to start until it is removed.`,
+            );
+            continue;
+          }
+          throw error;
         }
       }
       for (const [file, content] of envFilesBefore) {
@@ -199,9 +201,13 @@ export class PatchApp extends WizardStep<
             await writeFile(join(this.deps.cwd, file), content);
           }
         } catch (error) {
-          warnings.report(
-            `Could not restore ${file} after the failed setup (${errorMessage(error)}); it may still name the abandoned project.`,
-          );
+          if (error instanceof FsError) {
+            warnings.report(
+              `Could not restore ${file} after the failed setup (${error.message}); it may still name the abandoned project.`,
+            );
+            continue;
+          }
+          throw error;
         }
       }
     }

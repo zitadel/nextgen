@@ -3,13 +3,15 @@ import { describe, expect, it } from "vitest";
 
 import {
   BrokenFile,
-  BrokenFilesError,
+  ZitadelConfigError,
   Branding,
   CONFIG_DIRECTORIES,
-  ConfigError,
-  ConflictError,
-  ConnectionExistsError,
-  FileExistsError,
+  ZitadelConfigPasswordPolicyInvalidError,
+  ZitadelConfigResourceClashError,
+  ZitadelConfigSignupPolicyInvalidError,
+  ZitadelConfigConnectionExistsError,
+  ZitadelConfigFileExistsError,
+  ZitadelConfigNothingToDeployError,
   Flow,
   PasswordPolicy,
   Policy,
@@ -264,7 +266,7 @@ describe("ZitadelConfig.load", () => {
       return ZitadelConfig.load(store);
     });
 
-    expect(error).toBeInstanceOf(BrokenFilesError);
+    expect(error).toBeInstanceOf(ZitadelConfigError);
   });
 
   it("names the broken file", async () => {
@@ -274,7 +276,9 @@ describe("ZitadelConfig.load", () => {
       return ZitadelConfig.load(store);
     });
 
-    expect(error).toMatchObject({ problems: [expect.objectContaining({ path: BROKEN_SCHEMA })] });
+    expect(error).toMatchObject({
+      message: expect.stringContaining(`${BROKEN_SCHEMA}:`),
+    });
   });
 
   it("refuses a file that could not be parsed, naming it", async () => {
@@ -285,7 +289,9 @@ describe("ZitadelConfig.load", () => {
       return ZitadelConfig.load(store);
     });
 
-    expect(error).toMatchObject({ problems: [expect.objectContaining({ path })] });
+    expect(error).toMatchObject({
+      message: expect.stringContaining(`${path}:`),
+    });
   });
 
   it("leaves a broken policy test file to the command that runs it", async () => {
@@ -696,7 +702,7 @@ describe("ZitadelConfig.scaffold", () => {
         return config.scaffold(MINIMAL);
       });
 
-      expect(error).toBeInstanceOf(FileExistsError);
+      expect(error).toBeInstanceOf(ZitadelConfigFileExistsError);
       expect(error).toMatchObject({ path });
     });
 
@@ -749,8 +755,11 @@ describe("ZitadelConfig.scaffold", () => {
         return config.scaffold({ ...MINIMAL, force: true });
       });
 
-      expect(error).toBeInstanceOf(ConfigError);
-      expect(error).toMatchObject({ details: { file: PasswordPolicy.PATH } });
+      expect(error).toBeInstanceOf(ZitadelConfigPasswordPolicyInvalidError);
+      expect(error).toMatchObject({
+        message: `${PasswordPolicy.PATH} is not a valid password policy`,
+        path: PasswordPolicy.PATH,
+      });
     });
   });
 
@@ -790,8 +799,11 @@ describe("ZitadelConfig.scaffold", () => {
         return config.scaffold({ ...MINIMAL, force: true });
       });
 
-      expect(error).toBeInstanceOf(ConfigError);
-      expect(error).toMatchObject({ details: { file: SignupPolicy.PATH } });
+      expect(error).toBeInstanceOf(ZitadelConfigSignupPolicyInvalidError);
+      expect(error).toMatchObject({
+        message: `${SignupPolicy.PATH} is not a valid sign-up policy`,
+        path: SignupPolicy.PATH,
+      });
     });
   });
 
@@ -803,7 +815,7 @@ describe("ZitadelConfig.scaffold", () => {
         return config.scaffold({ ...MINIMAL, sso: [{ selection: googleSelection }], force });
       });
 
-      expect(error).toBeInstanceOf(ConnectionExistsError);
+      expect(error).toBeInstanceOf(ZitadelConfigConnectionExistsError);
       expect(error).toMatchObject({ path: GOOGLE, selection: googleSelection });
     });
 
@@ -814,7 +826,7 @@ describe("ZitadelConfig.scaffold", () => {
         return config.scaffold({ ...MINIMAL, sso: [{ selection: googleSelection }] });
       });
 
-      expect(error).toBeInstanceOf(ConnectionExistsError);
+      expect(error).toBeInstanceOf(ZitadelConfigConnectionExistsError);
       expect(error).toMatchObject({ path: `${CONFIG_DIRECTORIES.connections}/elsewhere.json` });
     });
 
@@ -825,7 +837,7 @@ describe("ZitadelConfig.scaffold", () => {
         return config.scaffold({ ...MINIMAL, sso: [{ selection: googleSelection }] });
       });
 
-      expect(error).toBeInstanceOf(ConnectionExistsError);
+      expect(error).toBeInstanceOf(ZitadelConfigConnectionExistsError);
       expect(error).toMatchObject({ path: GOOGLE, selection: googleSelection });
     });
 
@@ -838,10 +850,10 @@ describe("ZitadelConfig.scaffold", () => {
         return config.scaffold({ ...MINIMAL, sso: [{ selection: googleSelection }] });
       });
 
-      expect(error).toBeInstanceOf(ConflictError);
+      expect(error).toBeInstanceOf(ZitadelConfigConnectionExistsError);
     });
 
-    it("refuses one that connects to another issuer, saying to choose another slug", () => {
+    it("refuses one that connects to another issuer", () => {
       const config = aConfig({
         connections: {
           "acme.json": anOidcConnection({ oidc: { issuer: "https://sso.other.example" } }),
@@ -852,9 +864,9 @@ describe("ZitadelConfig.scaffold", () => {
         return config.scaffold({ ...MINIMAL, sso: [{ selection: acmeSelection }] });
       });
 
-      expect(error).toBeInstanceOf(ConflictError);
+      expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
       expect(error).toMatchObject({
-        hint: expect.stringContaining("Choose another slug for this connection"),
+        message: expect.stringContaining("connects to https://sso.other.example"),
       });
     });
   });
@@ -879,7 +891,7 @@ describe("ZitadelConfig.scaffold", () => {
         return config.scaffold({ ...MINIMAL, sso: [{ selection: acmeSelection }] });
       });
 
-      expect(error).toBeInstanceOf(ConflictError);
+      expect(error).toBeInstanceOf(ZitadelConfigResourceClashError);
     });
   });
 
@@ -951,7 +963,7 @@ describe("ZitadelConfig.bundle", () => {
       return config.bundle(new MemoryStore());
     });
 
-    expect(error).toBeInstanceOf(ConfigError);
+    expect(error).toBeInstanceOf(ZitadelConfigError);
     expect(error).toMatchObject({
       message: "A release carries at most one OAuth settings file, but .zitadel/oauth/ holds 2",
     });
@@ -1030,7 +1042,7 @@ describe("ZitadelConfig.bundle", () => {
       return config.bundle(new MemoryStore());
     });
 
-    expect(error).toBeInstanceOf(ConfigError);
+    expect(error).toBeInstanceOf(ZitadelConfigNothingToDeployError);
     expect(error).toMatchObject({ message: "There is nothing in .zitadel/ to deploy" });
   });
 
@@ -1062,7 +1074,9 @@ describe("ZitadelConfig.bundle", () => {
     });
 
     expect(error).toMatchObject({
-      message: "A release carries at most one branding, but .zitadel/branding/ holds 2",
+      message: expect.stringContaining(
+        "A release carries at most one branding, but .zitadel/branding/ holds 2",
+      ),
     });
   });
 
@@ -1088,9 +1102,11 @@ describe("ZitadelConfig.bundle", () => {
       return config.bundle(new MemoryStore());
     });
 
-    expect(error).toBeInstanceOf(ConfigError);
+    expect(error).toBeInstanceOf(ZitadelConfigError);
     expect(error).toMatchObject({
-      message: "A release carries at most one branding, but .zitadel/branding/ holds 2",
+      message: expect.stringContaining(
+        "A release carries at most one branding, but .zitadel/branding/ holds 2",
+      ),
     });
   });
 
@@ -1101,7 +1117,7 @@ describe("ZitadelConfig.bundle", () => {
       return config.bundle(new MemoryStore());
     });
 
-    expect(error).toBeInstanceOf(ConfigError);
+    expect(error).toBeInstanceOf(ZitadelConfigError);
     expect(error).toMatchObject({
       message: "A release pins at most 50 resources, but .zitadel/ holds 51",
     });

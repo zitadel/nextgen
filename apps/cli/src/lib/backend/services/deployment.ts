@@ -8,7 +8,11 @@ import { Paging } from "@zitadel/api/runtime/paging";
 
 import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
 import { isCancelled, pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
-import { ConflictError } from "@/lib/backend/errors";
+import {
+  BackendConflictError,
+  BackendError,
+  BackendReleaseRevokedError,
+} from "@/lib/backend/errors";
 
 import { OriginService } from "./origin";
 import { Variable } from "./variable";
@@ -506,7 +510,7 @@ export class DeploymentService extends ApiService {
    *
    * @param input - The release, the targets and the optional guard.
    * @returns The deployment, new or the one the targets already served.
-   * @throws ConflictError `409` (`dep.conflict`) when `expected_deployment_id` is no longer the newest.
+   * @throws BackendConflictError `409` (`dep.conflict`) when `expected_deployment_id` is no longer the newest.
    */
   async create(input: DeploymentInput): Promise<Deployment> {
     const record = await this.client.createDeployment(input, {
@@ -522,7 +526,7 @@ export class DeploymentService extends ApiService {
    * @param deploymentId - The deployment to re-apply.
    * @param options - A message, and the guard against a deploy that raced in.
    * @returns The deployment the rollback wrote, or the one already serving.
-   * @throws ConflictError `409` (`dep.conflict`) when `expected_deployment_id` is no longer the newest.
+   * @throws BackendConflictError `409` (`dep.conflict`) when `expected_deployment_id` is no longer the newest.
    */
   async rollback(deploymentId: string, options: RollbackInput = {}): Promise<Deployment> {
     const record = await this.client.rollbackDeployment(
@@ -560,33 +564,34 @@ export class DeploymentService extends ApiService {
         deployment,
       };
     } catch (error) {
-      if (!(error instanceof ConflictError)) {
-        throw error;
-      }
-      if (error.serverCode === "rel.revoked") {
+      if (error instanceof BackendReleaseRevokedError) {
         return {
           outcome: "revoked",
         };
       }
-      // The conflict is the answer; naming the deployment that won it is the
-      // report. A read that fails here leaves the winner unnamed rather than
-      // replacing a race the caller can act on with an error it cannot.
-      //
-      // The newest primary, not the newest to land on these origins: the guard
-      // above asks what this deploy was replacing, while this asks what the
-      // project serves now, which is what the caller is told and what it would
-      // guard against on a retry.
-      return {
-        outcome: "raced",
-        current: await this.newestPrimary().catch((cause: unknown): undefined => {
+      if (error instanceof BackendConflictError) {
+        // The conflict is the answer; naming the deployment that won it is the
+        // report. A read that fails here leaves the winner unnamed rather than
+        // replacing a race the caller can act on with an error it cannot.
+        //
+        // The newest primary, not the newest to land on these origins: the guard
+        // above asks what this deploy was replacing, while this asks what the
+        // project serves now, which is what the caller is told and what it would
+        // guard against on a retry.
+        const current = await this.newestPrimary().catch((error: unknown) => {
           // A cancellation is not a winner that could not be named: the person
           // asked the command to stop, and nothing was deployed to report.
-          if (isCancelled(this.client)) {
-            throw cause;
+          if (error instanceof BackendError && !isCancelled(this.client)) {
+            return undefined;
           }
-          return undefined;
-        }),
-      };
+          throw error;
+        });
+        return {
+          outcome: "raced",
+          current,
+        };
+      }
+      throw error;
     }
   }
 

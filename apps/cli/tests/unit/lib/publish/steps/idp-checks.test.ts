@@ -3,8 +3,8 @@ import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
 
-import { ForbiddenError } from "@/lib/backend/errors";
-import { ZitadelError } from "@/lib/errors";
+import { BackendForbiddenError } from "@/lib/backend";
+import { PublishConnectionVariableMissingError, PublishError } from "@/lib/publish";
 import { validateConnections } from "@/lib/publish/steps/idp-checks";
 import { aConfig, anOidcConnection } from "@tests/helpers/config";
 import { answering, refusal, answeringVariables } from "@tests/helpers/api-answers";
@@ -61,7 +61,7 @@ describe("validateConnections", () => {
       return validateConnections(context);
     });
 
-    expect(error).toBeInstanceOf(ZitadelError);
+    expect(error).toBeInstanceOf(PublishError);
     expect(error).toMatchObject({
       message: expect.stringContaining(".zitadel/idps/acme-workspace.json"),
     });
@@ -86,7 +86,7 @@ describe("validateConnections", () => {
       return validateConnections(context);
     });
 
-    expect(error).toBeInstanceOf(ZitadelError);
+    expect(error).toBeInstanceOf(PublishError);
     expect(error).toMatchObject({
       message: expect.stringContaining(
         ".zitadel/idps/b-okta.json: client_secret names the variable OKTA_CLIENT_SECRET",
@@ -103,7 +103,7 @@ describe("validateConnections", () => {
         return validateConnections(context);
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({ code: "E_CREDENTIAL_MISSING" });
     });
 
@@ -115,15 +115,9 @@ describe("validateConnections", () => {
         return validateConnections(context);
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishConnectionVariableMissingError);
       expect(error).toMatchObject({
-        nextCommands: [
-          {
-            id: "variable:set",
-            args: { name: "ACME_CLIENT_SECRET" },
-            flags: { secret: true, preview: false },
-          },
-        ],
+        message: expect.stringContaining("ACME_CLIENT_SECRET"),
       });
     });
 
@@ -137,7 +131,7 @@ describe("validateConnections", () => {
         return validateConnections(context);
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({ message: expect.stringContaining("which is not a secret") });
     });
 
@@ -159,7 +153,7 @@ describe("validateConnections", () => {
         return validateConnections(context);
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({ message: expect.stringContaining("which is a secret") });
     });
 
@@ -178,7 +172,7 @@ describe("validateConnections", () => {
         return validateConnections(context);
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
         message: expect.stringContaining(
           "client_id and client_secret both name the variable ACME_CLIENT_SECRET",
@@ -194,7 +188,7 @@ describe("validateConnections", () => {
         return validateConnections(context);
       });
 
-      expect(error).toBeInstanceOf(ForbiddenError);
+      expect(error).toBeInstanceOf(BackendForbiddenError);
     });
   });
 
@@ -207,7 +201,7 @@ describe("validateConnections", () => {
         return validateConnections(context);
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({ code: "E_CREDENTIAL_MISSING" });
     });
 
@@ -219,15 +213,9 @@ describe("validateConnections", () => {
         return validateConnections(context);
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishConnectionVariableMissingError);
       expect(error).toMatchObject({
-        nextCommands: [
-          {
-            id: "variable:set",
-            args: { name: "ACME_CLIENT_SECRET" },
-            flags: { secret: true, preview: true },
-          },
-        ],
+        message: expect.stringContaining("ACME_CLIENT_SECRET"),
       });
     });
 
@@ -242,7 +230,7 @@ describe("validateConnections", () => {
         return validateConnections(context);
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({ code: "E_CREDENTIAL_MISSING" });
     });
 

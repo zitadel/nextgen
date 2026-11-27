@@ -1,4 +1,4 @@
-import { realpath } from "node:fs/promises";
+import { FsError, realpath } from "@/lib/fs";
 import { resolve } from "node:path";
 
 import type { Run, TcpListener } from "./local";
@@ -143,8 +143,13 @@ export class RealMachine implements LocalMachine {
  * @param folder - The folder.
  * @returns Its real path.
  */
-function resolved(folder: string): Promise<string> {
-  return realpath(folder).catch(() => {
-    return resolve(folder);
-  });
+async function resolved(folder: string): Promise<string> {
+  try {
+    return await realpath(folder);
+  } catch (error) {
+    if (error instanceof FsError) {
+      return resolve(folder);
+    }
+    throw error;
+  }
 }

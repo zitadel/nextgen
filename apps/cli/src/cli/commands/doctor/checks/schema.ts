@@ -1,12 +1,18 @@
-import { createZitadelClient, IdpService } from "@/lib/backend";
+import { BackendError, createZitadelClient, IdpService } from "@/lib/backend";
 import { ZitadelRuntime } from "@/lib/server";
-import { isCancellation } from "@/lib/errors";
+import { FsError } from "@/lib/fs";
 import { DEPLOYED_DEPENDENT_RULE } from "@/lib/publish/steps/validate";
 import { Runtime } from "@/lib/runtime";
-import { CONFIG_DIRECTORIES, DiskStore, type Issue, ZitadelConfig } from "@/lib/zitadel";
+import {
+  CONFIG_DIRECTORIES,
+  DiskStore,
+  type Issue,
+  ZitadelConfig,
+  ZitadelConfigError,
+} from "@/lib/zitadel";
 
-import { AbstractSanityCheck, type CheckContext, type CheckOutcome } from "./types";
-import { Project } from "@/lib/project";
+import { AbstractSanityCheck, CheckFailure, type CheckContext, type CheckOutcome } from "./types";
+import { Project, ProjectError } from "@/lib/project";
 
 /**
  * What one read of the configuration found.
@@ -57,12 +63,7 @@ export class SchemaCheck extends AbstractSanityCheck {
    */
   override async run(ctx: CheckContext): Promise<CheckOutcome> {
     try {
-      const found = await this.inspected(ctx).catch(() => {
-        return undefined;
-      });
-      if (found === undefined) {
-        return await super.run(ctx);
-      }
+      const found = await this.inspected(ctx);
       const brokenSchemas = found.config.broken.filter((file) => {
         return file.kind === "schema";
       });
@@ -105,6 +106,11 @@ export class SchemaCheck extends AbstractSanityCheck {
         message: this.summary,
         path: this.path,
       };
+    } catch (error) {
+      if (error instanceof ZitadelConfigError) {
+        return await super.run(ctx);
+      }
+      throw error;
     } finally {
       this.inspections.delete(ctx);
     }
@@ -196,10 +202,16 @@ export class SchemaCheck extends AbstractSanityCheck {
       });
       return await new IdpService(client, secret.data.project_id).deployedSlugs();
     } catch (error) {
-      if (isCancellation(error)) {
-        throw error;
+      if (error instanceof ProjectError) {
+        return undefined;
       }
-      return undefined;
+      if (error instanceof FsError) {
+        return undefined;
+      }
+      if (error instanceof BackendError) {
+        return undefined;
+      }
+      throw error;
     }
   }
 
@@ -216,7 +228,7 @@ export class SchemaCheck extends AbstractSanityCheck {
       return issue.severity === "error";
     });
     if (errors.length > 0) {
-      throw new Error(described(errors));
+      throw new CheckFailure(described(errors));
     }
   }
 }

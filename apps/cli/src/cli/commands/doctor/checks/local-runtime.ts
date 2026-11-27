@@ -1,9 +1,11 @@
 import { errorMessage } from "@/lib/errors";
+import { isErrno } from "@/lib/errno";
 import {
   BinaryLauncher,
   DockerLauncher,
   type DockerResult,
   LocalRuntime,
+  LocalServerDockerMissingError,
   type LocalServers,
   type ManagedRuntimeProcess,
   type RuntimeBackend,
@@ -77,6 +79,7 @@ export class LocalRuntimeChecks {
     if (backend === "binary") {
       before.push(
         await AbstractSanityCheck.attempt(
+          this.runtimeDir,
           "server-binary",
           "Server npm package is available",
           () => {
@@ -91,16 +94,27 @@ export class LocalRuntimeChecks {
         return `Docker is not reachable${because}; managed local runtime commands need Docker, but remote or cloud setup can continue with --server <url>.`;
       };
       const docker = await AbstractSanityCheck.attempt(
+        this.runtimeDir,
         "docker-cli",
         "Docker is reachable",
         async () => {
-          const result = await this.docker().catch((error: unknown) => {
-            throw new Error(unreachable(errorMessage(error)), { cause: error });
-          });
-          if (result.status !== 0) {
-            throw new Error(unreachable(result.stderr || "docker version failed"));
+          try {
+            const result = await this.docker();
+            if (result.status !== 0) {
+              throw new CheckFailure(unreachable(result.stderr || "docker version failed"));
+            }
+            return `Docker engine ${result.stdout.trim() || "available"}`;
+          } catch (error) {
+            if (error instanceof LocalServerDockerMissingError) {
+              throw new CheckFailure(unreachable(errorMessage(error.cause)), undefined, {
+                cause: error,
+              });
+            }
+            if (isErrno(error, "ENOENT") || isErrno(error, "EACCES")) {
+              throw new CheckFailure(unreachable(errorMessage(error)), undefined, { cause: error });
+            }
+            throw error;
           }
-          return `Docker engine ${result.stdout.trim() || "available"}`;
         },
         "warn",
       );
@@ -108,6 +122,7 @@ export class LocalRuntimeChecks {
       if (docker.status === "pass") {
         before.push(
           await AbstractSanityCheck.attempt(
+            this.runtimeDir,
             "image",
             `Image ${image} is available`,
             async () => {
@@ -121,10 +136,8 @@ export class LocalRuntimeChecks {
               } catch (error) {
                 const detail = errorMessage(error).trim();
                 const suffix = detail ? ` (${detail})` : "";
-                throw new Error(
-                  `Image ${image} is not available to Docker${suffix}; ${this.suggest({ id: "start" })} may need a pull or a different image.`,
-                  { cause: error },
-                );
+                const message = `Image ${image} is not available to Docker${suffix}; ${this.suggest({ id: "start" })} may need a pull or a different image.`;
+                throw new CheckFailure(message, undefined, { cause: error });
               }
             },
             "warn",
@@ -140,6 +153,7 @@ export class LocalRuntimeChecks {
     }
 
     const stateDirectory = await AbstractSanityCheck.attempt(
+      this.runtimeDir,
       "state-dir",
       "Local state directory is writable",
       async () => {
@@ -154,6 +168,7 @@ export class LocalRuntimeChecks {
     );
 
     const portAvailable = await AbstractSanityCheck.attempt(
+      this.runtimeDir,
       "port",
       `Port ${String(port)} is available`,
       async () => {
@@ -183,6 +198,7 @@ export class LocalRuntimeChecks {
     );
 
     const runtimeHealthy = await AbstractSanityCheck.attempt(
+      this.runtimeDir,
       "runtime",
       "Existing local runtime is healthy",
       async () => {
@@ -190,12 +206,12 @@ export class LocalRuntimeChecks {
           return "No existing runtime metadata";
         }
         if (runtime.backend !== backend) {
-          throw new Error(
+          throw new CheckFailure(
             `Existing local runtime uses ${runtime.backend}; run start --runtime ${backend} to switch backends.`,
           );
         }
         if (!(await this.isHealthy(runtime.server_url))) {
-          throw new Error(`${runtime.server_url} is not ready: /readyz did not answer ok`);
+          throw new CheckFailure(`${runtime.server_url} is not ready: /readyz did not answer ok`);
         }
         if (this.inheritedFrom === undefined) {
           return `${runtime.server_url} is healthy`;

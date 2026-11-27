@@ -31,11 +31,12 @@ import semver from "semver";
 import type { CreatedProject } from "@/lib/backend";
 import type { Consent, Gate } from "@/lib/consent";
 import type { InitialDeployment } from "@/lib/environment";
-import { errorMessage, ZitadelError } from "@/lib/errors";
-import { Repository } from "@/lib/git";
+import { ZitadelError } from "@/lib/errors";
+import { GitError, Repository } from "@/lib/git";
 import {
   type CustomFlagValues,
   customFlagValues,
+  IdpError,
   type PublishState,
   SETUP_FLAG_KEYS,
   SETUP_FLAG_NAMES,
@@ -49,18 +50,23 @@ import type { derivePosture } from "@/lib/orca/patchers/posture";
 import type { PatchContext, PatchResult } from "@/lib/orca/patchers/types";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import type { Facts } from "@/cli/core/base";
-import { LocalRuntime, type LocalMachine, type ResolvedServer, ZitadelRuntime } from "@/lib/server";
+import {
+  LocalRuntime,
+  LocalServerError,
+  type LocalMachine,
+  type ResolvedServer,
+  ZitadelRuntime,
+} from "@/lib/server";
 
 import { style } from "@/lib/ui";
 import type { Suggest, SuggestedCommand, SuggestFlags } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { tryCatch } from "@/lib/try-catch";
 import type { Questions, Spinner, Step, Ui } from "@/lib/ui";
 import {
   CONFIG_DIRECTORIES,
-  ConnectionExistsError,
+  ZitadelConfigConnectionExistsError,
   DiskStore,
-  FileExistsError,
+  ZitadelConfigFileExistsError,
   PasswordPolicy,
   type PasswordMinLength,
   type Scaffold,
@@ -837,6 +843,36 @@ export async function scaffoldOf(
   }
 }
 
+/** How setup refuses to replace a password policy file that is already there. */
+const PASSWORD_POLICY_EXISTS_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Rerun setup with --force to keep this policy and deploy it to the new project, or move the file aside to start from an empty one.",
+  details: {
+    file: "{path}",
+  },
+} as const satisfies Refusal;
+
+/** How setup refuses to replace a signup policy file that is already there. */
+const SIGNUP_POLICY_EXISTS_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Rerun setup with --force to keep this policy and deploy it to the new project, or move the file aside to start from the default.",
+  details: {
+    file: "{path}",
+  },
+} as const satisfies Refusal;
+
+/** How setup refuses to replace any other file that is already there. */
+const FILE_EXISTS_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Move the file aside or rerun setup with --force if you want setup to replace it.",
+  details: {
+    file: "{path}",
+  },
+} as const satisfies Refusal;
+
 /**
  * The refusal setup words for a file it will not write, with what to do about
  * that file; any other error as it is.
@@ -856,10 +892,10 @@ export function setupRefusal(
   error: unknown,
   connections: readonly ScaffoldedConnection[],
 ): unknown {
-  if (error instanceof ConnectionExistsError) {
+  if (error instanceof ZitadelConfigConnectionExistsError) {
     return connectionRefusal(error.path, error.selection);
   }
-  if (!(error instanceof FileExistsError)) {
+  if (!(error instanceof ZitadelConfigFileExistsError)) {
     return error;
   }
   const planned = connections.find((scaffolded) => {
@@ -869,20 +905,23 @@ export function setupRefusal(
     return connectionRefusal(error.path, planned.chosen.selection);
   }
   if (error.path === PasswordPolicy.PATH) {
-    return new ZitadelError("E_CONFLICT", error.message, {
-      hint: "Rerun setup with --force to keep this policy and deploy it to the new project, or move the file aside to start from an empty one.",
-      details: error.details,
+    return refusalError(PASSWORD_POLICY_EXISTS_REFUSAL, {
+      ...error,
+      message: error.message,
+      path: error.path,
     });
   }
   if (error.path === SignupPolicy.PATH) {
-    return new ZitadelError("E_CONFLICT", error.message, {
-      hint: "Rerun setup with --force to keep this policy and deploy it to the new project, or move the file aside to start from the default.",
-      details: error.details,
+    return refusalError(SIGNUP_POLICY_EXISTS_REFUSAL, {
+      ...error,
+      message: error.message,
+      path: error.path,
     });
   }
-  return new ZitadelError("E_CONFLICT", error.message, {
-    hint: "Move the file aside or rerun setup with --force if you want setup to replace it.",
-    details: error.details,
+  return refusalError(FILE_EXISTS_REFUSAL, {
+    ...error,
+    message: error.message,
+    path: error.path,
   });
 }
 
@@ -1241,10 +1280,13 @@ export async function inspectWorktree(cwd: string): Promise<WorktreeState> {
         }),
     };
   } catch (error) {
-    return {
-      kind: "unknown",
-      reason: errorMessage(error),
-    };
+    if (error instanceof GitError) {
+      return {
+        kind: "unknown",
+        reason: error.message,
+      };
+    }
+    throw error;
   }
 }
 
@@ -1341,33 +1383,7 @@ export function retryOptionsFromFlags(
     ssoScopes?: string;
   }>,
 ): SetupRetryOptions {
-  const [, selection] = tryCatch(() => {
-    if (flags.sso === undefined) {
-      return undefined;
-    }
-    return selectionFromFlags(
-      flags.sso,
-      customFlagValues(flags, SETUP_FLAG_KEYS),
-      SETUP_FLAG_NAMES,
-      "",
-    );
-  });
-  return {
-    ssoTyped:
-      selection === undefined &&
-      flags.sso !== undefined &&
-      (flags.sso === CUSTOM_PROVIDER ||
-        IDP_PROVIDERS.some((provider) => {
-          return provider === flags.sso;
-        }))
-        ? {
-            sso: flags.sso,
-            ssoSlug: flags.ssoSlug,
-            ssoDisplayName: flags.ssoDisplayName,
-            ssoIssuer: flags.ssoIssuer,
-            ssoScopes: flags.ssoScopes,
-          }
-        : undefined,
+  const typed = {
     framework: flags.framework,
     preset: SETUP_PRESETS.find((preset) => {
       return preset === flags.preset;
@@ -1378,8 +1394,49 @@ export function retryOptionsFromFlags(
     renderer: flags.renderer,
     devPort: flags.devPort,
     passwordMinLength: flags.passwordMinLength,
-    sso: selection === undefined ? undefined : [selection],
   };
+  if (flags.sso === undefined) {
+    return {
+      ...typed,
+      ssoTyped: undefined,
+      sso: undefined,
+    };
+  }
+  try {
+    return {
+      ...typed,
+      ssoTyped: undefined,
+      sso: [
+        selectionFromFlags(
+          flags.sso,
+          customFlagValues(flags, SETUP_FLAG_KEYS),
+          SETUP_FLAG_NAMES,
+          "",
+        ),
+      ],
+    };
+  } catch (error) {
+    if (error instanceof IdpError) {
+      return {
+        ...typed,
+        ssoTyped:
+          flags.sso === CUSTOM_PROVIDER ||
+          IDP_PROVIDERS.some((provider) => {
+            return provider === flags.sso;
+          })
+            ? {
+                sso: flags.sso,
+                ssoSlug: flags.ssoSlug,
+                ssoDisplayName: flags.ssoDisplayName,
+                ssoIssuer: flags.ssoIssuer,
+                ssoScopes: flags.ssoScopes,
+              }
+            : undefined,
+        sso: undefined,
+      };
+    }
+    throw error;
+  }
 }
 
 /**
@@ -1563,27 +1620,32 @@ export async function outdatedLocalServer(
   cwd: string,
   machine: LocalMachine,
 ): Promise<OutdatedLocalServer | undefined> {
-  const nearest = await LocalRuntime.readNearest(cwd).catch(() => {
-    return undefined;
-  });
-  const runtime = nearest?.runtime;
-  const expected = machine.bundledVersion();
-  if (
-    !nearest ||
-    runtime?.backend !== "binary" ||
-    expected === undefined ||
-    !semver.valid(expected) ||
-    !semver.valid(runtime.server_version) ||
-    runtime.server_version === expected
-  ) {
-    return undefined;
+  try {
+    const nearest = await LocalRuntime.readNearest(cwd);
+    const runtime = nearest?.runtime;
+    const expected = machine.bundledVersion();
+    if (
+      !nearest ||
+      runtime?.backend !== "binary" ||
+      expected === undefined ||
+      !semver.valid(expected) ||
+      !semver.valid(runtime.server_version) ||
+      runtime.server_version === expected
+    ) {
+      return undefined;
+    }
+    return {
+      dir: nearest.dir,
+      serverUrl: runtime.server_url,
+      running: runtime.server_version,
+      expected,
+    };
+  } catch (error) {
+    if (error instanceof LocalServerError) {
+      return undefined;
+    }
+    throw error;
   }
-  return {
-    dir: nearest.dir,
-    serverUrl: runtime.server_url,
-    running: runtime.server_version,
-    expected,
-  };
 }
 
 /**

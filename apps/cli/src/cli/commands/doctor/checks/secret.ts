@@ -2,16 +2,27 @@ import { join } from "node:path";
 
 import { createZitadelClient, Origins, ProjectService } from "@/lib/backend";
 import { Dotenv } from "@/lib/environment";
-import { Project } from "@/lib/project";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
+import { Project, ProjectFileMissingError } from "@/lib/project";
 import { ZitadelRuntime } from "@/lib/server";
 import { Runtime } from "@/lib/runtime";
 
-import { AbstractSanityCheck, type CheckContext } from "./types";
+import { AbstractSanityCheck, CheckFailure, type CheckContext } from "./types";
 
 /**
  * The env file the CLI reads, which setup fills with the project's credentials.
  */
 const DEVELOPMENT_ENV_FILE = ".env.development.local";
+
+/**
+ * How the check fails when there is no `.zitadel/secret`: `doctor --fix`
+ * rebuilds it from the env file setup filled.
+ */
+const SECRET_MISSING_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Run `zitadel doctor --fix` to restore the project secret from .env.development.local.",
+} as const satisfies Refusal;
 
 /**
  * Verifies `.zitadel/secret` exists and parses. A missing file is rebuilt from
@@ -23,8 +34,22 @@ export class SecretCheck extends AbstractSanityCheck {
   readonly path = ".zitadel/secret";
   protected readonly summary = ".zitadel/secret parses";
 
+  /**
+   * Reads `.zitadel/secret`, which parses it.
+   *
+   * @param ctx - The project to check.
+   * @returns Once the secret parses.
+   * @throws {ZitadelError} When there is no secret, pointing at `doctor --fix`.
+   */
   protected async verify(ctx: CheckContext): Promise<void> {
-    await Project.at(ctx.cwd).secret();
+    try {
+      await Project.at(ctx.cwd).secret();
+    } catch (error) {
+      if (error instanceof ProjectFileMissingError) {
+        throw refusalError(SECRET_MISSING_REFUSAL, { ...error, message: error.message });
+      }
+      throw error;
+    }
   }
 
   /**
@@ -44,14 +69,14 @@ export class SecretCheck extends AbstractSanityCheck {
     const projectSecret = env?.ZITADEL_PROJECT_SECRET;
     const previewSecret = env?.ZITADEL_PREVIEW_TOKEN;
     if (!projectId || !projectSecret || !previewSecret) {
-      throw new Error(
+      throw new CheckFailure(
         `${DEVELOPMENT_ENV_FILE} must hold ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET and ZITADEL_PREVIEW_TOKEN to restore the project's secrets`,
       );
     }
     const config = await Project.at(ctx.cwd).config();
     const configured = config.data.project;
     if (projectId !== configured) {
-      throw new Error(
+      throw new CheckFailure(
         `${DEVELOPMENT_ENV_FILE} names project ${projectId} but zitadel.json names ${typeof configured === "string" ? configured : "no project"}, so its secrets are not restored`,
       );
     }
@@ -67,7 +92,7 @@ export class SecretCheck extends AbstractSanityCheck {
       }),
     ).get(projectId);
     if (project.id !== projectId) {
-      throw new Error(`The server returned project ${project.id}, not ${projectId}`);
+      throw new CheckFailure(`The server returned project ${project.id}, not ${projectId}`);
     }
     const origins = Origins.wrap(project.origins);
     await Project.at(ctx.cwd).writeSecret({

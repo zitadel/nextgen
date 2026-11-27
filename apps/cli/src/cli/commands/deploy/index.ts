@@ -5,7 +5,8 @@ import { z } from "zod";
 
 import { Origins } from "@/lib/backend";
 import { Cmd } from "@/lib/cmd";
-import { confirmationHint, ZitadelError } from "@/lib/errors";
+import { ConsentRequiredError } from "@/lib/consent";
+import { ZitadelError } from "@/lib/errors";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, Connection, CommandResult } from "@/cli/core";
 import { reads, type Refused } from "@/cli/core/flags";
@@ -28,7 +29,8 @@ import {
 } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
-import { Project } from "@/lib/project";
+import { FsError } from "@/lib/fs";
+import { Project, ProjectError } from "@/lib/project";
 import { RemoveCommand } from "@/cli/commands/bases";
 import { Telemetered } from "@/cli/telemetry/telemetered";
 
@@ -231,14 +233,10 @@ export default class Deploy extends Telemetered(
     const diff = this.said(prepared);
     const question = await this.lockoutQuestion(prepared.lockouts);
     if (question !== undefined && this.nonInteractive && !this.force) {
-      throw new ZitadelError(
-        "E_CONFIRMATION_REQUIRED",
+      throw new ConsentRequiredError(
         `Cannot ${LOCKOUT_ACTION} without --force in non-interactive mode`,
-        {
-          hint: confirmationHint(question),
-          details: { question },
-          nextCommands: [await this.again("deploy", { with: { dryRun: true, force: true } })],
-        },
+        question,
+        await this.again("deploy", { with: { dryRun: true, force: true } }),
       );
     }
     const { resourceCount } = prepared;
@@ -485,14 +483,18 @@ export default class Deploy extends Telemetered(
     }
     const setupProject = await Project.at(this.cwd)
       .secret()
-      .then(
-        (secret) => {
-          return secret.data.project_id;
-        },
-        () => {
+      .then((secret) => {
+        return secret.data.project_id;
+      })
+      .catch((error: unknown) => {
+        if (error instanceof ProjectError) {
           return undefined;
-        },
-      );
+        }
+        if (error instanceof FsError) {
+          return undefined;
+        }
+        throw error;
+      });
     const missing = missingPrimaryOrigin({
       origins,
       issuer: environment.values.ZITADEL_ISSUER?.value,

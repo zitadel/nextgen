@@ -1,18 +1,29 @@
-import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { errorMessage, ZitadelError } from "@/lib/errors";
-import { isErrno } from "@/lib/errno";
+import { errorMessage } from "@/lib/errors";
+import { FsNotFoundError, readFile, writeFile } from "@/lib/fs";
 import { isObject } from "@/lib/json";
 
+import { STATE_PATH, SyncStateMalformedError, SyncStateUnreadableError } from "./errors";
 import type { ScaffoldManifest, StoredState } from "./types.js";
 
 export type { StoredState, ZitadelState } from "./types.js";
 
 /**
- * Where the state file lives, relative to the project root.
+ * The state file's text as JSON.
+ *
+ * @param raw - The file's text.
+ * @returns What it parses as.
+ * @throws {@link SyncStateUnreadableError} When it is not JSON, with the parser's message and error.
  */
-const STATE_PATH = ".zitadel/state.json";
+function parsedJson(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    // The boundary: `JSON.parse` throws an untyped SyntaxError.
+    throw new SyncStateUnreadableError(errorMessage(error), error);
+  }
+}
 
 /**
  * Read and parse `.zitadel/state.json`.
@@ -24,14 +35,14 @@ const STATE_PATH = ".zitadel/state.json";
  *
  * @param cwd - The project root.
  * @returns The file's sections, unchecked.
- * @throws {@link Error} When the file is missing, is not JSON, or does not
- *   hold an object.
+ * @throws {@link FsError} When the file is missing or cannot be read.
+ * @throws {@link SyncStateUnreadableError} When it is not JSON or does not hold an object.
  */
 export async function readState(cwd: string): Promise<StoredState> {
   const raw = await readFile(join(cwd, STATE_PATH), "utf8");
-  const parsed: unknown = JSON.parse(raw);
+  const parsed = parsedJson(raw);
   if (!isObject(parsed)) {
-    throw new Error(`${STATE_PATH} does not hold an object`);
+    throw new SyncStateUnreadableError(`${STATE_PATH} does not hold an object`);
   }
   return parsed;
 }
@@ -48,7 +59,8 @@ export async function readState(cwd: string): Promise<StoredState> {
  * @param cwd - The project root.
  * @param scaffold - The manifest to record.
  * @returns Nothing, once the file is written.
- * @throws {@link Error} When the file cannot be read or written.
+ * @throws {@link FsError} When the file cannot be read or written.
+ * @throws {@link SyncStateMalformedError} When it is not JSON or does not hold an object.
  */
 export async function updateScaffold(cwd: string, scaffold: ScaffoldManifest): Promise<void> {
   const current = await readState(cwd);
@@ -73,8 +85,8 @@ export async function updateScaffold(cwd: string, scaffold: ScaffoldManifest): P
  * @param cwd - The project root.
  * @param paths - The project-relative paths of the files to look up.
  * @returns The ids, by path; a path with none is left out.
- * @throws {@link ZitadelError} With `E_VALIDATION` when the state file cannot
- *   be read or parsed, or an entry it holds for one of the paths is malformed.
+ * @throws {@link SyncStateMalformedError} When the state file cannot be read
+ *   or parsed, or an entry it holds for one of the paths is malformed.
  */
 export async function publishedIds(
   cwd: string,
@@ -112,14 +124,9 @@ export async function publishedIds(
     });
     return new Map(entries);
   } catch (error) {
-    if (isErrno(error, "ENOENT")) {
+    if (error instanceof FsNotFoundError) {
       return new Map();
     }
-    throw new ZitadelError("E_VALIDATION", `Cannot read ${STATE_PATH}: ${errorMessage(error)}`, {
-      hint:
-        "The file records which platform resource each local file was synced as. " +
-        "Fix or remove it, then run this command again.",
-      details: { file: STATE_PATH },
-    });
+    throw new SyncStateMalformedError(`Cannot read ${STATE_PATH}: ${errorMessage(error)}`, error);
   }
 }

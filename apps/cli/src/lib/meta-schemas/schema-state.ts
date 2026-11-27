@@ -1,9 +1,7 @@
-import { lstat } from "node:fs/promises";
 import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 
-import { isErrno } from "@/lib/errno";
-import { readIfExists } from "@/lib/fs";
+import { FsNotFoundError, lstat, readIfExists } from "@/lib/fs";
 import { parseJsonOrUndefined } from "@/lib/json";
 
 import type { MetaSchemaState, ProjectMetaSchema } from "./types";
@@ -124,7 +122,7 @@ export class SchemaState {
           return prefix;
         }
       } catch (error) {
-        if (isErrno(error, "ENOENT")) {
+        if (error instanceof FsNotFoundError) {
           return undefined;
         }
         throw error;

@@ -1,4 +1,5 @@
-import { stat } from "node:fs/promises";
+import { FsError, stat } from "@/lib/fs";
+import { PmManifestInvalidError } from "@/lib/pm";
 import { join } from "node:path";
 
 import { hasDependency, readPackageJson } from "./package-json";
@@ -24,18 +25,26 @@ export class NuxtDetector implements Detector {
   readonly versionFloor = "4";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
-    const pkg = await readPackageJson(cwd).catch(() => {
-      return undefined;
-    });
-    if (!pkg || !hasDependency(pkg, this.versionPackage)) {
-      return null;
+    try {
+      const pkg = await readPackageJson(cwd);
+      if (!hasDependency(pkg, this.versionPackage)) {
+        return null;
+      }
+
+      await enforceVersionFloor(this, pkg, cwd);
+
+      const appDir = await detectSrcDir(cwd);
+      const devPort = await detectDevPort(cwd, pkg);
+      return { id: "nuxt", appDir, devPort, url: issuerFromPort(devPort) };
+    } catch (error) {
+      if (error instanceof FsError) {
+        return null;
+      }
+      if (error instanceof PmManifestInvalidError) {
+        return null;
+      }
+      throw error;
     }
-
-    await enforceVersionFloor(this, pkg, cwd);
-
-    const appDir = await detectSrcDir(cwd);
-    const devPort = await detectDevPort(cwd, pkg);
-    return { id: "nuxt", appDir, devPort, url: issuerFromPort(devPort) };
   }
 }
 
@@ -52,12 +61,11 @@ async function detectSrcDir(cwd: string): Promise<string> {
 }
 
 async function dirExists(path: string): Promise<boolean> {
-  return stat(path).then(
-    (s) => {
-      return s.isDirectory();
-    },
-    () => {
-      return false;
-    },
-  );
+  const stats = await stat(path).catch((error: unknown) => {
+    if (error instanceof FsError) {
+      return undefined;
+    }
+    throw error;
+  });
+  return stats?.isDirectory() ?? false;
 }

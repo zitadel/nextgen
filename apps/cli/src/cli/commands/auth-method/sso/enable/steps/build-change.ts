@@ -35,7 +35,7 @@ export class BuildChange extends WizardStep<"change", Fact<"change">, Needs> {
    *
    * @param needs - What was read and decided.
    * @returns The change.
-   * @throws {@link ZitadelError} When saving the change would be refused.
+   * @throws {@link ZitadelConfigError} When saving the change would be refused.
    */
   async run(needs: Needs): Promise<Fact<"change">> {
     const change =

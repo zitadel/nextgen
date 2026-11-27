@@ -1,8 +1,13 @@
-import { mkdir, readdir, rename, rmdir } from "node:fs/promises";
+import { mkdir, readdir, rename, rmdir } from "@/lib/fs";
 import { basename, join } from "node:path";
 import { execaSync } from "execa";
 
-import { ZitadelError } from "@/lib/errors";
+import {
+  OrcaCommandFailedError,
+  OrcaCommandNotFoundError,
+  OrcaCommandSpawnFailedError,
+  OrcaNodeUnsupportedError,
+} from "@/lib/orca/errors";
 import { warnings } from "@/lib/ui";
 
 import {
@@ -119,51 +124,54 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
       );
     }
     if (support === "refused") {
-      throw new ZitadelError(
-        "E_VALIDATION",
+      throw new OrcaNodeUnsupportedError(
         `${engines.label} needs Node ${range}; this is Node v${this.nodeVersion}`,
-        {
-          hint: `Switch to Node ${describeAcceptedNode(range)} and rerun, or create the ${this.displayName} app with that Node and run setup inside it.`,
-          details: { node: this.nodeVersion, required: range },
-        },
+        this.nodeVersion,
+        range,
+        describeAcceptedNode(range),
+        this.displayName,
       );
     }
   }
 
   /**
-   * Runs an external command in `cwd`, throwing a typed {@link ZitadelError} on
-   * failure so the cause surfaces as a categorized CLI error. Distinguishes
-   * "binary not on PATH" (`ENOENT` from the spawn itself) from "binary ran but
-   * exited non-zero" — the former is not masked as a generic
-   * `exited with status 1`, which would leave users to guess. Tests stub
-   * `execa` to assert the command without spawning.
+   * Runs an external command in `cwd`, throwing a typed {@link OrcaError} on
+   * failure. Distinguishes "binary not on PATH" (`ENOENT` from the spawn
+   * itself) from "binary ran but exited non-zero" — the former is not masked
+   * as a generic `exited with status 1`, which would leave users to guess.
+   * Tests stub `execa` to assert the command without spawning.
    */
   protected runCommand(command: string, args: ReadonlyArray<string>, cwd: string): void {
     const result = execaSync(command, [...args], { cwd, reject: false });
     if (result.code !== undefined) {
-      const notFound = result.code === "ENOENT";
-      throw new ZitadelError(
-        "E_VALIDATION",
-        notFound
-          ? `Command not found: ${command}`
-          : `Failed to spawn "${command}": ${result.originalMessage ?? result.message}`,
-        {
-          hint: notFound ? `Ensure '${command}' is installed and on PATH.` : undefined,
-          details: { command, args: [...args], code: result.code },
-        },
+      if (result.code === "ENOENT") {
+        throw new OrcaCommandNotFoundError(
+          `Command not found: ${command}`,
+          command,
+          args,
+          result.code,
+        );
+      }
+      throw new OrcaCommandSpawnFailedError(
+        `Failed to spawn "${command}": ${result.originalMessage ?? result.message}`,
+        command,
+        args,
+        result.code,
       );
     }
     const status = result.exitCode ?? 1;
     if (status !== 0) {
       const stdout = String(result.stdout);
       const stderr = String(result.stderr);
-      const output = truncateCommandOutput([stderr, stdout].filter(Boolean).join("\n").trim());
-      throw new ZitadelError(
-        "E_VALIDATION",
+      throw new OrcaCommandFailedError(
         `Command "${command} ${args.join(" ")}" exited with status ${String(status)}`,
         {
-          hint: output ? `Command output:\n${output}` : "Run the command directly for more detail.",
-          details: { command, args: [...args], cwd, stdout, stderr },
+          command,
+          args: [...args],
+          cwd,
+          stdout,
+          stderr,
+          output: truncateCommandOutput([stderr, stdout].filter(Boolean).join("\n").trim()),
         },
       );
     }

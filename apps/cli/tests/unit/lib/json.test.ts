@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  JsonNotAnObjectError,
   deepMerge,
   parseJsonObject,
   setTopLevelJsonKey,
@@ -139,6 +140,14 @@ describe("parseJsonObject", () => {
     expect(() => parseJsonObject("42", "config.json")).toThrow(
       "config.json must contain a JSON object",
     );
+  });
+
+  it.each(["[]", "42", "null"])("throws a SyntaxError for the non-object %s", (text) => {
+    expect(() => parseJsonObject(text, "config.json")).toThrow(SyntaxError);
+  });
+
+  it.each(["[]", "42", "null"])("throws a JsonNotAnObjectError for the non-object %s", (text) => {
+    expect(() => parseJsonObject(text, "config.json")).toThrow(JsonNotAnObjectError);
   });
 
   it("throws a path-qualified error for JSON null", () => {

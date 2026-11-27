@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { BrokenFile, BrokenFilesError, CONFIG_DIRECTORIES, PolicyTest } from "@/lib/zitadel";
+import { BrokenFile, ZitadelConfigError, CONFIG_DIRECTORIES, PolicyTest } from "@/lib/zitadel";
 import { MemoryStore } from "@tests/helpers/storage/backend/memory";
 import { aFile, PASSWORD_POLICY } from "@tests/helpers/config";
 import { aPolicyTest, PASSWORD_POLICY_TEST_FILE, TOO_SHORT_CASE } from "@tests/helpers/policies";
@@ -64,8 +64,10 @@ describe("PolicyTest.of", () => {
       return PolicyTest.of(file);
     });
 
-    expect(error).toBeInstanceOf(BrokenFilesError);
-    expect(error).toMatchObject({ problems: [{ path: PATH }] });
+    expect(error).toBeInstanceOf(ZitadelConfigError);
+    expect(error).toMatchObject({
+      message: expect.stringContaining(`${PATH}:`),
+    });
   });
 
   it("names the file and what the contract refuses in it", () => {

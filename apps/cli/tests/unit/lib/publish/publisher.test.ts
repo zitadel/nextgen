@@ -2,9 +2,10 @@ import type { SetupServer } from "msw/node";
 import { afterEach, describe, expect, vi } from "vitest";
 
 import { createZitadelClient, type ZitadelClient } from "@/lib/backend";
-import { ConflictError } from "@/lib/backend/errors";
+import { BackendConflictError } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { type PreparedRelease, type PrepareRequest, Publisher } from "@/lib/publish/publisher";
+import { PublishConfigInvalidError } from "@/lib/publish";
 import { Output } from "@/lib/ui";
 import { DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { aFile, anOidcConnection } from "@tests/helpers/config";
@@ -275,7 +276,7 @@ describe("Publisher.deploy", () => {
         return aPublisher().deploy({ prepared: PREPARED });
       });
 
-      expect(error).toBeInstanceOf(ConflictError);
+      expect(error).toBeInstanceOf(BackendConflictError);
     });
 
     it("deploys nothing", async ({ server }) => {
@@ -408,6 +409,7 @@ describe("Publisher.prepare", () => {
         return aPublisherListing(server, BROKEN_LISTING).prepare(aDryRunOf(dir));
       });
 
+      expect(error).toBeInstanceOf(PublishConfigInvalidError);
       expect(error).toMatchObject({ code: "E_VALIDATION" });
     });
 

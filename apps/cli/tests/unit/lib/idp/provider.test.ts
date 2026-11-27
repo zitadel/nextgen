@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { ZitadelError } from "@/lib/errors";
-import { ProviderChoice } from "@/lib/idp";
-import { ConfigError, ConflictError, Connection } from "@/lib/zitadel";
+import { IdpError, ProviderChoice } from "@/lib/idp";
+import {
+  Connection,
+  ZitadelConfigConnectionNotOidcError,
+  ZitadelConfigSettingUnusableError,
+} from "@/lib/zitadel";
 import { aFile, anOidcConnection } from "@tests/helpers/config";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
@@ -39,8 +42,11 @@ describe("ProviderChoice.fromFlags", () => {
       return ProviderChoice.fromFlags({ provider: "nope" }, SCRIPTED);
     });
 
-    expect(error).toBeInstanceOf(ZitadelError);
-    expect(error).toMatchObject({ code: "E_VALIDATION", message: "Unknown provider nope" });
+    expect(error).toBeInstanceOf(IdpError);
+    expect(error).toMatchObject({
+      code: "E_VALIDATION",
+      message: "Unknown provider nope",
+    });
   });
 
   it("refuses a custom setting beside a catalog provider", () => {
@@ -48,7 +54,7 @@ describe("ProviderChoice.fromFlags", () => {
       return ProviderChoice.fromFlags({ provider: "google", slug: "acme" }, SCRIPTED);
     });
 
-    expect(error).toBeInstanceOf(ZitadelError);
+    expect(error).toBeInstanceOf(IdpError);
     expect(error).toMatchObject({ code: "E_VALIDATION" });
   });
 
@@ -57,10 +63,10 @@ describe("ProviderChoice.fromFlags", () => {
       return ProviderChoice.fromFlags({ provider: "custom", slug: "acme" }, SCRIPTED);
     });
 
-    expect(error).toBeInstanceOf(ZitadelError);
+    expect(error).toBeInstanceOf(IdpError);
     expect(error).toMatchObject({
       code: "E_VALIDATION",
-      details: { missing: ["--display-name", "--issuer"] },
+      missing: ["--display-name", "--issuer"],
     });
   });
 
@@ -116,13 +122,13 @@ describe("ProviderChoice.readStoredSettings", () => {
         return UNDESCRIBED.readStoredSettings(acme);
       });
 
-      expect(error).toBeInstanceOf(ConfigError);
+      expect(error).toBeInstanceOf(ZitadelConfigSettingUnusableError);
       expect(error).toMatchObject({
         message: expect.stringContaining(
           `${ACME_SSO_FILE} holds a display name that cannot be used: `,
         ),
-        hint: "Fix it in that file, or choose another slug.",
-        details: { file: ACME_SSO_FILE, slug: "acme-sso" },
+        path: ACME_SSO_FILE,
+        slug: "acme-sso",
       });
     });
   });
@@ -145,10 +151,11 @@ describe("ProviderChoice.readStoredSettings", () => {
         return choice.readStoredSettings(acme);
       });
 
-      expect(error).toBeInstanceOf(ConflictError);
+      expect(error).toBeInstanceOf(ZitadelConfigConnectionNotOidcError);
       expect(error).toMatchObject({
         message: `${ACME_SSO_FILE} is already named acme-sso and is not an OIDC connection`,
-        hint: "Fix the file, or choose another slug, then run the command again.",
+        path: ACME_SSO_FILE,
+        slug: "acme-sso",
       });
     });
   });

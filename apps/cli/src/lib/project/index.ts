@@ -1,4 +1,13 @@
 export type { EnvFile } from "./env-file";
+export {
+  ProjectEnvValueMultilineError,
+  ProjectEnvValueUnquotableError,
+  ProjectError,
+  ProjectConfigMissingError,
+  ProjectFileMissingError,
+  ProjectSecretMissingError,
+  ProjectInvalidError,
+} from "./errors";
 export type { Gitignore, GitignoreRule } from "./gitignore";
 export { Project } from "./project";
 export type { ProjectConfig } from "./project-config";

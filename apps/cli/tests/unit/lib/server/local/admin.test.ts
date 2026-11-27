@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, vi } from "vitest";
 
+import { LocalServerAdminMalformedError, LocalServerAdminUnreadableError } from "@/lib/server";
 import {
   LOCAL_ADMIN_EMAIL,
   LOCAL_ADMIN_FILE,
@@ -129,11 +130,10 @@ describe("local admin", () => {
 
     const error = await readLocalAdmin(cwd).catch((caught: unknown) => caught);
 
+    expect(error).toBeInstanceOf(LocalServerAdminMalformedError);
     expect(error).toMatchObject({
       code: "E_VALIDATION",
-      kind: "admin-malformed",
-      hint: undefined,
-      nextCommands: undefined,
+      path: join(cwd, LOCAL_ADMIN_FILE),
     });
   });
 
@@ -146,8 +146,10 @@ describe("local admin", () => {
       await chmod(join(cwd, LOCAL_ADMIN_FILE), 0o000);
 
       try {
-        await expect(ensureLocalAdmin(cwd)).rejects.toMatchObject({
-          kind: "admin-unreadable",
+        const rejection = expect(ensureLocalAdmin(cwd)).rejects;
+        await rejection.toBeInstanceOf(LocalServerAdminUnreadableError);
+        await rejection.toMatchObject({
+          code: "E_VALIDATION",
           message: expect.stringMatching(/cannot be read/),
         });
       } finally {

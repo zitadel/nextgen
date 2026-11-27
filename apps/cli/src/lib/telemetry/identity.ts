@@ -1,7 +1,20 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync } from "node:fs";
+import {
+  FsError,
+  FsExistsError,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "@/lib/fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+
+import { errorMessage } from "@/lib/errors";
+
+import { TelemetryHomeUnknownError } from "./errors";
 
 /**
  * A stable, anonymous identifier for this install. It is a random UUID tied to
@@ -72,9 +85,17 @@ export function telemetryConfigDir(env: NodeJS.ProcessEnv): string | undefined {
     return join(configured, "zitadel", "cli");
   }
   try {
-    return join(homedir(), ".config", "zitadel", "cli");
-  } catch {
-    return undefined;
+    try {
+      return join(homedir(), ".config", "zitadel", "cli");
+    } catch (error) {
+      // The boundary: `homedir` throws Node's untyped system error.
+      throw new TelemetryHomeUnknownError(errorMessage(error), error);
+    }
+  } catch (error) {
+    if (error instanceof TelemetryHomeUnknownError) {
+      return undefined;
+    }
+    throw error;
   }
 }
 
@@ -103,9 +124,12 @@ export function loadOrCreateIdentity(env: NodeJS.ProcessEnv): Identity {
     mkdirSync(dir, { recursive: true });
     writeStored(join(dir, "telemetry.json"), record);
     return { distinctId: record.distinctId, isFirstRun: true, record };
-  } catch {
+  } catch (error) {
     // Another run may have stored its id first: take that one, so the two are one install.
-    return readStored(dir) ?? { distinctId: record.distinctId, isFirstRun: false };
+    if (error instanceof FsError) {
+      return readStored(dir) ?? { distinctId: record.distinctId, isFirstRun: false };
+    }
+    throw error;
   }
 }
 
@@ -128,8 +152,15 @@ function readStored(dir: string): Identity | undefined {
         record,
       };
     }
-  } catch {
-    /* no usable record */
+  } catch (error) {
+    // No usable record: JSON that does not parse, or a file Node cannot read.
+    if (error instanceof SyntaxError) {
+      return undefined;
+    }
+    if (error instanceof FsError) {
+      return undefined;
+    }
+    throw error;
   }
 
   return undefined;
@@ -181,8 +212,11 @@ export function profileDue(
       ...(firstVersion !== undefined && { firstVersion }),
       profile: { at: now, hash },
     });
-  } catch {
-    return undefined;
+  } catch (error) {
+    if (error instanceof FsError) {
+      return undefined;
+    }
+    throw error;
   }
 
   return { firstVersion };
@@ -208,7 +242,14 @@ export function markNoticed(env: NodeJS.ProcessEnv): boolean {
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, NOTICE_FILE), "", { mode: 0o600, flag: "wx" });
   } catch (error) {
-    return (error as NodeJS.ErrnoException).code !== "EEXIST";
+    // A marker already there means another run claimed the notice; any other failure shows it.
+    if (error instanceof FsExistsError) {
+      return false;
+    }
+    if (error instanceof FsError) {
+      return true;
+    }
+    throw error;
   }
 
   return true;

@@ -89,16 +89,18 @@ export class Progress {
     const report = Progress.collect(lines);
     if (!this.drawing.interactive) {
       this.narrate(MARK.started, label);
-      const result = await work(report).catch((error: unknown) => {
+      try {
+        const result = await work(report);
+        for (const { verb, subject } of lines) {
+          this.narrate(MARK.info, `${verb} ${subject}`);
+        }
+        this.narrate(MARK.done, done?.(result) ?? label);
+
+        return result;
+      } catch (error) {
         cliLog.fail(`${label} failed`);
         throw error;
-      });
-      for (const { verb, subject } of lines) {
-        this.narrate(MARK.info, `${verb} ${subject}`);
       }
-      this.narrate(MARK.done, done?.(result) ?? label);
-
-      return result;
     }
     this.drawing.open();
     const progress = new DrawnSpinner(label, this.drawing.chained);

@@ -1,4 +1,4 @@
-import { rm } from "node:fs/promises";
+import { rm } from "@/lib/fs";
 import { join } from "node:path";
 
 import { AbstractCLIScaffolder } from "./cli";

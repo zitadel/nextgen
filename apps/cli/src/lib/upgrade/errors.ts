@@ -1,18 +1,35 @@
+import { originalOf, ZitadelLibError } from "@/lib/errors";
+import type { ErrorCategory, ZitadelErrorCode } from "@/lib/errors";
 import type { PackageCommand } from "@/lib/pm";
+
+/**
+ * Anything planning or applying an upgrade fails with on purpose.
+ *
+ * @remarks
+ * A caller catches this, or one of its subclasses, and words the failure for
+ * its own person. A failure nothing here anticipated bubbles as it was thrown.
+ */
+export abstract class UpgradeError extends ZitadelLibError {
+  /**
+   * The failure the upgrade stands for.
+   *
+   * @returns It, as `original`.
+   */
+  override get details(): Readonly<Record<string, unknown>> {
+    return {
+      original: originalOf(this),
+    };
+  }
+}
 
 /**
  * The newest release could not be looked up. Its message is generic on purpose:
  * a caller words the failure for its own person, with its own suggestions.
  */
-export class ReleaseLookupError extends Error {
-  /**
-   * Takes no arguments: there is nothing to say beyond the fact that the lookup
-   * found no release.
-   */
-  constructor() {
-    super("Could not look up the latest release");
-    this.name = "ReleaseLookupError";
-  }
+export class UpgradeReleaseLookupError extends UpgradeError {
+  override readonly category: ErrorCategory = "unavailable";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
 }
 
 /**
@@ -20,7 +37,11 @@ export class ReleaseLookupError extends Error {
  * and the failure, and nothing about how either is worded, so a caller words the
  * failure for its own person.
  */
-export class InstallError extends Error {
+export class UpgradeInstallFailedError extends UpgradeError {
+  override readonly category: ErrorCategory = "unknown";
+  override readonly retryable: boolean = false;
+  override readonly code: ZitadelErrorCode = "E_VALIDATION";
+
   /**
    * The install, as the person's shell reads it, so it can be offered again.
    */
@@ -31,8 +52,7 @@ export class InstallError extends Error {
    * @param cause - What the package manager failed with.
    */
   constructor(command: PackageCommand, cause: unknown) {
-    super("Could not install the new packages", { cause });
-    this.name = "InstallError";
+    super("Could not install the new packages", cause);
     this.command = command;
   }
 }

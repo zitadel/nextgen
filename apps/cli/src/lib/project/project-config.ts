@@ -1,10 +1,9 @@
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { ZitadelError } from "@/lib/errors";
-import { isErrno } from "@/lib/errno";
-import { pathExistsStrict } from "@/lib/fs";
+import { FsNotFoundError, pathExistsStrict, readFile } from "@/lib/fs";
 import { isObject, parseJsonObject } from "@/lib/json";
+
+import { ProjectConfigMissingError, ProjectInvalidError } from "./errors";
 
 /**
  * A project's `zitadel.json`: the committed record of how setup configured it.
@@ -34,13 +33,14 @@ export class ProjectConfig {
   }
 
   /**
-   * Reads and parses `zitadel.json`. A missing file becomes an actionable
-   * `E_VALIDATION` error pointing at `setup`; other errors (malformed JSON)
-   * propagate unchanged.
+   * Reads and parses `zitadel.json`. A missing file is a
+   * {@link ProjectConfigMissingError} and text that is not JSON a
+   * {@link ProjectInvalidError}; other errors propagate unchanged.
    *
    * @param cwd - The project's directory.
    * @returns The project's configuration.
-   * @throws {@link ZitadelError} When there is no `zitadel.json`.
+   * @throws {@link ProjectConfigMissingError} When there is no `zitadel.json`.
+   * @throws {@link ProjectInvalidError} When it is not JSON.
    */
   static async read(cwd: string): Promise<ProjectConfig> {
     try {
@@ -48,11 +48,11 @@ export class ProjectConfig {
         parseJsonObject(await readFile(join(cwd, "zitadel.json"), "utf8"), "zitadel.json"),
       );
     } catch (error) {
-      if (isErrno(error, "ENOENT")) {
-        throw new ZitadelError("E_VALIDATION", "zitadel.json was not found", {
-          hint: "Set the project up first.",
-          nextCommands: [{ id: "setup" }],
-        });
+      if (error instanceof FsNotFoundError) {
+        throw new ProjectConfigMissingError("zitadel.json was not found", error);
+      }
+      if (error instanceof SyntaxError) {
+        throw new ProjectInvalidError(error.message, error);
       }
       throw error;
     }

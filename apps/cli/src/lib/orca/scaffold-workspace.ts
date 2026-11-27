@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "@/lib/fs";
 import { basename, dirname, join } from "node:path";
 
 import fse from "fs-extra";

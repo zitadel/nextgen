@@ -68,7 +68,7 @@ export class PlanChange extends WizardStep<
    *
    * @param needs - What was read and decided.
    * @returns The plan.
-   * @throws {@link ZitadelError} When the change would be refused.
+   * @throws {@link ZitadelConfigError} When the change would be refused.
    */
   async run(
     needs: Needs,

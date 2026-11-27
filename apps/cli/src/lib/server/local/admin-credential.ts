@@ -1,20 +1,22 @@
 import { randomBytes } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { defaultHumanUserSchemaUrl } from "@zitadel/config";
 import { bootstrapUserDocument } from "@zitadel/config/bootstrap-user";
 
-import { errorMessage } from "@/lib/errors";
-import { LocalServerError } from "./local-server-error";
+import { FsExistsError, FsNotFoundError, mkdir, readFile, rename, writeFile } from "@/lib/fs";
+import {
+  LocalServerAdminMalformedError,
+  LocalServerAdminUnreadableError,
+} from "@/lib/server/errors";
 import { ancestors } from "@/lib/paths";
 import { isObject } from "@/lib/json";
 import {
   findUpward,
   LOCAL_RUNTIME_DIR,
   PLATFORM_PROJECT_ID,
-  readRuntimeMetadata,
+  peekRuntimeMetadata,
   sameLocalServer,
 } from "./runtime";
 import { SecretFile } from "@/lib/project/secret-file";
@@ -62,9 +64,7 @@ export async function findLocalAdminFor(
 ): Promise<LocalAdmin | undefined> {
   for (const dir of ancestors(cwd, homedir())) {
     if ((await findLocalAdminDir(dir)) !== dir) continue;
-    const runtime = await readRuntimeMetadata(dir).catch(() => {
-      return undefined;
-    });
+    const runtime = await peekRuntimeMetadata(dir);
     if (runtime && sameLocalServer(runtime.server_url, serverUrl)) {
       return readLocalAdmin(dir);
     }
@@ -74,27 +74,36 @@ export async function findLocalAdminFor(
 
 /** Reads the local admin credential, or `undefined` when `start` never wrote one. */
 export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefined> {
-  const raw = await readFile(join(cwd, LOCAL_ADMIN_FILE), "utf8").catch((error: unknown) => {
-    // Only a missing file means `start` never created the admin. A file that
-    // exists but cannot be read is still the credential the server imported,
-    // and minting a replacement would leave the two holding different passwords.
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-    throw new LocalServerError(
-      "admin-unreadable",
-      "E_VALIDATION",
-      `${LOCAL_ADMIN_FILE} cannot be read`,
-      { path: join(cwd, LOCAL_ADMIN_FILE), cause: errorMessage(error) },
-    );
-  });
-  if (raw === undefined) return undefined;
-
   try {
+    const raw = await readFile(join(cwd, LOCAL_ADMIN_FILE), "utf8");
     const parsed: unknown = JSON.parse(raw);
     if (isLocalAdmin(parsed)) return parsed;
   } catch (error) {
-    throw malformedAdminFile(cwd, error);
+    // Only a missing file means `start` never created the admin. A file that
+    // exists but cannot be read is still the credential the server imported,
+    // and minting a replacement would leave the two holding different passwords.
+    if (error instanceof FsNotFoundError) {
+      return undefined;
+    }
+    if (error instanceof SyntaxError) {
+      throw new LocalServerAdminMalformedError(
+        `${LOCAL_ADMIN_FILE} is malformed`,
+        join(cwd, LOCAL_ADMIN_FILE),
+        cwd,
+        error,
+      );
+    }
+    throw new LocalServerAdminUnreadableError(
+      `${LOCAL_ADMIN_FILE} cannot be read`,
+      join(cwd, LOCAL_ADMIN_FILE),
+      error,
+    );
   }
-  throw malformedAdminFile(cwd);
+  throw new LocalServerAdminMalformedError(
+    `${LOCAL_ADMIN_FILE} is malformed`,
+    join(cwd, LOCAL_ADMIN_FILE),
+    cwd,
+  );
 }
 
 function isLocalAdmin(value: unknown): value is LocalAdmin {
@@ -105,32 +114,6 @@ function isLocalAdmin(value: unknown): value is LocalAdmin {
     typeof value.user_id === "string" &&
     typeof value.team_id === "string"
   );
-}
-
-/**
- * Recovery needs both halves. `zitadel reset` clears the server's data but keeps
- * `admin.json`, so the next start would read the same broken file; deleting the
- * file alone leaves the server holding a hash of the old password, so the admin
- * could never sign in. Removing the file and resetting the data lets the next
- * start mint a fresh credential and import it.
- */
-function malformedAdminFile(cwd: string, cause?: unknown): LocalServerError {
-  const details = { path: join(cwd, LOCAL_ADMIN_FILE), directory: cwd };
-  if (cause) {
-    return new LocalServerError(
-      "admin-malformed",
-      "E_VALIDATION",
-      `${LOCAL_ADMIN_FILE} is malformed`,
-      { ...details, cause: errorMessage(cause) },
-    );
-  } else {
-    return new LocalServerError(
-      "admin-malformed",
-      "E_VALIDATION",
-      `${LOCAL_ADMIN_FILE} is malformed`,
-      details,
-    );
-  }
 }
 
 /**
@@ -206,7 +189,9 @@ async function writePrivateIfAbsent(path: string, content: string): Promise<bool
   try {
     await writeFile(path, content, { mode: 0o600, flag: "wx" });
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
+    if (error instanceof FsExistsError) {
+      return false;
+    }
     throw error;
   }
   await SecretFile.enforceMode(path, 0o600);

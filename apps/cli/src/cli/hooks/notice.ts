@@ -1,3 +1,5 @@
+import { FsError } from "@/lib/fs";
+import { PmManifestInvalidError } from "@/lib/pm";
 import { Dependencies } from "@/lib/upgrade/dependencies";
 
 import { Ui, style } from "@/lib/ui";
@@ -38,12 +40,7 @@ export async function updateNotice(input: {
   if (updateCheckDisabled(env)) {
     return undefined;
   }
-  const [release, dependencies] = await Promise.all([
-    releaseChannel(cliVersion, env).latest(),
-    Dependencies.read(cwd, ZITADEL_SCOPE).catch(() => {
-      return undefined;
-    }),
-  ]);
+  const release = await releaseChannel(cliVersion, env).latest();
   if (release === undefined) {
     return undefined;
   }
@@ -52,6 +49,15 @@ export async function updateNotice(input: {
   if (release.isNewerThan(cliVersion)) {
     behind.push(`CLI ${cliVersion} → ${release.version}`);
   }
+  const dependencies = await Dependencies.read(cwd, ZITADEL_SCOPE).catch((error: unknown) => {
+    if (error instanceof PmManifestInvalidError) {
+      return undefined;
+    }
+    if (error instanceof FsError) {
+      return undefined;
+    }
+    throw error;
+  });
   for (const dependency of dependencies?.exact() ?? []) {
     if (dependency.isBehind(release.version)) {
       const name = escapeControlCharacters(dependency.name);

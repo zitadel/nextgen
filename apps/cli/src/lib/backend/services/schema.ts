@@ -9,7 +9,11 @@ import { Paging } from "@zitadel/api/runtime/paging";
 
 import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
 import { pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
-import { NotFoundError } from "@/lib/backend/errors";
+import {
+  BackendGoneError,
+  BackendNameUnknownError,
+  BackendNotFoundError,
+} from "@/lib/backend/errors";
 
 /** What narrows and pages a list of schemas. */
 export type SchemaQuery = Readonly<Omit<ListSchemasParams, "project_id">>;
@@ -97,25 +101,31 @@ export class SchemaService extends ApiService {
    *
    * @param reference - A revision id, or an object type.
    * @returns The schema revision.
-   * @throws NotFoundError when neither names a schema.
+   * @throws BackendNotFoundError when neither names a schema.
    */
   async get(reference: string): Promise<SchemaRecord> {
-    try {
-      // Scoped like every other call of this service: a schema id is unique
-      // within a project and not across them — the seeded default schema
-      // carries the same `$id` in every project — so a credential that can see
-      // more than one resolves it ambiguously without the project named.
-      return await this.client.getSchema(reference, {
+    // Scoped like every other call of this service: a schema id is unique
+    // within a project and not across them — the seeded default schema
+    // carries the same `$id` in every project — so a credential that can see
+    // more than one resolves it ambiguously without the project named.
+    const found = await this.client
+      .getSchema(reference, {
         project_id: this.projectId,
-      });
-    } catch (error) {
-      // A 404 exactly, because this reads the failure as a statement about the
-      // reference rather than about the schema: nothing holds that id, so the
-      // reference must have been an object type. A schema the server says is
-      // gone is not an object type, and the not-found class covers both.
-      if (!(error instanceof NotFoundError) || error.status !== 404) {
+      })
+      .catch((error: unknown) => {
+        // A 404 exactly, because this reads the failure as a statement about the
+        // reference rather than about the schema: nothing holds that id, so the
+        // reference must have been an object type.
+        if (error instanceof BackendGoneError) {
+          throw error;
+        }
+        if (error instanceof BackendNotFoundError) {
+          return undefined;
+        }
         throw error;
-      }
+      });
+    if (found !== undefined) {
+      return found;
     }
     const first = await this.page({
       object_type: reference,
@@ -124,9 +134,7 @@ export class SchemaService extends ApiService {
     });
     const current = first.items[0];
     if (current === undefined) {
-      throw new NotFoundError(`No schema named "${reference}"`, {
-        hint: "Run `schema list` to see the object types this project has.",
-      });
+      throw new BackendNameUnknownError(`No schema named "${reference}"`, "schema", reference);
     }
     return current;
   }

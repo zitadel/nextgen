@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
+import { LocalServerProgramFailedError } from "@/lib/server/errors";
 import type { Run } from "@/lib/server/local/ports";
 import { discoverManagedRuntimeProcesses } from "@/lib/server/local/processes";
 import { it } from "@tests/fixtures";
@@ -208,11 +209,8 @@ describe("discoverManagedRuntimeProcesses", () => {
   });
 
   it("reports unsupported discovery instead of throwing", async () => {
-    const enoent: NodeJS.ErrnoException = Object.assign(new Error("spawn ps ENOENT"), {
-      code: "ENOENT",
-    });
     const run: Run = async () => {
-      throw enoent;
+      throw new LocalServerProgramFailedError("spawn ps ENOENT");
     };
 
     await expect(discoverManagedRuntimeProcesses({ run })).resolves.toMatchObject({

@@ -1,5 +1,6 @@
 import { dirname, relative, resolve, sep } from "node:path";
 
+import { FsNotDirectoryError, FsNotFoundError, fsFailure } from "@/lib/fs";
 import type { FileSystem } from "@/lib/zitadel/storage/types";
 
 /**
@@ -128,9 +129,16 @@ export class Path {
     const dangling = missing.some((path) => {
       try {
         return fs.lstatSync(path.value).isSymbolicLink();
-      } catch {
+      } catch (error) {
         // Nothing there, or a file where a directory would be: no link either way.
-        return false;
+        const failure = fsFailure(error);
+        if (failure instanceof FsNotFoundError) {
+          return false;
+        }
+        if (failure instanceof FsNotDirectoryError) {
+          return false;
+        }
+        throw error;
       }
     });
     if (dangling) {

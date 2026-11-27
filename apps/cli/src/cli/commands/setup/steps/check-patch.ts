@@ -49,7 +49,7 @@ export class CheckPatch extends WizardStep<"patchCheck", object, Needs> {
    *
    * @param needs - The patcher, the app and the issuer.
    * @returns Nothing is added.
-   * @throws {@link ZitadelError} With `E_CONFLICT` for a file it would refuse.
+   * @throws {@link OrcaError} For a file the patch would refuse to write.
    */
   async run(needs: Needs): Promise<object> {
     const { framework, issuer, patchContext, patcher } = needs;

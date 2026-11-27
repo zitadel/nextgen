@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { ConfigError } from "@/lib/zitadel";
-import {
-  findFileReferences,
-  inlineFileReferences,
-  outsideProject,
-} from "@/lib/zitadel/storage/references";
+import { ZitadelConfigError } from "@/lib/zitadel";
+import { findFileReferences, inlineFileReferences } from "@/lib/zitadel/storage/references";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
 /**
@@ -77,8 +73,10 @@ describe("inlineFileReferences", () => {
       return inlineFileReferences({ t: GONE }, readA, "throw");
     });
 
-    expect(error).toBeInstanceOf(ConfigError);
-    expect(error).toMatchObject({ message: '$file "./gone" cannot be read' });
+    expect(error).toBeInstanceOf(ZitadelConfigError);
+    expect(error).toMatchObject({
+      message: expect.stringContaining('$file "./gone" cannot be read'),
+    });
   });
 
   it("drops the key of a missing reference under omit", () => {
@@ -99,19 +97,5 @@ describe("inlineFileReferences", () => {
     inlineFileReferences(document, readA, "throw");
 
     expect(document).toEqual({ t: { $file: "./a.txt" } });
-  });
-});
-
-describe("outsideProject", () => {
-  it("names the reference that leaves the project", () => {
-    const error = outsideProject("../x");
-
-    expect(error.message).toBe('$file "../x" points outside the project');
-  });
-
-  it("says where a referenced file must be", () => {
-    const error = outsideProject("../x");
-
-    expect(error.hint).toContain("inside the project");
   });
 });

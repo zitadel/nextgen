@@ -5,14 +5,12 @@ import { ApiCall, type PathValues } from "@/cli/core/crud/api-call";
 import {
   type ApiRequest,
   createZitadelClient,
-  InvalidError,
   Operation,
   OperationService,
   type Target,
-  UnauthorizedError,
+  BackendUnauthorizedError,
   type ZitadelClient,
 } from "@/lib/backend";
-import { ZitadelError } from "@/lib/errors";
 import { Output } from "@/lib/ui";
 import { ZitadelRuntime } from "@/lib/server";
 import { CommandGroups } from "@/cli/commands/groups";
@@ -66,28 +64,15 @@ const FORCE_REQUIRED_REFUSAL = {
   details: { question: "{question}" },
 } as const satisfies Refusal;
 
-/**
- * The operation an operation id or a path names, or the refusal that says how to
- * list them.
- */
-function resolveTarget(ref: string, method?: string): Target {
-  try {
-    return Operation.named(ref, method);
-  } catch (error) {
-    if (error instanceof InvalidError) {
-      throw new ZitadelError("E_VALIDATION", error.message, {
-        hint: error.hint,
-        nextCommands: [
-          {
-            id: "api:ls",
-            flags: { json: true },
-          },
-        ],
-      });
-    }
-    throw error;
-  }
-}
+/** How a call the server did not authenticate is refused. */
+const UNAUTHORIZED_SECRET_REFUSAL = {
+  code: "E_AUTH",
+  message: "{message}",
+  hint: "{server} did not accept the {credential} sent with this call. It must be the secret of the project on that server: check ZITADEL_URL and {credential} in the environment, or pick one with --env or --env-file.",
+  details: {
+    server: "{server}",
+  },
+} as const satisfies Refusal;
 
 /**
  * The operation the command line points at: an operation id or a path, with
@@ -102,7 +87,7 @@ export function readOperation(
   if (ref === undefined) {
     return undefined;
   }
-  const target = resolveTarget(ref, method);
+  const target = Operation.named(ref, method);
   const reason = target.operation.uncallable;
   if (reason !== undefined) {
     throw refusalError(UNCALLABLE_REFUSAL, {
@@ -411,46 +396,47 @@ export default class Api extends Telemetered(
     const operationService = new OperationService(
       consent === undefined ? client : consent.unlock(client),
     );
-    const response = await (flags.paginate
-      ? operationService.callAll(request)
-      : operationService.call(request)
-    ).catch((error: unknown) => {
-      if (error instanceof UnauthorizedError && operation.auth === "secret") {
-        throw new ZitadelError("E_AUTH", error.message, {
-          hint: `${server} did not accept the ${CREDENTIALS.project} sent with this call. It must be the secret of the project on that server: check ZITADEL_URL and ${CREDENTIALS.project} in the environment, or pick one with --env or --env-file.`,
-          details: {
-            server,
+    try {
+      const response = await (flags.paginate
+        ? operationService.callAll(request)
+        : operationService.call(request));
+
+      if (response.body === undefined) {
+        return {
+          status: "ok",
+          data: null,
+          verbatim: true,
+          ...(Output.screen ? {} : { pretty: prose("") }),
+          summary: {
+            title: `No content (${response.status})`,
+            sections: [],
           },
+        };
+      }
+      const pretty = typeof response.body === "string" ? prose(response.body) : json(response.body);
+
+      return {
+        status: "ok",
+        data: response.body,
+        verbatim: true,
+        ...(Output.screen ? {} : { pretty }),
+        summary: {
+          title: `Called ${operation.id}`,
+          sections: [],
+          lines: pretty.text.split("\n"),
+        },
+      };
+    } catch (error) {
+      if (error instanceof BackendUnauthorizedError && operation.auth === "secret") {
+        throw refusalError(UNAUTHORIZED_SECRET_REFUSAL, {
+          ...error,
+          message: error.message,
+          server,
+          credential: CREDENTIALS.project,
         });
       }
       throw error;
-    });
-
-    if (response.body === undefined) {
-      return {
-        status: "ok",
-        data: null,
-        verbatim: true,
-        ...(Output.screen ? {} : { pretty: prose("") }),
-        summary: {
-          title: `No content (${response.status})`,
-          sections: [],
-        },
-      };
     }
-    const pretty = typeof response.body === "string" ? prose(response.body) : json(response.body);
-
-    return {
-      status: "ok",
-      data: response.body,
-      verbatim: true,
-      ...(Output.screen ? {} : { pretty }),
-      summary: {
-        title: `Called ${operation.id}`,
-        sections: [],
-        lines: pretty.text.split("\n"),
-      },
-    };
   }
 
   /**
@@ -467,7 +453,7 @@ export default class Api extends Telemetered(
     const named = readOperation(args.operation, flags.method);
     refuseUnpaged(named, flags.paginate);
 
-    const target = named ?? resolveTarget(await this.chooseOperation(flags.paginate));
+    const target = named ?? Operation.named(await this.chooseOperation(flags.paginate));
     const { operation } = target;
     this.annotate({
       operation: operation.id,

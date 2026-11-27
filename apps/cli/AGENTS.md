@@ -325,6 +325,76 @@
   keeps its variables in the mixin's static `flagVariables`, which the reference reads
   from each command.
 
+## Errors
+
+- Keep each package's errors in one `errors.ts` beside `index.ts`; import them
+  from the barrel outside the package.
+- Name an error `<Package><Condition>Error` and extend `<Package>Error`, which
+  extends `ZitadelLibError` (`src/lib/lib-error.ts`); derive `name` there only.
+- Add a class only when a catch names it by `instanceof`, it reports another
+  `code`, `category` or `retryable`, or ErrorSupport advises on it apart.
+- Otherwise carry the fact in a field or the message of its parent or sibling;
+  make `<Package>Error` concrete when the package needs one class.
+- State `category`, `retryable` and `code` as literals in each class.
+- Add no type for errors beyond `ErrorCategory`.
+- Write the `message` a person reads, with its facts, as a template literal, and
+  keep a foreign error as `cause`.
+- Give an error a field for each fact a person or a script needs; `details`
+  reports each in snake_case.
+- Override `details` only where the report shows other facts; report the
+  foreign error a lib error stands for as `original: originalOf(this)`.
+- Put advice about the world (a file, a permission, a value) on the class as a
+  `readonly hint`, set where the error is made from its own facts.
+- Never name a CLI command, a `--flag` or a backticked command in a lib error's
+  hint: `biome-plugins/error-hint-names-no-command.grit` fails `biome check` on one.
+- Never throw `ZitadelError` or a `Refusal` from `src/lib`.
+- Put advice that names a command or a flag, and every next command, in
+  `src/cli/core/error-support/<package>.ts`: an `*_ADVICE` and a `[Class, ADVICE]` row.
+- Give a wording only what names the CLI; the error states its message, its
+  hint about the world and its facts itself.
+- A wording advises exactly its class: a subclass without one states itself.
+- Use `derived(Class, ADVICE, fn)` where the advice needs more than the fields:
+  a path quoted, a list joined, a follow-up aimed at another folder.
+- `ErrorSupport` (`src/cli/core/error-support.ts`), under `BaseCommand`, advises
+  on every lib error a command lets through; a command wires nothing.
+- `toZitadelError` reports any other lib error from its own code, message,
+  hint and `details`, in one branch for `ZitadelLibError`.
+- Catch a class in a command only where its context changes the words (its own
+  rerun, a flag it was given, a check it ran); never to repeat the wording.
+- Inside such a catch write one flat `if (error instanceof X)` per class that
+  throws `refusalError(X_REFUSAL, ...)`, then `throw error;`.
+- Spread the error into the refusal's values so no property is dropped.
+- Recognise an error only by `instanceof`, never by `reason`, `code`, `hint`,
+  `message`, `status` or `name`.
+- Where a call yields a value that falls back to a default, use one
+  `.catch((error: unknown) => { if (error instanceof X) { return fallback; } throw error; })`;
+  never chain or nest `.catch`, and never use `let`, an IIFE, `Promise.allSettled` or `.then(ok, err)` as a catch.
+- Make a class for a server code where an `ApiError` becomes a backend error, in
+  `src/lib/backend/client.ts`.
+- Use no `as`, `!` or `any` on errors.
+- Import file-system calls from `@/lib/fs`, never from `node:fs/promises`; catch
+  `FsNotFoundError` etc. by class; only `src/lib/fs` reads a Node error's code.
+  Exceptions: `src/lib/skills/bundle.ts` (`tsdown.config.ts` loads it with plain
+  Node, which does not resolve `@/`) and `src/lib/orca/patchers/` (no sweeps there).
+- The only other places that read a foreign error's `code` or `reason` are
+  boundaries that turn it into one of our classes in the same function:
+  `signalProcess` in `binary-launcher.ts`, `translateFailure` in
+  `src/lib/backend/client.ts`, the injected `FileSystem` in
+  `src/lib/zitadel/storage/backend/store.ts` and the docker spawn in
+  `src/cli/commands/doctor/checks/local-runtime.ts`, and the spawn results in
+  `runDocker` in `src/lib/server/local/internal/docker-launcher.ts`,
+  `src/lib/pm/package-command.ts`, `src/lib/git/git.ts` and
+  `src/lib/orca/scaffolders/cli.ts`.
+- Let an error nobody anticipated bubble up unwrapped.
+- The one exception is a safety net that must never break a run: telemetry reporting
+  (`cli/telemetry/telemetered.ts`), the version notice, a doctor check's outcome
+  (`doctor/checks/types.ts`), setup's claim and first deploy, the deploy lockout scans,
+  and every call into code the CLI does not own (a plugin, an injected opener, publisher,
+  question, resolver or telemetry client, a step's undo, agent detection, an origin re-read).
+  They keep their typed branches and fall back for the rest; the lint rules name these files.
+- These rules are lint: `biome-plugins/error-*.grit` and `no-node-fs-promises.grit` fail
+  `biome check` on any catch that breaks them (`src/lib/orca/patchers` excepted).
+
 ## Telemetry
 
 Anonymous product analytics: a copy of each event to Vercel Web Analytics

@@ -1,4 +1,4 @@
-import { ZitadelError } from "@/lib/errors";
+import { OrcaInvalidError, OrcaPatchOpEmptyError } from "@/lib/orca/errors";
 import type { FileOp } from "./types";
 import type { Entry, Workspace } from "./workspace";
 
@@ -103,9 +103,7 @@ export abstract class Operation<Kind extends FileOp["kind"]> {
     const located = await workspace.locate(candidates);
 
     if (preferred === undefined) {
-      throw new ZitadelError("E_VALIDATION", "An op needs at least one candidate path", {
-        hint: "This is an internal patcher error — please report it if you hit it.",
-      });
+      throw new OrcaPatchOpEmptyError("An op needs at least one candidate path");
     }
 
     const path = located?.path ?? preferred;
@@ -113,7 +111,7 @@ export abstract class Operation<Kind extends FileOp["kind"]> {
     const isClash = !isDirectoryOp && located !== undefined && !located.entry.isFile;
 
     if (isClash) {
-      throw new ZitadelError("E_VALIDATION", `${path} is not a regular file`);
+      throw new OrcaInvalidError(`${path} is not a regular file`);
     }
 
     const before = !isDirectoryOp && located !== undefined ? await workspace.read(path) : undefined;

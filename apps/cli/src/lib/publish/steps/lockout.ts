@@ -1,4 +1,4 @@
-import type { Credential, QueriedUser, UserQuery } from "@/lib/backend";
+import { BackendError, type Credential, type QueriedUser, type UserQuery } from "@/lib/backend";
 import { isCancellation } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 import { mapBounded } from "@/lib/map-bounded";
@@ -224,16 +224,15 @@ export const lockoutStep: Step = {
       }
       return { lockouts: found.lockouts };
     } catch (error) {
-      // The person stopping the command is not a check that could not finish.
-      if (isCancellation(error)) {
-        throw error;
-      }
       // Never a failed deploy, but never a silent pass either.
-      warnings.report(
-        "Could not finish checking existing users for sign-in lockouts: an unexpected error stopped the check.",
-      );
+      if (error instanceof BackendError) {
+        warnings.report(
+          "Could not finish checking existing users for sign-in lockouts: an unexpected error stopped the check.",
+        );
+        return undefined;
+      }
+      throw error;
     }
-    return undefined;
   },
 };
 
@@ -269,13 +268,17 @@ function merged(scans: readonly Scan[]): Scan {
  * @returns The listing, read on first use.
  */
 function lazyNames(ctx: StepContext): Names {
-  // biome-ignore lint/plugin: the memoised read, started on first use
-  let listed: Promise<Listing | undefined> | undefined;
-  return () => {
-    listed ??= objectTypes(ctx).catch(() => {
-      return undefined;
-    });
-    return listed;
+  const memo: { listed?: Promise<Listing> } = {};
+  return async () => {
+    memo.listed ??= objectTypes(ctx);
+    try {
+      return await memo.listed;
+    } catch (error) {
+      if (error instanceof BackendError) {
+        return undefined;
+      }
+      throw error;
+    }
   };
 }
 
@@ -340,28 +343,28 @@ async function findLockouts(ctx: StepContext): Promise<Found> {
   );
   const share = Math.max(1, Math.floor(SCAN_CAP / (scanned.size + 1 + disabling.changes.length)));
   // One scan failing must not discard what the other found.
-  const settled = await Promise.allSettled([
-    lookupWarnings(ctx, flows, share),
-    ssoSkipped === undefined ? unservedWarnings(ctx, flows, names, share) : NOTHING,
-    credentialWarnings(ctx, disabling.changes, share),
+  const scans = await Promise.all([
+    lookupWarnings(ctx, flows, share).catch(() => {
+      // A safety net: a scan that fails is noted, never a failed deploy.
+      return { ...NOTHING, failed: true };
+    }),
+    ssoSkipped === undefined
+      ? unservedWarnings(ctx, flows, names, share).catch(() => {
+          // A safety net: a scan that fails is noted, never a failed deploy.
+          return { ...NOTHING, failed: true };
+        })
+      : NOTHING,
+    credentialWarnings(ctx, disabling.changes, share).catch(() => {
+      // A safety net: a scan that fails is noted, never a failed deploy.
+      return { ...NOTHING, failed: true };
+    }),
   ]);
-  const scans = settled.flatMap((outcome) => {
-    if (outcome.status !== "fulfilled") {
-      return [];
-    }
-    return [outcome.value];
-  });
   const scan = merged(scans);
-  // A clean result must not look the same as a check that did not run fully.
-  const rejected = settled.some((outcome) => {
-    return outcome.status === "rejected";
-  });
-  const failedNote =
-    rejected || scan.failed
-      ? [
-          "Could not finish checking existing users for sign-in lockouts: a request to the server failed.",
-        ]
-      : [];
+  const failedNote = scan.failed
+    ? [
+        "Could not finish checking existing users for sign-in lockouts: a request to the server failed.",
+      ]
+    : [];
   const skippedNote = ssoSkipped === undefined ? [] : [ssoSkipped];
   const disablingNote = disabling.unreadable
     ? [
@@ -504,9 +507,12 @@ async function lookupWarnings(
         partial: [],
         failed: false,
       };
-    } catch {
+    } catch (error) {
       // One schema's failed read must not discard the warnings of the others.
-      return { warnings: [], partial: [], failed: true };
+      if (error instanceof BackendError) {
+        return { warnings: [], partial: [], failed: true };
+      }
+      throw error;
     }
   });
   return merged(scans);
@@ -553,10 +559,10 @@ async function unservedWarnings(
       // answers rather than raising: nothing to report for them.
       return await ctx.users.hasIdentityLink(user.id);
     } catch (error) {
-      if (isCancellation(error)) {
-        throw error;
+      if (error instanceof BackendError) {
+        return undefined;
       }
-      return undefined;
+      throw error;
     }
   });
   const failed = hasLink.includes(undefined);
@@ -742,10 +748,10 @@ async function liveReleases(ctx: StepContext): Promise<readonly LiveRelease[] | 
       return [{ pinsFlow, schemas }];
     });
   } catch (error) {
-    if (isCancellation(error)) {
-      throw error;
+    if (error instanceof BackendError) {
+      return undefined;
     }
-    return undefined;
+    throw error;
   }
 }
 
@@ -788,6 +794,8 @@ async function credentialWarnings(
         try {
           return await ctx.users.credentials(user.id, asked);
         } catch (error) {
+          // Any failure of one user's read, not only the server's, leaves the
+          // count a lower bound; only the person stopping the command stops it.
           if (isCancellation(error)) {
             throw error;
           }
@@ -825,11 +833,11 @@ async function credentialWarnings(
         failed,
       };
     } catch (error) {
-      if (isCancellation(error)) {
-        throw error;
-      }
       // One schema's failed read must not discard the warnings of the others.
-      return { warnings: [], partial: [], failed: true };
+      if (error instanceof BackendError) {
+        return { warnings: [], partial: [], failed: true };
+      }
+      throw error;
     }
   });
   return merged(scans);

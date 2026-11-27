@@ -1,4 +1,6 @@
+import { FsError } from "@/lib/fs";
 import { CommitIsHere } from "@/lib/git/checks/commit-is-here";
+import { GitError } from "@/lib/git/errors";
 import { Git } from "@/lib/git/git";
 import type { Check, Operation } from "@/lib/git/operation";
 import { StagingArea } from "@/lib/git/staging-area";
@@ -80,8 +82,14 @@ export class DiffSince implements Operation<string | null> {
         await staging.startFromDevelopers(git);
         await staging.markAsAdded(this.paths, this.globs);
         return (await staging.git.run(diff)).stdout;
-      } catch {
-        return (await git.run(diff)).stdout;
+      } catch (error) {
+        if (error instanceof GitError) {
+          return (await git.run(diff)).stdout;
+        }
+        if (error instanceof FsError) {
+          return (await git.run(diff)).stdout;
+        }
+        throw error;
       }
     });
   }

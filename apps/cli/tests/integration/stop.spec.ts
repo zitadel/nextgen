@@ -179,6 +179,22 @@ describe("stop", () => {
         });
       });
 
+      it("refuses a malformed record, and offers to reset it and start again", async () => {
+        const app = await aSetUpApp();
+        await app.writeMalformedServerRecord();
+
+        const result = await app.run(["stop", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          hint: expect.any(String),
+          next_commands: [
+            expectedPublicCliCommand(`reset --force --cwd ${app.path}`),
+            expectedPublicCliCommand(`start --cwd ${app.path}`),
+          ],
+        });
+      });
+
       it("stops a server whose recorded process has died", async () => {
         const app = await aSetUpApp();
         await app.startLocalServer({ shape: "orphaned" });

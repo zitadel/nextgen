@@ -1,3 +1,6 @@
+import { rm } from "node:fs/promises";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
@@ -111,6 +114,19 @@ describe("release create", () => {
     });
 
     describe("--json", () => {
+      it("refuses a release that would carry two brandings", async () => {
+        const app = await aSetUpApp();
+        await app.holdsTwoBrandings();
+
+        const result = await app.run(["release", "create", "--non-interactive", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint: "A project has a single branding; keep one descriptor under .zitadel/branding/.",
+        });
+      });
+
       it("builds a release from the config without deploying it", async () => {
         const app = await aSetUpApp();
 
@@ -421,6 +437,21 @@ describe("release create", () => {
         const result = await app.run(["release", "create", "--dry-run", "--non-interactive"]);
 
         expect(result).toSayOnce(expectedPublicCliCommand(app.againAsRun("release create")));
+      });
+    });
+  });
+
+  describe("with nothing in .zitadel/ to deploy", () => {
+    it("says to add a resource under .zitadel/ or set the project up", async () => {
+      const app = await aSetUpApp();
+      await rm(join(app.path, ".zitadel"), { recursive: true, force: true });
+
+      const result = await createRelease(app);
+
+      expect(app.envelopeOf(result)).toMatchObject({
+        code: "E_VALIDATION",
+        message: "There is nothing in .zitadel/ to deploy",
+        hint: `Add a schema, flow, policy, branding, application or OAuth settings under .zitadel/, or run ${expectedPublicCliCommand("setup")} to scaffold one.`,
       });
     });
   });

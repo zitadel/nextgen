@@ -15,10 +15,14 @@ import { Brandings } from "@/lib/zitadel/resources/branding/collection";
 import { Connection } from "@/lib/zitadel/resources/connections/connection";
 import { Connections } from "@/lib/zitadel/resources/connections/collection";
 import {
-  BrokenFilesError,
-  ConfigError,
-  ConnectionExistsError,
-  FileExistsError,
+  ZitadelConfigDocumentDuplicatedError,
+  ZitadelConfigError,
+  ZitadelConfigConnectionExistsError,
+  ZitadelConfigPasswordPolicyInvalidError,
+  ZitadelConfigSignupPolicyInvalidError,
+  ZitadelConfigFileExistsError,
+  ZitadelConfigFilesBrokenError,
+  ZitadelConfigNothingToDeployError,
 } from "@/lib/zitadel/errors";
 import { Flow } from "@/lib/zitadel/resources/flows/flow";
 import { Flows } from "@/lib/zitadel/resources/flows/collection";
@@ -227,7 +231,7 @@ export class ZitadelConfig {
    * @param options - What is known beyond the files.
    * @returns The configuration, holding no broken file of a kind a release
    *   carries.
-   * @throws {@link BrokenFilesError} Naming every file the contract rules refuse.
+   * @throws {@link ZitadelConfigFilesBrokenError} Naming every file the contract rules refuse.
    */
   static async load(store: ConfigStore, options: ConfigOptions = {}): Promise<ZitadelConfig> {
     const config = await ZitadelConfig.loadUnchecked(store, options);
@@ -307,7 +311,7 @@ export class ZitadelConfig {
    * @param kinds - The kinds the caller asked for.
    * @param kind - The kind to read.
    * @returns The kind's files, none when it was not asked for.
-   * @throws {@link ConfigError} When a file of an asked-for kind cannot be read.
+   * @throws {@link ZitadelConfigError} When a file of an asked-for kind cannot be read.
    */
   private static async readKind(
     store: ConfigStore,
@@ -454,7 +458,7 @@ export class ZitadelConfig {
    *
    * @param store - Where branding's referenced files are read from.
    * @returns The bundle and how many resources it carries.
-   * @throws {@link ConfigError} When there is nothing to deploy, more than one
+   * @throws {@link ZitadelConfigError} When there is nothing to deploy, more than one
    *   branding or OAuth settings file, or more resources than a release may pin.
    */
   bundle(store: ConfigStore): BuiltBundle {
@@ -506,12 +510,10 @@ export class ZitadelConfig {
         return file.kind !== "policy-test";
       }).length;
     if (fileCount === 0) {
-      throw new ConfigError("There is nothing in .zitadel/ to deploy", {
-        hint: "Add a schema, flow, policy, branding, application or OAuth settings under .zitadel/, or run `zitadel setup` to scaffold one.",
-      });
+      throw new ZitadelConfigNothingToDeployError();
     }
     if (fileCount > ZitadelConfig.MAX_BUNDLE_RESOURCES) {
-      throw new ConfigError(
+      throw new ZitadelConfigError(
         `A release pins at most ${ZitadelConfig.MAX_BUNDLE_RESOURCES} resources, but .zitadel/ holds ${fileCount}`,
       );
     }
@@ -524,7 +526,7 @@ export class ZitadelConfig {
    * `deploy` does.
    *
    * @returns This configuration.
-   * @throws {@link ConfigError} When `.zitadel/oauth/` holds more than one file.
+   * @throws {@link ZitadelConfigError} When `.zitadel/oauth/` holds more than one file.
    */
   refuseSecondOAuth(): ZitadelConfig {
     this.refuseSecond("oauth", this.oauth.all.length, "OAuth settings file");
@@ -538,7 +540,7 @@ export class ZitadelConfig {
    * @param kind - The kind of document.
    * @param documents - How many documents of the kind there are.
    * @param what - What a release carries one of, as the refusal names it.
-   * @throws {@link ConfigError} When the kind's directory holds more than one file.
+   * @throws {@link ZitadelConfigError} When the kind's directory holds more than one file.
    */
   private refuseSecond(kind: ConfigKind & DocumentKind, documents: number, what: string): void {
     const count =
@@ -548,10 +550,7 @@ export class ZitadelConfig {
       }).length;
     if (count > 1) {
       const directory = CONFIG_DIRECTORIES[kind];
-      throw new ConfigError(
-        `A release carries at most one ${what}, but ${directory}/ holds ${count}`,
-        { hint: `A project has a single ${what}; keep one descriptor under ${directory}/.` },
-      );
+      throw new ZitadelConfigDocumentDuplicatedError(what, directory, count);
     }
   }
 
@@ -575,13 +574,13 @@ export class ZitadelConfig {
    *   connection.
    * @param options - What to scaffold, and whether files may be replaced.
    * @returns The change that writes it, and its documents.
-   * @throws {@link ConnectionExistsError} When a chosen provider already has
+   * @throws {@link ZitadelConfigConnectionExistsError} When a chosen provider already has
    *   a connection.
-   * @throws {@link FileExistsError} Without `force`, when the default schema,
+   * @throws {@link ZitadelConfigFileExistsError} Without `force`, when the default schema,
    *   flow, password policy or sign-up policy file is already there.
-   * @throws {@link ConflictError} When a chosen provider's connection would
+   * @throws {@link ZitadelConfigResourceClashError} When a chosen provider's connection would
    *   collide with another connection, by file name, slug or variables.
-   * @throws {@link ConfigError} When `force` keeps a password or sign-up
+   * @throws {@link ZitadelConfigError} When `force` keeps a password or sign-up
    *   policy file that is not a sound policy of its operation.
    */
   scaffold<P extends ScaffoldedProvider>(options: ScaffoldOptions<P>): Scaffold<P> {
@@ -602,7 +601,7 @@ export class ZitadelConfig {
       const existing =
         this.connections.resolveExisting(connection) ?? this.findBroken(connection.path);
       if (existing !== undefined) {
-        throw new ConnectionExistsError(existing.path, scaffolded.chosen.selection);
+        throw new ZitadelConfigConnectionExistsError(existing.path, scaffolded.chosen.selection);
       }
     }
     const defaults = [
@@ -613,7 +612,7 @@ export class ZitadelConfig {
     ];
     for (const taken of defaults) {
       if (!options.force && taken !== undefined) {
-        throw new FileExistsError(taken.path);
+        throw new ZitadelConfigFileExistsError(taken.path);
       }
     }
     const policy = this.scaffoldedPasswordPolicy(options);
@@ -704,7 +703,7 @@ export class ZitadelConfig {
    * @param store - Where the configuration is kept, for the rules that read
    *   beside the files.
    * @returns This configuration.
-   * @throws {@link BrokenFilesError} Naming every file the contract rules refuse.
+   * @throws {@link ZitadelConfigFilesBrokenError} Naming every file the contract rules refuse.
    */
   refuseBroken(store: ConfigStore): ZitadelConfig {
     const problems = CONTRACT_RULES.flatMap((rule) => {
@@ -717,7 +716,7 @@ export class ZitadelConfig {
         return { path: issue.file, problem: issue.message };
       });
     if (problems.length > 0) {
-      throw new BrokenFilesError(problems);
+      throw new ZitadelConfigFilesBrokenError(problems);
     }
     return this;
   }
@@ -830,7 +829,7 @@ export class ZitadelConfig {
    *
    * @param options - Whether files may be replaced, and the minimum given.
    * @returns The policy.
-   * @throws {@link ConfigError} When `force` keeps a password policy file that
+   * @throws {@link ZitadelConfigError} When `force` keeps a password policy file that
    *   is not a sound password policy.
    */
   private scaffoldedPasswordPolicy(options: ScaffoldOptions): PasswordPolicy {
@@ -843,10 +842,7 @@ export class ZitadelConfig {
       return PasswordPolicy.initial(options.passwordMinLength);
     }
     if (kept === undefined) {
-      throw new ConfigError(`${PasswordPolicy.PATH} is not a valid password policy`, {
-        hint: "Setup keeps an existing policy file and deploys it, so fix it against .zitadel/meta/policy.json or move it aside to start from an empty one.",
-        details: { file: PasswordPolicy.PATH },
-      });
+      throw new ZitadelConfigPasswordPolicyInvalidError(PasswordPolicy.PATH);
     }
     return kept.withMinLength(options.passwordMinLength).document;
   }
@@ -859,7 +855,7 @@ export class ZitadelConfig {
    *   without the policy gets the default.
    * @returns The policy, or `undefined` when the project has none and gets
    *   none.
-   * @throws {@link ConfigError} When `force` keeps a sign-up policy file that
+   * @throws {@link ZitadelConfigError} When `force` keeps a sign-up policy file that
    *   is not a sound sign-up policy.
    */
   private scaffoldedSignupPolicy(options: ScaffoldOptions): SignupPolicy | undefined {
@@ -871,10 +867,7 @@ export class ZitadelConfig {
     }
     const kept = this.policies.signup;
     if (kept === undefined) {
-      throw new ConfigError(`${SignupPolicy.PATH} is not a valid sign-up policy`, {
-        hint: "Setup keeps an existing policy file and deploys it, so fix it against .zitadel/meta/policy.json or move it aside to start from the default.",
-        details: { file: SignupPolicy.PATH },
-      });
+      throw new ZitadelConfigSignupPolicyInvalidError(SignupPolicy.PATH);
     }
     return kept;
   }

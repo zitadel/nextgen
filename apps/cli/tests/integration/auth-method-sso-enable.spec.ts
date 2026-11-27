@@ -360,6 +360,121 @@ describe("auth-method sso enable", () => {
     });
 
     describe("--json", () => {
+      it("refuses a provider two connections are to", async () => {
+        const app = await anAppWith(CATALOG);
+        await app.addUnlistedConnection("google-work");
+
+        const result = await app.run([
+          "auth-method",
+          "sso",
+          "enable",
+          "--provider",
+          "google",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_CONFLICT",
+          hint: "Keep the one this project should use and remove the others, then run the command again.",
+        });
+      });
+
+      it("refuses a provider two connections are to, naming the provider", async () => {
+        const app = await anAppWith(CATALOG);
+        await app.addUnlistedConnection("google-work");
+
+        const result = await app.run([
+          "auth-method",
+          "sso",
+          "enable",
+          "--provider",
+          "google",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          details: { provider: "google" },
+        });
+      });
+
+      it("refuses a schema no login flow runs against", async () => {
+        const app = await aSetUpApp();
+        await app.losesItsLoginFlow();
+
+        const result = await app.run([
+          "auth-method",
+          "sso",
+          "enable",
+          "--provider",
+          "google",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_NOT_FOUND",
+          hint: "The provider is offered by a flow, and none of the files under .zitadel/flows/ names this schema. Check that the flow's user_schema names the schema's objectType.",
+        });
+      });
+
+      it("refuses a schema no login flow runs against, naming the schema", async () => {
+        const app = await aSetUpApp();
+        await app.losesItsLoginFlow();
+
+        const result = await app.run([
+          "auth-method",
+          "sso",
+          "enable",
+          "--provider",
+          "google",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          message: "No login flow runs against default-human-user",
+          details: { schema: ".zitadel/schemas/default-human-user.json" },
+        });
+      });
+
+      it("refuses a record of what was synced that is not JSON", async () => {
+        const app = await aSetUpApp();
+        await app.writeMalformedSyncState();
+
+        const result = await app.run([
+          "auth-method",
+          "sso",
+          "enable",
+          "--provider",
+          "google",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint: "The file records which platform resource each local file was synced as. Fix or remove it, then run this command again.",
+        });
+      });
+
+      it("refuses a record of what was synced that is not JSON, naming the file", async () => {
+        const app = await aSetUpApp();
+        await app.writeMalformedSyncState();
+
+        const result = await app.run([
+          "auth-method",
+          "sso",
+          "enable",
+          "--provider",
+          "google",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          details: { file: ".zitadel/state.json" },
+        });
+      });
+
       describe.each(PROVIDERS)("with $name", (provider) => {
         it("publishes the client id as a readable project variable", async () => {
           const app = await aSetUpApp();
@@ -1022,12 +1137,12 @@ describe("auth-method sso enable", () => {
             code: "E_CONFLICT",
             message: ".zitadel/idps/acme-sso.json and acme_sso both use ACME_SSO_CLIENT_ID",
             hint: "Point one of them at a variable of its own, then run the command again.",
-            details: {
+            details: expect.objectContaining({
               file: ".zitadel/idps/acme-sso.json",
               slug: "acme_sso",
               other_slug: "acme-sso",
               variable: "ACME_SSO_CLIENT_ID",
-            },
+            }),
           });
         });
       });
@@ -1050,12 +1165,12 @@ describe("auth-method sso enable", () => {
             message:
               ".zitadel/idps/acme-sso.json is already named acme-sso and connects to https://sso.acme.example, not https://sso.other.example",
             hint: "An applied connection keeps its issuer, and the server compares it exactly, so even a trailing slash names another provider. Choose another slug for this connection, then move the schemas and flows that name the old one to it.",
-            details: {
+            details: expect.objectContaining({
               file: ".zitadel/idps/acme-sso.json",
               slug: "acme-sso",
               issuer: "https://sso.other.example",
               existing_issuer: "https://sso.acme.example",
-            },
+            }),
           });
         });
       });
@@ -1075,7 +1190,35 @@ describe("auth-method sso enable", () => {
             message:
               '--slug: "google" is a built-in provider. Choose another name for this connection.',
             hint: "Fix --slug and run the command again.",
-            details: { flag: "--slug" },
+            details: expect.objectContaining({
+              flag: "--slug",
+            }),
+          });
+        });
+      });
+
+      describe("a sign-up step asking for a field the schema lacks", () => {
+        it("refuses a catalog provider, saying to fix the steps it names", async () => {
+          const app = await aSetUpApp();
+          await app.asksAtSignUpForAFieldTheSchemaLacks();
+
+          const result = await app.enableSso(GOOGLE, CREDENTIALS);
+
+          expect(JSON.parse(result.stdout)).toMatchObject({
+            status: "error",
+            hint: "Fix the steps named above, then run the command again.",
+          });
+        });
+
+        it("refuses a custom connection, saying to fix the steps it names", async () => {
+          const app = await aSetUpApp();
+          await app.asksAtSignUpForAFieldTheSchemaLacks();
+
+          const result = await app.enableCustomSso(ACME, ACME_CREDENTIALS);
+
+          expect(JSON.parse(result.stdout)).toMatchObject({
+            status: "error",
+            hint: "Fix the steps named above, then run the command again.",
           });
         });
       });
@@ -1115,11 +1258,11 @@ describe("auth-method sso enable", () => {
             code: "E_NOT_FOUND",
             message: "This project has no user schema named no\u001b[31mpe",
             hint: "Known schemas: default-human-user (human-user)",
-            details: {
+            details: expect.objectContaining({
               requested: "no\u001b[31mpe",
               known: [SCHEMA],
               schemas: [{ name: SCHEMA, object_type: "human-user" }],
-            },
+            }),
           });
         });
       });

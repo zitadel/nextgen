@@ -1,3 +1,6 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
@@ -160,6 +163,67 @@ describe("start", () => {
             next_commands: [expectedPublicCliCommand(`setup --server local --cwd ${app.path}`)],
           },
           warnings: [],
+        });
+      });
+
+      it("refuses a record of the local server that is malformed with the reset and start that repair it", async () => {
+        const app = await aSetUpApp();
+        await mkdir(join(app.path, ".zitadel/local"), { recursive: true });
+        await writeFile(
+          join(app.path, ".zitadel/local/runtime.json"),
+          JSON.stringify({ backend: "nope" }),
+        );
+
+        const result = await app.run(["start", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          next_commands: [
+            expectedPublicCliCommand(app.againAsRun("reset --force")),
+            expectedPublicCliCommand(app.againAsRun("start")),
+          ],
+        });
+      });
+
+      it("refuses a malformed local admin with the hint that names it", async () => {
+        const app = await aSetUpApp();
+        await app.writeMalformedLocalAdmin();
+
+        const result = await app.run(["start", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint: `Delete ${app.localAdminFile} and run ${expectedPublicCliCommand("reset --force")}, then ${expectedPublicCliCommand("start")}. Both are needed: reset keeps the file, and deleting it alone leaves the server holding the old password.`,
+        });
+      });
+
+      it("refuses a malformed local admin with the removal, reset and start that repair it", async () => {
+        const app = await aSetUpApp();
+        await app.writeMalformedLocalAdmin();
+
+        const result = await app.run(["start", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          next_commands: [
+            `rm ${app.localAdminFile}`,
+            expectedPublicCliCommand(app.againAsRun("reset --force")),
+            expectedPublicCliCommand(app.againAsRun("start")),
+          ],
+        });
+      });
+
+      it("refuses an env file it cannot read with the hint that names it", async () => {
+        const app = await aSetUpApp();
+        await app.makeLocalEnvFileUnreadable();
+
+        const result = await app.run(["start", "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint: `The file ${app.localEnvFile} exists but could not be read; fix its permissions or remove it.`,
         });
       });
 

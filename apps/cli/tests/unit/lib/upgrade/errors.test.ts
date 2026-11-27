@@ -1,27 +1,55 @@
 import { describe, expect, it } from "vitest";
 
 import { PM } from "@/lib/pm";
-import { InstallError, ReleaseLookupError } from "@/lib/upgrade/errors";
+import { UpgradeError, UpgradeInstallFailedError, UpgradeReleaseLookupError } from "@/lib/upgrade";
 
 const INSTALL = PM.named("npm").addExact(["@zitadel/api@2.0.0"]);
 
-describe("ReleaseLookupError", () => {
+describe("UpgradeReleaseLookupError", () => {
   it("is named, and says only that no release was found", () => {
-    const error = new ReleaseLookupError();
+    const error = new UpgradeReleaseLookupError("Could not look up the latest release");
 
     expect([error.name, error.message]).toEqual([
-      "ReleaseLookupError",
+      "UpgradeReleaseLookupError",
       "Could not look up the latest release",
     ]);
   });
+
+  it("is an unavailable failure that is not worth retrying unchanged", () => {
+    const error = new UpgradeReleaseLookupError("Could not look up the latest release");
+
+    expect(error).toBeInstanceOf(UpgradeError);
+    expect([error.category, error.retryable]).toEqual(["unavailable", false]);
+    expect(error.code).toBe("E_VALIDATION");
+  });
 });
 
-describe("InstallError", () => {
+describe("UpgradeInstallFailedError", () => {
   it("carries the install and what the package manager failed with", () => {
     const cause = new Error("exit 1");
 
-    const error = new InstallError(INSTALL, cause);
+    const error = new UpgradeInstallFailedError(INSTALL, cause);
 
-    expect([error.name, error.command, error.cause]).toEqual(["InstallError", INSTALL, cause]);
+    expect(error).toBeInstanceOf(UpgradeError);
+    expect([error.name, error.command, error.cause]).toEqual([
+      "UpgradeInstallFailedError",
+      INSTALL,
+      cause,
+    ]);
+  });
+
+  it("is a generic failure that is not worth retrying unchanged", () => {
+    const error = new UpgradeInstallFailedError(INSTALL, new Error("exit 1"));
+
+    expect([error.category, error.retryable]).toEqual(["unknown", false]);
+    expect(error.code).toBe("E_VALIDATION");
+  });
+});
+
+describe("what UpgradeReleaseLookupError states", () => {
+  it("reports itself as the failure it is", () => {
+    expect(new UpgradeReleaseLookupError("fatal: bad").details).toEqual({
+      original: { name: "UpgradeReleaseLookupError", message: "fatal: bad", code: undefined },
+    });
   });
 });

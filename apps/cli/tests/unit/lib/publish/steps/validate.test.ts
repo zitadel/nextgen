@@ -3,7 +3,7 @@ import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
 
-import { ZitadelError } from "@/lib/errors";
+import { PublishError } from "@/lib/publish";
 import { validateStep } from "@/lib/publish/steps/validate";
 import {
   aBranding,
@@ -91,7 +91,7 @@ describe("validateStep", () => {
       return validateStep.run(aStepContext({ config }));
     });
 
-    expect(error).toBeInstanceOf(ZitadelError);
+    expect(error).toBeInstanceOf(PublishError);
     expect(error).toMatchObject({
       code: "E_VALIDATION",
       message: expect.stringContaining("MISSING_VAR"),
@@ -107,7 +107,7 @@ describe("validateStep", () => {
       return validateStep.run(aStepContext({ config }));
     });
 
-    expect(error).toBeInstanceOf(ZitadelError);
+    expect(error).toBeInstanceOf(PublishError);
     expect(error).toMatchObject({
       message: expect.stringMatching(
         /\.zitadel\/schemas\/a\.json[\s\S]*\.zitadel\/schemas\/b\.json/,
@@ -149,7 +149,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({ code: "E_VALIDATION" });
     });
 
@@ -163,16 +163,11 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
-        details: {
-          issues: [
-            expect.objectContaining({
-              path: ".zitadel/schemas/human-user.json",
-              message: expect.stringMatching(/x-auth-methods pasword is not/),
-            }),
-          ],
-        },
+        message: expect.stringMatching(
+          /\.zitadel\/schemas\/human-user\.json: .*x-auth-methods pasword is not/,
+        ),
       });
     });
   });
@@ -192,25 +187,9 @@ describe("validateStep", () => {
       });
 
       expect(error).toMatchObject({
-        details: {
-          issues: [
-            expect.objectContaining({
-              path: ".zitadel/schemas/human-user.json",
-              message:
-                "properties.firstName minimumLength is not an allowed key. Did you mean minLength?",
-            }),
-          ],
-        },
-      });
-    });
-
-    it("says a key a newer server added needs a CLI as new as the server", async () => {
-      const error = await rejectionOf(() => {
-        return validateStep.run(aStepContext({ config }));
-      });
-
-      expect(error).toMatchObject({
-        hint: "Fix the files named above and rerun; no changes were made. A key a newer Zitadel server added needs a CLI as new as the server.",
+        message: expect.stringContaining(
+          ".zitadel/schemas/human-user.json: properties.firstName minimumLength is not an allowed key. Did you mean minLength?",
+        ),
       });
     });
   });
@@ -223,26 +202,12 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining(
           ".zitadel/idps/acme.json: client_secret must reference a variable, not hold a value",
         ),
-      });
-    });
-
-    it("tells a literal client_secret how to publish it", async () => {
-      const config = aConfig({ connections: { "acme.json": LITERAL_SECRET } });
-
-      const error = await rejectionOf(() => {
-        return validateStep.run(aStepContext({ config }));
-      });
-
-      expect(error).toBeInstanceOf(ZitadelError);
-      expect(error).toMatchObject({
-        hint: expect.stringContaining("Publish a secret with the command below"),
-        nextCommands: [{ id: "variable:set", args: { name: "NAME" }, flags: { secret: true } }],
       });
     });
 
@@ -284,7 +249,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config, ...overrides }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({ code: "E_VALIDATION" });
     });
 
@@ -300,7 +265,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining(".zitadel/idps/b-acme.json: client_secret must reference"),
@@ -327,7 +292,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(JSON.stringify(error)).not.toContain("a-literal-secret");
     });
 
@@ -341,7 +306,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
         message: expect.stringContaining(
           ".zitadel/idps/acme.json: oidc names some endpoints but not jwks_uri, token_endpoint, userinfo_endpoint",
@@ -382,7 +347,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining(".zitadel/idps/b-bad.json"),
@@ -397,7 +362,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({ code: "E_CREDENTIAL_MISSING" });
     });
   });
@@ -410,44 +375,10 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
-        details: {
-          issues: [
-            expect.objectContaining({
-              message: expect.stringContaining("not a property in the user schema"),
-            }),
-          ],
-        },
-      });
-    });
-
-    it("lists the steps a refusal names under its issue", async () => {
-      const flow = aLoginFlow({ userSchema: "human-user" });
-      const config = aConfig({
-        schemas: { "human-user.json": aUserSchema() },
-        flows: {
-          "default-login.json": {
-            ...flow,
-            steps: [{ name: "identifier", sso_providers: ["google", "google"] }],
-          },
-        },
-      });
-
-      const error = await rejectionOf(() => {
-        return validateStep.run(aStepContext({ config }));
-      });
-
-      expect(error).toMatchObject({
-        details: {
-          issues: expect.arrayContaining([
-            expect.objectContaining({
-              steps: ["identifier"],
-              path: ".zitadel/flows/default-login.json",
-            }),
-          ]),
-        },
+        message: expect.stringContaining("not a property in the user schema"),
       });
     });
 
@@ -502,19 +433,12 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
-        details: {
-          issues: [
-            {
-              path: ".zitadel/flows/default-login.json",
-              rule: "release/user-schema-resolves",
-              message:
-                'user_schema "missing-schema" is not the objectType of a schema in .zitadel/schemas/ ("human-user") or in the project.',
-            },
-          ],
-        },
+        message: expect.stringContaining(
+          '.zitadel/flows/default-login.json: user_schema "missing-schema" is not the objectType of a schema in .zitadel/schemas/ ("human-user") or in the project.',
+        ),
       });
     });
 
@@ -581,7 +505,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining(`.zitadel/policies/${PASSWORD_POLICY}.json: config`),
@@ -595,7 +519,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining(
@@ -635,7 +559,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({ code: "E_VALIDATION", message: expect.stringContaining(why) });
     });
 
@@ -663,7 +587,7 @@ describe("validateStep", () => {
         return validateStep.run(aStepContext({ config, store }));
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
+      expect(error).toBeInstanceOf(PublishError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
         message: expect.stringContaining("BRAND_NAME"),

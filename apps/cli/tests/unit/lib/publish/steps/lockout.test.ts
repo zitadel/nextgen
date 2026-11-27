@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, vi } from "vitest";
 
 import { it } from "@tests/fixtures";
 
-import type { Credential } from "@/lib/backend";
+import { BackendUnreachableError, type Credential } from "@/lib/backend";
 import { lockoutStep } from "@/lib/publish/steps/lockout";
 import { warnings } from "@/lib/ui";
 import type { JsonObject, JsonValue } from "@/lib/zitadel";
@@ -324,7 +324,7 @@ function liveOn(platform: Platform) {
  * @returns Never; it always throws.
  */
 function refused(): never {
-  throw new Error("forbidden");
+  throw new BackendUnreachableError("forbidden");
 }
 
 /**

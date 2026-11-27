@@ -1,12 +1,18 @@
-import { SERVER } from "@/constants";
-import { readdir } from "node:fs/promises";
+import { readdir } from "@/lib/fs";
 import { join, resolve } from "node:path";
 
-import { ZitadelError } from "@/lib/errors";
 import { Project } from "@/lib/project";
+import { LocalServerUrlInvalidError } from "@/lib/server";
 
 import { Dotenv } from "./dotenv";
 import { EnvironmentName } from "./environment-name";
+import {
+  EnvironmentFileMissingError,
+  EnvironmentSourcesConflictError,
+  EnvironmentValueInvalidError,
+  EnvironmentValueMissingError,
+  EnvironmentValueUnboundError,
+} from "./errors";
 import { InitialRelease } from "./initial-release";
 import { ENVIRONMENT_KEYS, SECRET_KEYS } from "./keys";
 import type {
@@ -82,15 +88,15 @@ export class Environment {
    *
    * @param input - The directory, the process environment and the flags.
    * @returns The resolved environment.
-   * @throws {ZitadelError} `E_VALIDATION` when `--env` and `--env-file` are
-   *   both given, the name is not usable, the file is missing or a server is
-   *   not a URL.
+   * @throws {@link EnvironmentSourcesConflictError} When `--env` and `--env-file` are
+   *   both given.
+   * @throws {@link EnvironmentNameInvalidError} When the name is not usable.
+   * @throws {@link EnvironmentValueInvalidError} When a server is not a URL.
+   * @throws {@link EnvironmentFileMissingError} When the file is missing.
    */
   static async resolve(input: ResolveEnvironmentInput): Promise<Environment> {
     if (input.envName && input.envFile) {
-      throw new ZitadelError("E_VALIDATION", "--env and --env-file cannot be used together", {
-        hint: "--env picks the .env.<name>.local files; --env-file names one file outright.",
-      });
+      throw new EnvironmentSourcesConflictError("--env and --env-file cannot be used together");
     }
     const name = EnvironmentName.resolve(input.env, input.envName);
 
@@ -113,7 +119,7 @@ export class Environment {
       // read.
       const values = await Dotenv.at(resolve(input.envFile)).read();
       if (values === undefined) {
-        throw new ZitadelError("E_VALIDATION", `--env-file ${input.envFile} was not found`);
+        throw new EnvironmentFileMissingError(`--env-file ${input.envFile} was not found`);
       }
       sources.push({ source: `--env-file ${input.envFile}`, values });
     }
@@ -222,8 +228,9 @@ export class Environment {
    *
    * @param key - The value.
    * @returns The value, from the first source that supplied it.
-   * @throws {ZitadelError} `E_VALIDATION` naming the environment, the variable
-   *   and every source the chain looked in.
+   * @throws {@link EnvironmentValueMissingError} naming the environment, the
+   *   variable and every source the chain looked in.
+   * @throws {@link EnvironmentValueUnboundError} When the environment has no project at all.
    */
   require(key: EnvironmentKey): string {
     const resolved = this.values[key];
@@ -231,11 +238,6 @@ export class Environment {
       return resolved.value;
     }
     const name = this.name.value;
-    const consulted = `Consulted, in order: ${this.consulted
-      .map((entry) => {
-        return entry.source;
-      })
-      .join(", ")}.`;
     // The file to set the value in. An --env-file run reads that file; an
     // environment already bound by `env add` has its `.env.<name>.local`. Only
     // an environment with no project at all is pointed at `env add` (or
@@ -248,31 +250,24 @@ export class Environment {
       return entry.source === boundFile && entry.present;
     });
     const file = this.envFile ?? (bound ? boundFile : undefined);
-    const unbound = file === undefined && this.values.ZITADEL_PROJECT_ID === undefined;
-    const elsewhere = this.cwd === process.cwd() ? {} : { cwd: this.cwd };
-    throw new ZitadelError("E_VALIDATION", `${key} is not set for the ${name} environment`, {
-      hint: unbound
-        ? `${consulted} Set ${key} in ${boundFile} or the process environment, or run \`zitadel env add ${name}\`.`
-        : `${consulted} Set ${key} in ${file ?? `${boundFile} or the process environment`}${file === undefined ? "" : " or the process environment"}.`,
-      ...(unbound
-        ? {
-            // Run in the directory this run addressed, which need not be the
-            // shell's: `setup` and `env add` both write their files there.
-            nextCommands: [
-              name === "development"
-                ? { id: "setup", flags: elsewhere }
-                : { id: "env:add", args: { name }, flags: elsewhere },
-            ],
-          }
-        : {}),
-      details: {
-        environment: name,
-        variable: key,
-        consulted: this.consulted.map((entry) => {
-          return entry.source;
-        }),
-      },
-    });
+    const missing = {
+      environment: name,
+      variable: key,
+      consulted: this.consulted.map((entry) => {
+        return entry.source;
+      }),
+      file: file ?? boundFile,
+    };
+    if (file === undefined && this.values.ZITADEL_PROJECT_ID === undefined) {
+      throw new EnvironmentValueUnboundError(
+        `${key} is not set for the ${name} environment`,
+        missing,
+      );
+    }
+    throw new EnvironmentValueMissingError(
+      `${key} is not set for the ${name} environment`,
+      missing,
+    );
   }
 
   /**
@@ -338,20 +333,20 @@ export class Environment {
    * @param value - The value a source supplied.
    * @param source - Where it came from, for the error.
    * @returns The origin.
-   * @throws {ZitadelError} `E_VALIDATION` naming where it came from.
+   * @throws {@link EnvironmentValueInvalidError} naming where it came from.
    */
   private static originFrom(servers: ServerAddresses, value: string, source: string): string {
     try {
       return servers.origin(value);
     } catch (error) {
-      throw new ZitadelError(
-        "E_VALIDATION",
-        `ZITADEL_URL from ${source} is not a valid server: ${value}`,
-        {
-          hint: `Fix or remove ZITADEL_URL in ${source}; it must be a URL such as ${SERVER}.`,
-          ...(error instanceof Error ? { details: { cause: error.message } } : {}),
-        },
-      );
+      if (error instanceof LocalServerUrlInvalidError) {
+        throw new EnvironmentValueInvalidError(
+          `ZITADEL_URL from ${source} is not a valid server: ${value}`,
+          source,
+          error,
+        );
+      }
+      throw error;
     }
   }
 }

@@ -1,7 +1,7 @@
 import { intro, log, note, outro } from "@clack/prompts";
 import pc from "picocolors";
 
-import { CANCELLED, PromptCancelled, ZitadelError } from "@/lib/errors";
+import { CANCELLED, isCancellation, PromptCancelled } from "@/lib/errors";
 
 import type { Audience } from "./audience";
 import { Asker } from "./asker";
@@ -209,11 +209,10 @@ export class Chain implements Drawing, Narratable {
    * leaving a run that failed showing nothing but its closing line.
    */
   abort(error: unknown): void {
-    if (
-      !(error instanceof ZitadelError && error.code === "E_CANCELLED") ||
-      !this.audience.interactive ||
-      this.ended
-    ) {
+    if (!isCancellation(error)) {
+      return;
+    }
+    if (!this.audience.interactive || this.ended) {
       return;
     }
     DrawnSpinner.clearAll();
@@ -222,7 +221,10 @@ export class Chain implements Drawing, Narratable {
       process.stdout.write(`\n${pc.red(CANCELLED)}\n`);
       return;
     }
-    if (error instanceof PromptCancelled || !this.opened) {
+    if (error instanceof PromptCancelled) {
+      return;
+    }
+    if (!this.opened) {
       return;
     }
     this.ended = true;
@@ -254,11 +256,8 @@ export class Chain implements Drawing, Narratable {
     audience: Pick<Audience, "interactive" | "force"> = this.audience,
   ): Questions & Confirmer {
     const shown = (): void => {
-      try {
-        this.promptListener?.();
-      } catch {
-        // Whoever listens never changes what the person sees.
-      }
+      // The one listener, telemetry, guards itself and never throws.
+      this.promptListener?.();
     };
     const session = {
       interactive: audience.interactive,

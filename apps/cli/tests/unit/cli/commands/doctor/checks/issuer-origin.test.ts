@@ -1,4 +1,4 @@
-import { readFile, rm } from "node:fs/promises";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { HttpResponse, http } from "msw";
@@ -237,22 +237,11 @@ describe("IssuerOriginCheck.run", () => {
   });
 
   describe("when it cannot tell", () => {
-    it.for([
-      [
-        "the server cannot be reached",
-        () => {
-          return HttpResponse.error();
-        },
-      ],
-      [
-        "the server answers with JSON null",
-        () => {
-          return HttpResponse.json(null);
-        },
-      ],
-    ] as const)("skips, passing, when %s", async ([, answer], { dir }) => {
+    it("skips, passing, when the server cannot be reached", async ({ dir }) => {
       await aProject(dir, AS_PREVIEW);
-      projectAnswers(answer);
+      projectAnswers(() => {
+        return HttpResponse.error();
+      });
 
       const outcome = await check.run(aCheckContext(dir));
 
@@ -277,6 +266,24 @@ describe("IssuerOriginCheck.run", () => {
     it("skips, passing, when .zitadel/secret cannot be read", async ({ dir }) => {
       await aProject(dir, AS_PREVIEW);
       await rm(join(dir, ".zitadel/secret"));
+
+      const outcome = await check.run(aCheckContext(dir));
+
+      expect(outcome.status).toBe("pass");
+    });
+
+    it("skips, passing, when zitadel.json is not an object", async ({ dir }) => {
+      await aProject(dir, AS_PREVIEW);
+      await writeFile(join(dir, "zitadel.json"), "[]");
+
+      const outcome = await check.run(aCheckContext(dir));
+
+      expect(outcome.status).toBe("pass");
+    });
+
+    it("skips, passing, when .zitadel/secret is not JSON", async ({ dir }) => {
+      await aProject(dir, AS_PREVIEW);
+      await writeFile(join(dir, ".zitadel/secret"), "{not json");
 
       const outcome = await check.run(aCheckContext(dir));
 
@@ -357,6 +364,37 @@ describe("IssuerOriginCheck.fix", () => {
       await check.fix(aCheckContext(dir, { dryRun: true, consent: forced(true) }));
 
       expect(await serverOrigins(project)).toEqual(AS_PREVIEW);
+    });
+  });
+
+  describe("when reading the deployments fails with no backend error", () => {
+    it("still says to deploy", async ({ dir }) => {
+      await aProject(dir, AS_PREVIEW);
+      server.use(
+        http.get(`${SERVER}/api/v1/deployments`, () => {
+          return HttpResponse.json({
+            deployments: [
+              {
+                id: "dep_primary",
+                release_id: "rel_primary",
+                kind: "primary",
+              },
+            ],
+            next_page_token: null,
+          });
+        }),
+      );
+
+      const error = await rejectionOf(() => {
+        return check.fix(aCheckContext(dir, { consent: forced() }));
+      });
+
+      expect([error, warnings.take()]).toEqual([
+        expect.any(TypeError),
+        [
+          `${ISSUER} is a primary origin now, but it serves nothing until a deployment names it: deploy in the app.`,
+        ],
+      ]);
     });
   });
 

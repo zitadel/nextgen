@@ -1,7 +1,10 @@
 import type { ReadonlyDeep } from "type-fest";
 import type { ZodType, z } from "zod";
 
-import { BrokenFilesError, RefusedEditError } from "@/lib/zitadel/errors";
+import {
+  ZitadelConfigFilesBrokenError,
+  ZitadelConfigRegionUneditableError,
+} from "@/lib/zitadel/errors";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import type { Issue, RuleId, ValidationContext } from "@/lib/zitadel/rules/types";
 import type { ConfigStore, WriteMode } from "@/lib/zitadel/storage/types";
@@ -111,9 +114,15 @@ export type DocumentContract<Schema extends ZodType> = {
    *
    * @param file - The file the schema refused.
    * @param refusals - One finding per refusal, under {@link rule}.
+   * @param paths - The dotted path each refusal is at, in the order of
+   *   `refusals` (empty for the root).
    * @returns The findings; never none.
    */
-  readonly explain?: (file: DocumentFile, refusals: readonly Issue[]) => readonly Issue[];
+  readonly explain?: (
+    file: DocumentFile,
+    refusals: readonly Issue[],
+    paths: readonly string[],
+  ) => readonly Issue[];
 };
 
 /**
@@ -210,8 +219,8 @@ export type Edit<Document> = {
  *   which tells one kind of document from another;
  * - an edit is a `with…` or `without…` method that returns an {@link Edit}
  *   holding a new document, or the same one when there is nothing to change,
- *   and throws {@link RefusedEditError} when it cannot be made, or
- *   {@link BrokenFilesError} when the contract refuses the body it makes.
+ *   and throws {@link ZitadelConfigError} when it cannot be made, or
+ *   {@link ZitadelConfigFilesBrokenError} when the contract refuses the body it makes.
  *
  * Immutable. The body is never changed in place, so a document read once can
  * be compared with what an edit made of it. The body is kept whole, including
@@ -316,16 +325,24 @@ export abstract class ConfigDocument<Value = unknown> {
       return make(result.data, file);
     }
     const parsed = result.success ? [] : result.error.issues;
-    const refusals = [
+    const located = [
       ...parsed.map((refusal) => {
         return { path: refusal.path.join("."), message: refusal.message };
       }),
       ...refused,
-    ].map((refusal) => {
+    ];
+    const refusals = located.map((refusal) => {
       const where = refusal.path || "(root)";
       return ConfigDocument.makeFileIssue(file.path, contract.rule, `${where} ${refusal.message}`);
     });
-    const issues = contract.explain?.(file, refusals) ?? refusals;
+    const issues =
+      contract.explain?.(
+        file,
+        refusals,
+        located.map((refusal) => {
+          return refusal.path;
+        }),
+      ) ?? refusals;
     return new BrokenFile({ path: file.path, kind: contract.kind, body: file.body, issues });
   }
 
@@ -337,8 +354,8 @@ export abstract class ConfigDocument<Value = unknown> {
    * @param contract - The kind's contract.
    * @param file - The file.
    * @returns What the contract parsed the body to.
-   * @throws {@link BrokenFilesError} When the contract refuses the body,
-   *   naming every finding its kind reports about it.
+   * @throws {@link ZitadelConfigFilesBrokenError} When the contract refuses the
+   *   body, naming every finding its kind reports about it.
    */
   protected static parseFile<Schema extends ZodType>(
     contract: DocumentContract<Schema>,
@@ -348,7 +365,7 @@ export abstract class ConfigDocument<Value = unknown> {
       return { value };
     });
     if (reading instanceof BrokenFile) {
-      throw new BrokenFilesError(reading.problems);
+      throw new ZitadelConfigFilesBrokenError(reading.problems);
     }
     return reading.value;
   }
@@ -452,7 +469,7 @@ export abstract class ConfigDocument<Value = unknown> {
    *
    * @param store - Where referenced files are read from.
    * @returns The body to send.
-   * @throws {@link ConfigError} When a referenced file cannot be read.
+   * @throws {@link ZitadelConfigError} When a referenced file cannot be read.
    */
   abstract toWireBody(store: ConfigStore): JsonObject;
 
@@ -474,18 +491,13 @@ export abstract class ConfigDocument<Value = unknown> {
    * Such a region was written by hand, and rewriting it would discard it.
    *
    * @param region - What is wrong with the region, or `undefined` when nothing is.
-   * @throws {@link RefusedEditError} When a region is named, with the file and
+   * @throws {@link ZitadelConfigError} When a region is named, with the file and
    *   the region.
    */
   protected refuseUneditable(region: string | undefined): void {
     if (region === undefined) {
       return;
     }
-    throw new RefusedEditError(`${this.path}: ${region}`, {
-      hint:
-        "This command edits that region, and it is not the shape it edits. " +
-        "Fix it against the dialect in .zitadel/meta/, then run the command again.",
-      details: { file: this.path, region },
-    });
+    throw new ZitadelConfigRegionUneditableError(this.path, region);
   }
 }

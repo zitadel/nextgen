@@ -1,4 +1,4 @@
-import { AbstractSanityCheck, type CheckContext } from "./types";
+import { AbstractSanityCheck, CheckFailure, type CheckContext } from "./types";
 import { Project } from "@/lib/project";
 
 /** Verifies `.zitadel/secret`'s project_id matches `zitadel.json`'s project. */
@@ -12,7 +12,7 @@ export class ProjectMatchCheck extends AbstractSanityCheck {
     const secret = await Project.at(ctx.cwd).secret();
     const configProject = typeof config.data.project === "string" ? config.data.project : undefined;
     if (secret.data.project_id !== configProject) {
-      throw new Error(".zitadel/secret project_id does not match zitadel.json project");
+      throw new CheckFailure(".zitadel/secret project_id does not match zitadel.json project");
     }
   }
 }

@@ -1,10 +1,13 @@
-import { isObject } from "@/lib/json";
-import { interpolate, type Refusal, refusalError } from "@/cli/core/refusal";
-import { isDirectoryOrMissing } from "@/lib/orca";
-import { LocalServerError, ZitadelRuntime } from "@/lib/server";
-import { LOCAL_SERVER_ADVICE, type LocalServerAdvice } from "@/lib/suggestion/local-server-advice";
 import { Cmd } from "@/lib/cmd";
-import { resolve } from "node:path";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
+import { isDirectoryOrMissing } from "@/lib/orca";
+import {
+  LocalServerNotRespondingElsewhereError,
+  LocalServerNotRespondingError,
+  LocalServerNotRunningError,
+  LocalServerUrlInvalidError,
+  ZitadelRuntime,
+} from "@/lib/server";
 import { WizardStep } from "@/lib/wizard";
 
 import {
@@ -18,12 +21,34 @@ import {
 } from "@/cli/commands/setup/shared";
 import { Project } from "@/lib/project";
 
-/** How `--server local` with nothing running is refused. */
+/** How `--server local` with no server ever started is refused. */
 const NO_LOCAL_SERVER_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
   message: "Local Zitadel server is not running",
-  hint: "{reason}Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
+  hint: "No local server has been started in this directory or a parent. Run `zitadel start`, or name a server another directory started with --server <url>. Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
   next: ["{start}", "{setup}"],
+} as const satisfies Refusal;
+
+/** How `--server local` with a recorded server that does not answer is refused. */
+const LOCAL_SERVER_NOT_RESPONDING_REFUSAL = {
+  code: "E_LOCAL_SERVER_NOT_RUNNING",
+  message: "{message}",
+  hint: "No healthy local server responded at {serverUrl}. Run `zitadel start` to bring it back. Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
+  next: ["{start}", "{setup}"],
+} as const satisfies Refusal;
+
+/** How `--server local` with a recorded server in another folder that does not answer is refused. */
+const LOCAL_SERVER_ELSEWHERE_REFUSAL = {
+  code: "E_LOCAL_SERVER_NOT_RUNNING",
+  message: "{message}",
+  hint: "No healthy local server responded at {serverUrl}. It was started in {folder}, so run `zitadel start --cwd {folder}` to bring it back. Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
+  next: ["{start}", "{setup}"],
+} as const satisfies Refusal;
+
+/** How a `--server` that is not an http(s) URL is refused. */
+const SERVER_URL_INVALID_REFUSAL = {
+  message: "{message}",
+  hint: "Use a URL like {example}.",
 } as const satisfies Refusal;
 
 /** How a `--cwd` that is a file, or lies under one, is refused. */
@@ -127,113 +152,180 @@ export class CheckPreconditions extends WizardStep<"preconditions", Fact<"prefli
   async run(needs: Needs): Promise<Fact<"preflight">> {
     const { flags } = needs;
     const { meta, suggest } = this.deps;
-    const server = await ZitadelRuntime.resolve({
-      cwd: meta.cwd,
-      serverFlag: meta.serverFlag,
-    }).catch((error: unknown) => {
-      if (!(error instanceof LocalServerError) || error.code !== "E_LOCAL_SERVER_NOT_RUNNING") {
-        throw error;
-      }
-      const advice: LocalServerAdvice = LOCAL_SERVER_ADVICE[error.kind];
-      const details = isObject(error.details) ? error.details : {};
-      const { directory } = details;
-      const elsewhere = typeof directory === "string" && resolve(directory) !== resolve(meta.cwd);
-      const startFlags: { cwd?: string } = {};
-      if (elsewhere) {
-        startFlags.cwd = directory;
-      }
-      const text = [elsewhere && advice.elsewhere, advice.hint].find((candidate) => {
-        return typeof candidate === "string";
+    try {
+      const server = await ZitadelRuntime.resolve({
+        cwd: meta.cwd,
+        serverFlag: meta.serverFlag,
       });
-      const hint = interpolate(text ?? advice.hint, {
-        ...details,
-        ...(elsewhere && { directory: Cmd.quote(directory) }),
-      });
-      const retry = retryOptionsFromFlags(flags);
-      const recovery = ssoRecovery(retry, suggest);
-      throw refusalError(
-        NO_LOCAL_SERVER_REFUSAL,
-        {
-          reason: `${hint} `,
-          scripting:
-            retry.sso && retry.sso.length > 0
-              ? "The rerun asks for the client id and secret, because a command carries neither. " +
-                "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
-              : "",
-          recovery:
-            recovery.commands.length > 0
-              ? `${recovery.hint}${recovery.commands.join(" ")} `
-              : recovery.hint,
+      if (!(await isDirectoryOrMissing(meta.cwd))) {
+        throw refusalError(NOT_A_DIRECTORY_REFUSAL, {
+          cwd: meta.cwd,
+        });
+      }
+      const configured = await Project.at(meta.cwd).hasConfig();
+      if (!configured && (await Project.at(meta.cwd).hasSecret())) {
+        throw refusalError(SECRET_WITHOUT_CONFIG_REFUSAL, {});
+      }
+      if (!configured && flags.git !== false) {
+        const state = await inspectWorktree(meta.cwd);
+        if (state.kind === "unknown") {
+          throw refusalError(WORKTREE_UNKNOWN_REFUSAL, {
+            reason: state.reason,
+          });
+        }
+        if (state.kind === "blocked") {
+          throw refusalError(WORKTREE_BLOCKED_REFUSAL, {
+            blocked: state.blocked,
+          });
+        }
+        if (state.kind === "dirty") {
+          throw refusalError(WORKTREE_DIRTY_REFUSAL, {
+            parts: new Intl.ListFormat("en", { type: "conjunction" }).format(
+              [
+                {
+                  noun: "uncommitted change",
+                  files: state.modified,
+                },
+                {
+                  noun: "untracked file",
+                  files: state.untracked,
+                },
+              ]
+                .filter(({ files }) => {
+                  return files.length > 0;
+                })
+                .map(({ files, noun }) => {
+                  return `${files.length} ${noun}${new Intl.PluralRules("en").select(files.length) === "one" ? "" : "s"}`;
+                }),
+            ),
+            modified: state.modified,
+            untracked: state.untracked,
+          });
+        }
+      }
+      if (!configured) {
+        await refuseOutdatedLocalServer({
+          cwd: meta.cwd,
+          machine: this.deps.machine,
+          serverUrl: server.value,
+          flags,
+        });
+      }
+      this.deps.useServer(server.value);
+      return {
+        preflight: {
+          server,
+          configured,
         },
-        {
-          start: { id: "start", flags: startFlags },
-          setup: {
-            id: "setup",
-            flags: setupRetryFlags(retry),
+      };
+    } catch (error) {
+      if (error instanceof LocalServerNotRunningError) {
+        const retry = retryOptionsFromFlags(flags);
+        const recovery = ssoRecovery(retry, suggest);
+        const scripting =
+          retry.sso && retry.sso.length > 0
+            ? "The rerun asks for the client id and secret, because a command carries neither. " +
+              "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
+            : "";
+        const recovered =
+          recovery.commands.length > 0
+            ? `${recovery.hint}${recovery.commands.join(" ")} `
+            : recovery.hint;
+        throw refusalError(
+          NO_LOCAL_SERVER_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+            scripting,
+            recovery: recovered,
           },
-        },
-      );
-    });
-    if (!(await isDirectoryOrMissing(meta.cwd))) {
-      throw refusalError(NOT_A_DIRECTORY_REFUSAL, {
-        cwd: meta.cwd,
-      });
-    }
-    const configured = await Project.at(meta.cwd).hasConfig();
-    if (!configured && (await Project.at(meta.cwd).hasSecret())) {
-      throw refusalError(SECRET_WITHOUT_CONFIG_REFUSAL, {});
-    }
-    if (!configured && flags.git !== false) {
-      const state = await inspectWorktree(meta.cwd);
-      if (state.kind === "unknown") {
-        throw refusalError(WORKTREE_UNKNOWN_REFUSAL, {
-          reason: state.reason,
-        });
+          {
+            start: {
+              id: "start",
+              flags: {},
+            },
+            setup: {
+              id: "setup",
+              flags: setupRetryFlags(retry),
+            },
+          },
+        );
       }
-      if (state.kind === "blocked") {
-        throw refusalError(WORKTREE_BLOCKED_REFUSAL, {
-          blocked: state.blocked,
-        });
+      if (error instanceof LocalServerNotRespondingError) {
+        const retry = retryOptionsFromFlags(flags);
+        const recovery = ssoRecovery(retry, suggest);
+        const scripting =
+          retry.sso && retry.sso.length > 0
+            ? "The rerun asks for the client id and secret, because a command carries neither. " +
+              "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
+            : "";
+        const recovered =
+          recovery.commands.length > 0
+            ? `${recovery.hint}${recovery.commands.join(" ")} `
+            : recovery.hint;
+        throw refusalError(
+          LOCAL_SERVER_NOT_RESPONDING_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+            scripting,
+            recovery: recovered,
+          },
+          {
+            start: {
+              id: "start",
+              flags: {},
+            },
+            setup: {
+              id: "setup",
+              flags: setupRetryFlags(retry),
+            },
+          },
+        );
       }
-      if (state.kind === "dirty") {
-        throw refusalError(WORKTREE_DIRTY_REFUSAL, {
-          parts: new Intl.ListFormat("en", { type: "conjunction" }).format(
-            [
-              {
-                noun: "uncommitted change",
-                files: state.modified,
+      if (error instanceof LocalServerNotRespondingElsewhereError) {
+        const retry = retryOptionsFromFlags(flags);
+        const recovery = ssoRecovery(retry, suggest);
+        const scripting =
+          retry.sso && retry.sso.length > 0
+            ? "The rerun asks for the client id and secret, because a command carries neither. " +
+              "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
+            : "";
+        const recovered =
+          recovery.commands.length > 0
+            ? `${recovery.hint}${recovery.commands.join(" ")} `
+            : recovery.hint;
+        throw refusalError(
+          LOCAL_SERVER_ELSEWHERE_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+            folder: Cmd.quote(error.directory),
+            scripting,
+            recovery: recovered,
+          },
+          {
+            start: {
+              id: "start",
+              flags: {
+                cwd: error.directory,
               },
-              {
-                noun: "untracked file",
-                files: state.untracked,
-              },
-            ]
-              .filter(({ files }) => {
-                return files.length > 0;
-              })
-              .map(({ files, noun }) => {
-                return `${files.length} ${noun}${new Intl.PluralRules("en").select(files.length) === "one" ? "" : "s"}`;
-              }),
-          ),
-          modified: state.modified,
-          untracked: state.untracked,
+            },
+            setup: {
+              id: "setup",
+              flags: setupRetryFlags(retry),
+            },
+          },
+        );
+      }
+      if (error instanceof LocalServerUrlInvalidError) {
+        throw refusalError(SERVER_URL_INVALID_REFUSAL, {
+          ...error,
+          message: error.message,
+          example: ZitadelRuntime.DEFAULT,
         });
       }
+      throw error;
     }
-    if (!configured) {
-      await refuseOutdatedLocalServer({
-        cwd: meta.cwd,
-        machine: this.deps.machine,
-        serverUrl: server.value,
-        flags,
-      });
-    }
-    this.deps.useServer(server.value);
-    return {
-      preflight: {
-        server,
-        configured,
-      },
-    };
   }
 }

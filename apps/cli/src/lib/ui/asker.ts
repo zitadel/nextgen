@@ -1,6 +1,7 @@
 import type { Parsed } from "@zitadel/config/idp";
 
-import { confirmationHint, ZitadelError } from "@/lib/errors";
+import { ConsentRequiredError } from "@/lib/consent";
+import { ZitadelError } from "@/lib/errors";
 import { Stdin } from "@/lib/stdin";
 
 import { type AnyQuestion, DrawnPrompter, type Kind, type Prompter } from "./prompter";
@@ -194,14 +195,10 @@ export class Asker implements Questions, Confirmer {
         return true;
       }
       if (!this.session.interactive) {
-        throw new ZitadelError(
-          "E_CONFIRMATION_REQUIRED",
+        throw new ConsentRequiredError(
           `Cannot ${q.name} without --force in non-interactive mode`,
-          {
-            hint: confirmationHint(q.message),
-            ...(q.retry === undefined ? {} : { nextCommands: [q.retry] }),
-            details: { question: q.message },
-          },
+          q.message,
+          q.retry,
         );
       }
       return this.drawn(() => {

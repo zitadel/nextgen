@@ -34,6 +34,11 @@ export class ChooseProvider extends WizardStep<"choice", Fact<"choice">, Fact<"f
    *
    * @param needs - What the run starts from.
    * @returns How the flags choose a provider.
+   * @throws {@link IdpProviderUnknownError} When the provider is unknown.
+   * @throws {@link IdpSettingsInvalidError} When a custom setting is refused.
+   * @throws {@link IdpSettingsMissingError} When a custom setting is left out.
+   * @throws {@link IdpSettingsUnusedError} When custom settings are given beside
+   *   a catalog provider.
    */
   async run(needs: Fact<"flags">): Promise<Fact<"choice">> {
     return {

@@ -13,7 +13,7 @@ import { scratchDir } from "@tests/fixtures/scratch";
  * recorded, as when a launcher is killed. `logging` is the server, writing
  * {@link LOGGED_LINES} to its log as it starts.
  */
-export type ServerShape = "plain" | "orphaned" | "logging";
+export type ServerShape = "plain" | "orphaned" | "logging" | "without-the-admin";
 
 /** What the `logging` server logs, in the real one's format: a sign-in provider it could not reach, and a failed request. */
 export const LOGGED_LINES = {
@@ -42,6 +42,37 @@ process.on("SIGINT", () => server.close(() => process.exit(0)));
 `;
 
 /**
+ * The `without-the-admin` stand-in, after its `#!` line: it hosts the platform
+ * project and opens auth attempts, but rejects every proof, as a server that
+ * never imported the local admin rejects its identifier.
+ */
+const SERVER_WITHOUT_THE_ADMIN = `const http = require("node:http");
+const port = Number((process.env.NEXTGEN_SERVER_ADDRESS || ":8080").split(":").at(-1));
+const json = (res, status, body) => {
+  res.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body));
+};
+const server = http.createServer((req, res) => {
+  const path = new URL(req.url, "http://localhost").pathname;
+  if (path === "/readyz") {
+    res.writeHead(200).end("ok");
+  } else if (path === "/console/runtime.json") {
+    json(res, 200, { console_project_id: "proj_platform", publishable_key: "pk_platform" });
+  } else if (path === "/api/v1/auth_attempts") {
+    json(res, 201, { attempt_id: "att_1", state: "in_progress" });
+  } else if (path === "/api/v1/auth_attempts/att_1/challenges") {
+    json(res, 201, { challenge_id: "ch_identifier", method: "identifier" });
+  } else if (path.endsWith("/verify")) {
+    json(res, 409, { code: "att.proof_rejected", message: "The proof was rejected." });
+  } else {
+    res.writeHead(404).end("not here");
+  }
+});
+server.listen(port, "localhost");
+process.on("SIGTERM", () => server.close(() => process.exit(0)));
+process.on("SIGINT", () => server.close(() => process.exit(0)));
+`;
+
+/**
  * A stand-in for the server binary, which the CLI starts from the path in `ZITADEL_SERVER_BINARY`.
  * Its directory is removed when the test ends.
  *
@@ -55,7 +86,7 @@ export async function aFakeServerBinary(shape: ServerShape): Promise<string> {
   const server = join(dir, "nextgen");
   await writeFile(
     server,
-    `#!/usr/bin/env node\n${shape === "logging" ? WRITE_LOGGED_LINES : ""}${PLAIN_SERVER}`,
+    `#!/usr/bin/env node\n${shape === "logging" ? WRITE_LOGGED_LINES : ""}${shape === "without-the-admin" ? SERVER_WITHOUT_THE_ADMIN : PLAIN_SERVER}`,
   );
   await chmod(server, 0o755);
   if (shape !== "orphaned") {

@@ -1,8 +1,8 @@
 import { parseEnv } from "node:util";
 
-import { ZitadelError } from "@/lib/errors";
 import { readIfExists } from "@/lib/fs";
 
+import { ProjectEnvValueMultilineError, ProjectEnvValueUnquotableError } from "./errors";
 import { SecretFile } from "./secret-file";
 
 /**
@@ -60,17 +60,13 @@ export class EnvFile {
    * @param key - The variable.
    * @param value - Its value.
    * @returns The line, without its line break.
-   * @throws {@link ZitadelError} When the value has a line break, or no
+   * @throws {@link ProjectInvalidError} When the value has a line break, or no
    *   quoting reads it back unchanged.
    */
   static line(key: string, value: string): string {
     if (/[\n\r]/.test(value)) {
-      throw new ZitadelError(
-        "E_VALIDATION",
+      throw new ProjectEnvValueMultilineError(
         `Cannot persist ${key}: its value contains a line break.`,
-        {
-          hint: "A .env value is a single line; remove the newline or store the value another way.",
-        },
       );
     }
     // Written as the first form the reader gives back unchanged: bare, then
@@ -89,10 +85,8 @@ export class EnvFile {
       );
     });
     if (faithful === undefined) {
-      throw new ZitadelError(
-        "E_VALIDATION",
+      throw new ProjectEnvValueUnquotableError(
         `Cannot persist ${key}: no .env quoting reads its value back unchanged.`,
-        { hint: "Set it in the process environment instead of a .env file." },
       );
     }
     return faithful;
@@ -104,7 +98,8 @@ export class EnvFile {
    * the whole write rather than corrupting the file.
    *
    * @param values - Each variable and its value.
-   * @throws {@link ZitadelError} When a value cannot be persisted.
+   * @throws {@link ProjectInvalidError} When a value has a line break, or no
+   *   quoting reads it back unchanged.
    */
   async write(values: Record<string, string>): Promise<void> {
     const body = `${Object.entries(values)
@@ -121,7 +116,7 @@ export class EnvFile {
    *
    * @param key - The variable.
    * @param value - Its value.
-   * @throws {@link ZitadelError} When the value cannot be persisted.
+   * @throws {@link ProjectInvalidError} When the value cannot be persisted.
    */
   async append(key: string, value: string): Promise<void> {
     const line = EnvFile.line(key, value);

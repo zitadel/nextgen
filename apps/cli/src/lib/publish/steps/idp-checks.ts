@@ -1,6 +1,9 @@
-import { ZitadelError } from "@/lib/errors";
+import {
+  PublishConnectionVariableKindError,
+  PublishConnectionVariableMissingError,
+  PublishConnectionVariableSharedError,
+} from "@/lib/publish/errors";
 import type { StepContext } from "@/lib/publish/pipeline";
-import type { Suggestion } from "@/lib/suggestion";
 import type { Connection } from "@/lib/zitadel";
 
 import { heldVariables } from "./held-variables";
@@ -23,11 +26,13 @@ import { heldVariables } from "./held-variables";
  *
  * @param ctx - The step's context: the connections and the variables.
  * @returns Nothing when every connection's variables are held as it needs.
- * @throws {@link ZitadelError} `E_VALIDATION` When a connection's client id and
- *   secret name one variable, or a variable is not the kind its field needs.
- * @throws {@link ZitadelError} `E_CREDENTIAL_MISSING` When a connection names a
- *   variable the project does not hold.
- * @throws `ForbiddenError` When a deploy's token may not read the
+ * @throws {@link PublishConnectionVariableSharedError} When a connection's client id and
+ *   secret name one variable.
+ * @throws {@link PublishConnectionVariableKindError} When the client secret names a
+ *   plain variable, or the client id names a secret one.
+ * @throws {@link PublishConnectionVariableMissingError} When the project does not
+ *   hold a variable a connection names.
+ * @throws {@link BackendForbiddenError} When a deploy's token may not read the
  *   variables.
  */
 export async function validateConnections(ctx: StepContext): Promise<void> {
@@ -40,7 +45,7 @@ export async function validateConnections(ctx: StepContext): Promise<void> {
     return;
   }
   for (const connection of connections) {
-    checkCredentialVariables(ctx, connection, held);
+    checkCredentialVariables(connection, held, ctx.mode === "preview");
   }
 }
 
@@ -49,18 +54,20 @@ export async function validateConnections(ctx: StepContext): Promise<void> {
  * exist, the client id is a plain one it can put in the authorize URL, the
  * client secret is a secret one, and they are not one and the same.
  *
- * @param ctx - The step's context.
  * @param connection - The connection.
  * @param held - The project's variables, and whether each is a secret.
- * @throws {@link ZitadelError} `E_VALIDATION` When the client id and secret
- *   name one variable, or a variable is not the kind its field needs.
- * @throws {@link ZitadelError} `E_CREDENTIAL_MISSING` When a named variable is
- *   not held.
+ * @param preview - Whether they are the preview values, for a preview.
+ * @throws {@link PublishConnectionVariableSharedError} When the client id and secret name
+ *   one variable.
+ * @throws {@link PublishConnectionVariableKindError} When the client secret names a
+ *   plain variable, or the client id names a secret one.
+ * @throws {@link PublishConnectionVariableMissingError} When a variable a connection
+ *   names is not held.
  */
 function checkCredentialVariables(
-  ctx: StepContext,
   connection: Connection,
   held: ReadonlyMap<string, boolean>,
+  preview: boolean,
 ): void {
   const file = connection.path;
   const credentials = connection.credentials;
@@ -83,48 +90,39 @@ function checkCredentialVariables(
   const idVariable: string | undefined = id?.variable;
   const secretVariable: string | undefined = secret?.variable;
   if (idVariable !== undefined && idVariable === secretVariable) {
-    throw new ZitadelError(
-      "E_VALIDATION",
+    throw new PublishConnectionVariableSharedError(
       `${file}: client_id and client_secret both name the variable ${idVariable}`,
-      {
-        hint: "Give each its own variable: a plain one for the client id, a secret one for the client secret.",
-        details: { variable: idVariable, file },
-      },
+      idVariable,
+      file,
     );
   }
   for (const use of uses) {
     const field = use.field;
     const variable = use.variable;
     const wantsSecret = field === "client_secret";
-    const setCommand: Suggestion = {
-      id: "variable:set",
-      args: { name: variable },
-      flags: { secret: wantsSecret, preview: ctx.mode === "preview" },
-    };
     const isSecret = held.get(variable);
     if (isSecret === undefined) {
-      throw new ZitadelError(
-        "E_CREDENTIAL_MISSING",
+      throw new PublishConnectionVariableMissingError(
         `${file}: ${field} names the variable ${variable}, which the project does not have`,
         {
-          hint: "Publish it with the command below, then deploy again.",
-          nextCommands: [setCommand],
-          details: { variable, field, file },
+          variable,
+          field,
+          file,
+          secret: wantsSecret,
+          preview,
         },
       );
     }
     if (isSecret !== wantsSecret) {
       const kind = isSecret ? "a secret" : "not a secret";
-      const hint = wantsSecret
-        ? "The client secret must be a secret variable: publish it with the command below."
-        : "The client id must be a plain variable the engine can read back: publish it with the command below, without --secret.";
-      throw new ZitadelError(
-        "E_VALIDATION",
+      throw new PublishConnectionVariableKindError(
         `${file}: ${field} names the variable ${variable}, which is ${kind}`,
         {
-          hint,
-          nextCommands: [setCommand],
-          details: { variable, field, file, secret: isSecret },
+          variable,
+          field,
+          file,
+          secret: wantsSecret,
+          preview,
         },
       );
     }

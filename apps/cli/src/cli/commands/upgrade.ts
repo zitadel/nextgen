@@ -1,8 +1,9 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { execa } from "execa";
+import { ExecaError, execa } from "execa";
 
-import { errorMessage, ZitadelError } from "@/lib/errors";
+import { errorMessage } from "@/lib/errors";
+import { isObject } from "@/lib/json";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { painted } from "@/lib/oclif/rendering";
@@ -15,9 +16,9 @@ import { UPDATE_CHECK_VARIABLE, ZITADEL_SCOPE } from "@/lib/upgrade/defaults";
 import {
   type BreakingChange,
   CliPackage,
-  InstallError,
+  UpgradeInstallFailedError,
   PackageInstaller,
-  ReleaseLookupError,
+  UpgradeReleaseLookupError,
   ReleaseNotes,
   Upgrader,
   type UpgradeResult,
@@ -25,12 +26,29 @@ import {
 import { Project } from "@/lib/project";
 import { Previewable } from "@/cli/core/previewable";
 import { BaseCommand } from "@/cli/core";
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { Telemetered } from "@/cli/telemetry/telemetered";
 
 /**
  * How long the new release's `doctor --fix` may run before it counts as failed.
  */
 const DOCTOR_TIMEOUT_MS = 5 * 60 * 1000;
+
+/** How an install that failed is refused. */
+const INSTALL_FAILED_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "Could not install the new packages",
+  hint: "{reason}. Nothing else changed; fix that and rerun.",
+  next: ["{install}", "{again}"],
+} as const satisfies Refusal;
+
+/** How a release that cannot be looked up is refused. */
+const RELEASE_LOOKUP_REFUSAL = {
+  code: "E_NETWORK",
+  message: "Could not look up the latest Zitadel release",
+  hint: "Check the connection to the npm registry, and that it serves this release's dist-tag, then rerun.",
+  next: ["{again}"],
+} as const satisfies Refusal;
 
 /** What the upgrader planned: the packages to move and the release they move to. */
 type Plan = Awaited<ReturnType<Upgrader["plan"]>>;
@@ -169,90 +187,102 @@ export default class Upgrade extends Telemetered(Previewable(BaseCommand)) {
     });
     const { plan, breaking, notes } = await this.planned(upgrader);
 
-    const result = await upgrader.apply(plan).catch(async (error: unknown) => {
-      if (!(error instanceof InstallError)) {
-        throw error;
+    try {
+      const result = await upgrader.apply(plan);
+
+      const refresh = await this.refresh(plan.target, result, flags.telemetry === false);
+
+      const refreshed = {
+        done: [`  ${style.mark.pass} Refreshed generated files with doctor --fix`],
+        issues: [`  ${style.mark.warn} Refreshed generated files; doctor still reports issues`],
+        failed: [`  ${style.mark.warn} Could not refresh generated files`],
+      };
+      const rows = [
+        ...plan.packages.map((pkg) => {
+          return `  ${style.mark.pass} ${escapeControlCharacters(`${pkg.name} ${pkg.from} → ${pkg.to}`)}`;
+        }),
+        ...(refresh === "done" || refresh === "issues" || refresh === "failed"
+          ? refreshed[refresh]
+          : []),
+        ...plan.leftAlone.map(({ name, specifier }) => {
+          const said = `- ${name} left at "${specifier}", not an exact version`;
+
+          return `  ${style.dim(escapeControlCharacters(said))}`;
+        }),
+      ];
+
+      const title = plan.upToDate
+        ? `Zitadel is up to date at ${plan.target}`
+        : `Zitadel upgraded to ${plan.target}`;
+
+      const atTarget = this.suggestWith(this.scope(), plan.target);
+      const commands: SuggestedCommand[] = [];
+      if (refresh === "failed") {
+        commands.push(
+          atTarget({
+            id: "doctor",
+            flags: { fix: true },
+          }),
+        );
       }
-      throw new ZitadelError("E_VALIDATION", "Could not install the new packages", {
-        hint: `${errorMessage(error.cause)}. Nothing else changed; fix that and rerun.`,
-        nextCommands: [suggestedCommandOf(error.command), await this.again("upgrade", {})],
-      });
-    });
+      if (refresh === "issues") {
+        commands.push(atTarget({ id: "doctor" }));
+      }
+      if (result.installed && existsSync(join(this.cwd, Skills.SHARED_DIR))) {
+        commands.push(atTarget({ id: "skills:add" }));
+      }
 
-    const refresh = await this.refresh(plan.target, result, flags.telemetry === false);
+      const actions = this.actions(plan);
 
-    const refreshed = {
-      done: [`  ${style.mark.pass} Refreshed generated files with doctor --fix`],
-      issues: [`  ${style.mark.warn} Refreshed generated files; doctor still reports issues`],
-      failed: [`  ${style.mark.warn} Could not refresh generated files`],
-    };
-    const rows = [
-      ...plan.packages.map((pkg) => {
-        return `  ${style.mark.pass} ${escapeControlCharacters(`${pkg.name} ${pkg.from} → ${pkg.to}`)}`;
-      }),
-      ...(refresh === "done" || refresh === "issues" || refresh === "failed"
-        ? refreshed[refresh]
-        : []),
-      ...plan.leftAlone.map(({ name, specifier }) => {
-        const said = `- ${name} left at "${specifier}", not an exact version`;
-
-        return `  ${style.dim(escapeControlCharacters(said))}`;
-      }),
-    ];
-
-    const title = plan.upToDate
-      ? `Zitadel is up to date at ${plan.target}`
-      : `Zitadel upgraded to ${plan.target}`;
-
-    const atTarget = this.suggestWith(this.scope(), plan.target);
-    const commands: SuggestedCommand[] = [];
-    if (refresh === "failed") {
-      commands.push(
-        atTarget({
-          id: "doctor",
-          flags: { fix: true },
-        }),
-      );
+      return {
+        status: "ok",
+        data: {
+          title,
+          current_version: plan.cliVersion,
+          latest_version: plan.target,
+          up_to_date: plan.upToDate,
+          packages: plan.packages,
+          left_alone: plan.leftAlone.map(({ name, specifier }) => {
+            return {
+              name,
+              specifier,
+            };
+          }),
+          breaking_changes: breaking,
+          release_notes_url: notes.url,
+          refresh,
+          ...(result.installCommand === undefined
+            ? {}
+            : { install_command: result.installCommand }),
+        },
+        pretty: painted([style.strong(title), ...rows].join("\n")),
+        summary: {
+          title,
+          sections: [],
+          lines: rows,
+        },
+        next: {
+          ...(actions.length > 0 ? { actions } : {}),
+          ...(commands.length > 0 ? { commands } : {}),
+        },
+      };
+    } catch (error) {
+      if (error instanceof UpgradeInstallFailedError) {
+        throw refusalError(
+          INSTALL_FAILED_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+            reason: errorMessage(error.cause),
+          },
+          {
+            install: suggestedCommandOf(error.command),
+            again: await this.again("upgrade", {}),
+          },
+        );
+      }
+      throw error;
     }
-    if (refresh === "issues") {
-      commands.push(atTarget({ id: "doctor" }));
-    }
-    if (result.installed && existsSync(join(this.cwd, Skills.SHARED_DIR))) {
-      commands.push(atTarget({ id: "skills:add" }));
-    }
-
-    const actions = this.actions(plan);
-
-    return {
-      status: "ok",
-      data: {
-        title,
-        current_version: plan.cliVersion,
-        latest_version: plan.target,
-        up_to_date: plan.upToDate,
-        packages: plan.packages,
-        left_alone: plan.leftAlone.map(({ name, specifier }) => {
-          return {
-            name,
-            specifier,
-          };
-        }),
-        breaking_changes: breaking,
-        release_notes_url: notes.url,
-        refresh,
-        ...(result.installCommand === undefined ? {} : { install_command: result.installCommand }),
-      },
-      pretty: painted([style.strong(title), ...rows].join("\n")),
-      summary: {
-        title,
-        sections: [],
-        lines: rows,
-      },
-      next: {
-        ...(actions.length > 0 ? { actions } : {}),
-        ...(commands.length > 0 ? { commands } : {}),
-      },
-    };
   }
 
   /**
@@ -267,39 +297,47 @@ export default class Upgrade extends Telemetered(Previewable(BaseCommand)) {
   private async planned(
     upgrader: Upgrader,
   ): Promise<{ plan: Plan; breaking: readonly BreakingChange[]; notes: ReleaseNotes }> {
-    const plan = await upgrader.plan().catch(async (error: unknown) => {
-      if (!(error instanceof ReleaseLookupError)) {
-        throw error;
+    try {
+      const plan: Plan = await upgrader.plan();
+
+      const notes = new ReleaseNotes();
+      const breaking: readonly BreakingChange[] = plan.upToDate
+        ? []
+        : await notes.breakingBetween(plan.oldest, plan.target);
+      if (!plan.upToDate) {
+        const banner = [
+          ...(breaking.length > 0 ? [style.strong("Breaking changes on the way:")] : []),
+          ...breaking.map(({ version, note }) => {
+            const said = `${style.strong(escapeControlCharacters(version))}  ${escapeControlCharacters(note)}`;
+
+            return `  ${style.mark.warn} ${said}`;
+          }),
+          `Release notes: ${style.url(notes.url)}`,
+          "",
+        ];
+        this.log(banner.join("\n"));
       }
-      throw new ZitadelError("E_NETWORK", "Could not look up the latest Zitadel release", {
-        hint: "Check the connection to the npm registry, and that it serves this release's dist-tag, then rerun.",
-        nextCommands: [await this.again("upgrade", {})],
-      });
-    });
 
-    const notes = new ReleaseNotes();
-    const breaking: readonly BreakingChange[] = plan.upToDate
-      ? []
-      : await notes.breakingBetween(plan.oldest, plan.target);
-    if (!plan.upToDate) {
-      const banner = [
-        ...(breaking.length > 0 ? [style.strong("Breaking changes on the way:")] : []),
-        ...breaking.map(({ version, note }) => {
-          const said = `${style.strong(escapeControlCharacters(version))}  ${escapeControlCharacters(note)}`;
-
-          return `  ${style.mark.warn} ${said}`;
-        }),
-        `Release notes: ${style.url(notes.url)}`,
-        "",
-      ];
-      this.log(banner.join("\n"));
+      return {
+        plan,
+        breaking,
+        notes,
+      };
+    } catch (error) {
+      if (error instanceof UpgradeReleaseLookupError) {
+        throw refusalError(
+          RELEASE_LOOKUP_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+          },
+          {
+            again: await this.again("upgrade", {}),
+          },
+        );
+      }
+      throw error;
     }
-
-    return {
-      plan,
-      breaking,
-      notes,
-    };
   }
 
   /**
@@ -374,14 +412,24 @@ export default class Upgrade extends Telemetered(Previewable(BaseCommand)) {
         cancelSignal: this.signal,
       });
       this.signal.throwIfAborted();
-      const envelope = JSON.parse(child.stdout) as { status?: unknown };
+      const envelope: unknown = JSON.parse(child.stdout);
+      // Anything but an object, `null` included, is no envelope: doctor did not report.
+      if (!isObject(envelope)) {
+        return "failed";
+      }
       if (envelope.status === "ok") {
         return "done";
       }
       return "issues";
-    } catch {
-      this.signal.throwIfAborted();
-      return "failed";
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        return "failed";
+      }
+      if (error instanceof ExecaError) {
+        this.signal.throwIfAborted();
+        return "failed";
+      }
+      throw error;
     }
   }
 }

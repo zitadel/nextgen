@@ -1,7 +1,11 @@
 import { apiBaseUrl, request } from "@/lib/backend/transport";
 
 import { createZitadelClient, AuthAttemptService } from "@/lib/backend";
-import { LocalServerError } from "./local-server-error";
+import {
+  LocalServerAdminNotFoundError,
+  LocalServerPlatformMissingError,
+  LocalServerSessionRefusedError,
+} from "@/lib/server/errors";
 import type { LocalAdmin } from "./admin-credential";
 import { PLATFORM_PROJECT_ID, readPlatformRuntime } from "./runtime";
 
@@ -92,11 +96,9 @@ export async function adminSessionCookie(
       });
     });
   if (!res.ok || !cookie) {
-    throw new LocalServerError(
-      "session-exchange-failed",
-      "E_AUTH",
+    throw new LocalServerSessionRefusedError(
       `Local admin session exchange failed (${String(res.status)})`,
-      { status: res.status },
+      res.status,
     );
   }
   return cookie;
@@ -113,11 +115,9 @@ async function signIn(
 ): Promise<{ handoffToken: string; publishableKey: string }> {
   const runtime = await readPlatformRuntime(serverUrl, REQUEST_TIMEOUT_MS);
   if (!runtime) {
-    throw new LocalServerError(
-      "platform-missing",
-      "E_VALIDATION",
+    throw new LocalServerPlatformMissingError(
       "The local server does not host the platform project, so the local admin cannot sign in",
-      { server_url: serverUrl },
+      serverUrl,
     );
   }
   const client = createZitadelClient({
@@ -139,7 +139,7 @@ async function signIn(
   });
   switch (identifier.outcome) {
     case "rejected":
-      throw adminNotFound();
+      throw new LocalServerAdminNotFoundError("The local server could not find the local admin");
     case "proved":
       break;
   }
@@ -157,20 +157,4 @@ async function signIn(
     handoffToken,
     publishableKey: runtime.publishable_key,
   };
-}
-
-/**
- * A rejected identifier usually means this server never imported the admin — a
- * data directory from before the local admin existed. But the server reports a
- * failed lookup with the same code, so the message names both causes, and the
- * command it suggests is the harmless one: the reset that fixes the first cause
- * deletes local data, so it stays a hint a person reads, never a next command
- * an agent runs.
- */
-function adminNotFound(): LocalServerError {
-  return new LocalServerError(
-    "admin-not-found",
-    "E_AUTH",
-    "The local server could not find the local admin",
-  );
 }

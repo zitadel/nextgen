@@ -55,12 +55,4 @@ describe("Failure", () => {
       message: "doctor was reported without being rendered",
     });
   });
-
-  describe("advised", () => {
-    it("leaves an error that is not the local server's as it was", () => {
-      const error = new Error("plain");
-
-      expect(Failure.advised(error, "/tmp")).toBe(error);
-    });
-  });
 });

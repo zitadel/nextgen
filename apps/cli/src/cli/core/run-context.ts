@@ -176,6 +176,8 @@ export class RunContext {
         false,
       );
     } catch {
+      // The resolver is injected and may fail in any way; a server that
+      // cannot be resolved is left to the command's own failure.
       return new RunContext(
         {
           ...meta,

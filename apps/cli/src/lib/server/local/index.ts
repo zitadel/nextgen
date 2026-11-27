@@ -28,7 +28,6 @@ export {
   findUpward,
   localContainerName,
   localRuntimePaths,
-  localServerNotRunning,
   localServerUrl,
   loopbackReach,
   peekRuntimeMetadata,
@@ -43,8 +42,6 @@ export {
   writeRuntimeMetadata,
 } from "./runtime";
 export type { RuntimeBackend, RuntimeMetadata, WritablePathProbe } from "./runtime";
-export { LocalServerError } from "./local-server-error";
-export type { LocalServerErrorKind } from "./local-server-error";
 export { LogLines } from "./log-lines";
 export { LOG_LEVELS, LogLineReader, atLeast, lastLines, logLines } from "./server-log";
 export type { LogLevel, LogSink } from "./server-log";

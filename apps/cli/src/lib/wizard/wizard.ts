@@ -1,3 +1,4 @@
+import { WizardDefinitionError } from "./errors";
 import type { EndStep, WizardStep } from "./step";
 
 /**
@@ -15,6 +16,7 @@ type Observer<Known extends object> = (known: Known) => void;
  * Told how a run goes, for a caller that follows it without the steps knowing.
  * Each call comes from the engine, never from a step. A step that ends the
  * wizard is reported by {@link RunWatcher.ended}, never as finished.
+ * A watcher must not throw: what it throws stops the run like a failed step.
  */
 export type RunWatcher = Readonly<{
   /**
@@ -60,7 +62,7 @@ function told(tell: () => void): void {
   try {
     tell();
   } catch {
-    // Following a run never changes it.
+    // Following a run never changes it, so a watcher's failure is dropped.
   }
 }
 
@@ -104,21 +106,6 @@ type Runner<Initial extends object, State extends object, Result> = (
   initial: Initial,
   options: RunOptions,
 ) => Promise<Progress<State, Result>>;
-
-/**
- * Refuses a wizard that is put together wrongly, such as two steps of one name.
- */
-export class WizardDefinitionError extends Error {
-  /**
-   * Describe how the wizard is wrong.
-   *
-   * @param message - What is wrong.
-   */
-  constructor(message: string) {
-    super(message);
-    this.name = "WizardDefinitionError";
-  }
-}
 
 /**
  * Does nothing, for the start of a run, where nothing has run to undo.
@@ -237,33 +224,43 @@ export class Wizard<Initial extends object, State extends object, Result> {
         return before;
       }
       const attempt = async (): Promise<Progress<State & Out, Result>> => {
-        told(() => options.watch?.started?.(step.key));
-        const out = await reader.run(before.state);
-        const undo = async (): Promise<void> => {
-          try {
-            await reader.undo(out);
-          } catch (error) {
-            options.onUndoError?.(step.key, error);
-          }
-          await before.undo();
-        };
+        try {
+          told(() => {
+            options.watch?.started?.(step.key);
+          });
+          const out = await reader.run(before.state);
+          const undo = async (): Promise<void> => {
+            try {
+              await reader.undo(out);
+            } catch (error) {
+              // A step's undo is the step's own code and may fail in any way;
+              // one that fails is reported and the undoing goes on.
+              options.onUndoError?.(step.key, error);
+            }
+            await before.undo();
+          };
 
-        return {
-          kind: "continue",
-          state: {
-            ...before.state,
-            ...out,
-          },
-          undo,
-        };
+          return {
+            kind: "continue",
+            state: {
+              ...before.state,
+              ...out,
+            },
+            undo,
+          };
+        } catch (error) {
+          told(() => {
+            options.watch?.failed?.(step.key, error);
+          });
+          await before.undo();
+          throw error;
+        }
       };
-      const finished = await attempt().catch(async (error: unknown) => {
-        told(() => options.watch?.failed?.(step.key, error));
-        await before.undo();
-        throw error;
-      });
+      const finished = await attempt();
       if (finished.kind === "continue") {
-        told(() => options.watch?.finished?.(step.key, finished.state));
+        told(() => {
+          options.watch?.finished?.(step.key, finished.state);
+        });
         try {
           observe?.(finished.state);
         } catch (error) {
@@ -301,7 +298,9 @@ export class Wizard<Initial extends object, State extends object, Result> {
           return before;
         }
         const result = await reader.run(before.state);
-        told(() => options.watch?.ended?.(step.key));
+        told(() => {
+          options.watch?.ended?.(step.key);
+        });
 
         return {
           kind: "end",
@@ -309,11 +308,15 @@ export class Wizard<Initial extends object, State extends object, Result> {
           undo: before.undo,
         };
       };
-      return attempt().catch(async (error: unknown) => {
-        told(() => options.watch?.failed?.(step.key, error));
+      try {
+        return await attempt();
+      } catch (error) {
+        told(() => {
+          options.watch?.failed?.(step.key, error);
+        });
         await before.undo();
         throw error;
-      });
+      }
     };
     return new Wizard(this.name, keys, runner);
   }
@@ -358,7 +361,9 @@ export class Wizard<Initial extends object, State extends object, Result> {
       }
       try {
         const answered = answer(progress.state);
-        told(() => options.watch?.completed?.());
+        told(() => {
+          options.watch?.completed?.();
+        });
 
         return answered;
       } catch (error) {

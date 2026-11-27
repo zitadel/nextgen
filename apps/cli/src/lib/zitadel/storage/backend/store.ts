@@ -1,6 +1,25 @@
 import { stringify } from "safe-stable-stringify";
 
-import { ConfigError, FileExistsError } from "@/lib/zitadel/errors";
+import { isErrno } from "@/lib/errno";
+import {
+  FsError,
+  FsIsDirectoryError,
+  FsNotDirectoryError,
+  FsNotFoundError,
+  fsFailure,
+} from "@/lib/fs";
+import {
+  ZitadelConfigDirectoryInTheWayError,
+  ZitadelConfigError,
+  ZitadelConfigFileExistsError,
+  ZitadelConfigPathBlockedError,
+  ZitadelConfigPathOutsideError,
+  ZitadelConfigReferenceBrokenError,
+  ZitadelConfigReferenceOutsideError,
+  ZitadelConfigFileUnreadableError,
+  ZitadelConfigPathUnreadableError,
+  ZitadelConfigReferenceUnreadableError,
+} from "@/lib/zitadel/errors";
 import {
   CONFIG_DIRECTORIES,
   type ConfigFile,
@@ -14,8 +33,6 @@ import {
   CONFIG_ROOT,
   findFileReferences,
   inlineFileReferences,
-  outsideConfig,
-  outsideProject,
 } from "@/lib/zitadel/storage/references";
 import type {
   ConfigStore,
@@ -82,46 +99,68 @@ export abstract class Store implements ConfigStore {
    * @returns The files, in file-name order; none when the kind's directory is
    *   not there. A file that is not valid JSON, or holds something other than
    *   a JSON object, comes back as an {@link UnparsedFile} with the reason.
-   * @throws {@link ConfigError} When the directory or a file cannot be read;
-   *   of several files that cannot, the first in path order.
+   * @throws {@link ZitadelConfigFileUnreadableError} When the operating system
+   *   refuses to let the directory or a file be read; of several files that
+   *   cannot, the first in path order.
+   * @throws {@link ZitadelConfigPathUnreadableError} When the directory or a
+   *   file cannot be read for another reason.
    */
   async read(kind: ConfigKind): Promise<readonly StoredFile[]> {
     const directory = CONFIG_DIRECTORIES[kind];
-    const names = await this.fs.promises
-      .readdir(this.root.resolve(directory).toString())
-      .catch((error: unknown) => {
-        // Only an absent directory means the project has none: a permission
-        // failure, or a file where the directory should be, reported as "no
-        // files" would hide what is there and let a later write fail instead.
-        const code = Store.errnoOf(error);
-        if (code === "ENOENT") {
-          return [];
-        }
-        throw Store.unreadable(directory, code);
+    try {
+      const names: readonly unknown[] = await this.fs.promises.readdir(
+        this.root.resolve(directory).toString(),
+      );
+      // The filter makes a fresh list, so sorting it changes nothing anyone else holds.
+      const files = names
+        .map((name) => {
+          return String(name);
+        })
+        .filter((name) => {
+          return name.endsWith(".json");
+        })
+        .sort();
+      // Every read settles before any failure is raised, and the first failure
+      // in path order is the one raised, so which bad file is named never
+      // depends on which read finished first.
+      const readings = await Promise.all(
+        files.map((name) => {
+          return this.readFileAt(`${directory}/${name}`).catch((error: unknown) => {
+            if (error instanceof ZitadelConfigError) {
+              return error;
+            }
+            throw error;
+          });
+        }),
+      );
+      const failure = readings.find((reading) => {
+        return reading instanceof ZitadelConfigError;
       });
-    // The filter makes a fresh list, so sorting it changes nothing anyone else holds.
-    const files = names
-      .map((name) => {
-        return String(name);
-      })
-      .filter((name) => {
-        return name.endsWith(".json");
-      })
-      .sort();
-    // Every read settles before any failure is raised, and the first failure
-    // in path order is the one raised, so which bad file is named never
-    // depends on which read finished first.
-    const readings = await Promise.allSettled(
-      files.map((name) => {
-        return this.readFileAt(`${directory}/${name}`);
-      }),
-    );
-    return readings.map((reading) => {
-      if (reading.status === "rejected") {
-        throw reading.reason;
+      if (failure !== undefined) {
+        throw failure;
       }
-      return reading.value;
-    });
+
+      return readings.filter((reading): reading is StoredFile => {
+        return !(reading instanceof ZitadelConfigError);
+      });
+    } catch (error) {
+      // Only an absent directory means the project has none: a permission
+      // failure, or a file where the directory should be, reported as "no
+      // files" would hide what is there and let a later write fail instead.
+      if (error instanceof ZitadelConfigError) {
+        throw error;
+      }
+      if (isErrno(error, "ENOENT")) {
+        return [];
+      }
+      if (isErrno(error, "EACCES")) {
+        throw new ZitadelConfigFileUnreadableError(directory, "EACCES", error);
+      }
+      if (isErrno(error, "EPERM")) {
+        throw new ZitadelConfigFileUnreadableError(directory, "EPERM", error);
+      }
+      throw new ZitadelConfigPathUnreadableError(directory, Store.errnoOf(error), error);
+    }
   }
 
   /**
@@ -133,25 +172,26 @@ export abstract class Store implements ConfigStore {
    *   directories being absent: a permission failure is not "absent".
    */
   async exists(path: string): Promise<boolean> {
-    return this.fs.promises.access(this.root.resolve(path).toString()).then(
-      () => {
-        return true;
-      },
-      (error: unknown) => {
-        const code = Store.errnoOf(error);
-        if (code === "ENOENT" || code === "ENOTDIR") {
-          return false;
-        }
-        throw error;
-      },
-    );
+    try {
+      await this.fs.promises.access(this.root.resolve(path).toString());
+      return true;
+    } catch (error) {
+      const failure = fsFailure(error);
+      if (failure instanceof FsNotFoundError) {
+        return false;
+      }
+      if (failure instanceof FsNotDirectoryError) {
+        return false;
+      }
+      throw error;
+    }
   }
 
   /**
    * Check that a file may be written, without touching it.
    *
    * @param path - The project-relative path.
-   * @throws {@link ConfigError} When the path, or the real target behind a
+   * @throws {@link ZitadelConfigError} When the path, or the real target behind a
    *   symlink on the way, leaves `.zitadel/`, or a directory it needs is a file.
    */
   assertWritable(path: string): void {
@@ -162,7 +202,7 @@ export abstract class Store implements ConfigStore {
    * Check that a file may be removed, without touching it.
    *
    * @param path - The project-relative path.
-   * @throws {@link ConfigError} When the path, or the real target behind a
+   * @throws {@link ZitadelConfigError} When the path, or the real target behind a
    *   symlink on the way, leaves `.zitadel/`, or it is a directory.
    */
   assertRemovable(path: string): void {
@@ -176,9 +216,9 @@ export abstract class Store implements ConfigStore {
    * @param file - The file to write.
    * @param mode - Whether an existing file may be replaced.
    * @returns Nothing, once the file is written.
-   * @throws {@link FileExistsError} When the file is already there, under
+   * @throws {@link ZitadelConfigFileExistsError} When the file is already there, under
    *   `create`.
-   * @throws {@link ConfigError} When the path leads outside `.zitadel/`, or a
+   * @throws {@link ZitadelConfigError} When the path leads outside `.zitadel/`, or a
    *   directory it needs is a file.
    */
   async write(file: ConfigFile, mode: WriteMode): Promise<void> {
@@ -190,18 +230,24 @@ export abstract class Store implements ConfigStore {
    *
    * @param path - The project-relative path.
    * @returns Nothing, once the file is gone.
-   * @throws {@link ConfigError} When the path leads outside `.zitadel/`, or is
+   * @throws {@link ZitadelConfigError} When the path leads outside `.zitadel/`, or is
    *   a directory.
    */
   async remove(path: string): Promise<void> {
-    await this.fs.promises.unlink(this.removable(path)).catch((error: unknown) => {
+    try {
+      await this.fs.promises.unlink(this.removable(path));
+    } catch (error) {
       // A file that is not there, or a directory on the way that is a file,
       // is already removed.
-      const code = Store.errnoOf(error);
-      if (code !== "ENOENT" && code !== "ENOTDIR") {
-        throw error;
+      const failure = fsFailure(error);
+      if (failure instanceof FsNotFoundError) {
+        return;
       }
-    });
+      if (failure instanceof FsNotDirectoryError) {
+        return;
+      }
+      throw error;
+    }
   }
 
   /**
@@ -211,23 +257,23 @@ export abstract class Store implements ConfigStore {
    * @param text - What it holds.
    * @param mode - Whether an existing file may be replaced.
    * @returns Nothing, once the file is written.
-   * @throws {@link FileExistsError} When the file is already there, under
+   * @throws {@link ZitadelConfigFileExistsError} When the file is already there, under
    *   `create`.
-   * @throws {@link ConfigError} When the path leads outside `.zitadel/`, or a
+   * @throws {@link ZitadelConfigError} When the path leads outside `.zitadel/`, or a
    *   directory it needs is a file.
    */
   async writeText(path: string, text: string, mode: WriteMode): Promise<void> {
     const target = this.place(path);
     this.assertClear(path, target);
     await this.fs.promises.mkdir(target.parent.toString(), { recursive: true });
-    await this.fs.promises
-      .writeFile(target.toString(), text, { flag: WRITE_FLAG[mode] })
-      .catch((error: unknown) => {
-        if (Store.errnoOf(error) === "EEXIST") {
-          throw new FileExistsError(path);
-        }
-        throw error;
-      });
+    try {
+      await this.fs.promises.writeFile(target.toString(), text, { flag: WRITE_FLAG[mode] });
+    } catch (error) {
+      if (isErrno(error, "EEXIST")) {
+        throw new ZitadelConfigFileExistsError(path);
+      }
+      throw error;
+    }
   }
 
   /**
@@ -237,7 +283,7 @@ export abstract class Store implements ConfigStore {
    * @param file - The file whose references to resolve.
    * @param missing - What to do with a reference whose file is not there.
    * @returns The body with its references inlined.
-   * @throws {@link ConfigError} When a reference leads outside the project,
+   * @throws {@link ZitadelConfigError} When a reference leads outside the project,
    *   when its file is there but cannot be read, or when it is not there,
    *   under `throw`.
    */
@@ -251,18 +297,28 @@ export abstract class Store implements ConfigStore {
         } catch (error) {
           // Only a file that is not there may be omitted; one that is there
           // but unreadable is refused, so a deploy never drops it silently.
-          const code = Store.errnoOf(error);
-          if (code === "ENOENT" || code === "ENOTDIR") {
+          const failure = fsFailure(error);
+          if (failure instanceof FsNotFoundError) {
             return undefined;
           }
-          throw new ConfigError(`$file ${JSON.stringify(ref)} cannot be read`, {
-            hint: "Create the referenced file or fix the path.",
-            details: {
-              file: file.path,
+          if (failure instanceof FsNotDirectoryError) {
+            return undefined;
+          }
+          if (isErrno(error, "EACCES")) {
+            throw new ZitadelConfigReferenceUnreadableError(file.path, ref, "EACCES", error);
+          }
+          if (isErrno(error, "EPERM")) {
+            throw new ZitadelConfigReferenceUnreadableError(file.path, ref, "EPERM", error);
+          }
+          if (failure instanceof FsError) {
+            throw new ZitadelConfigReferenceBrokenError(
+              file.path,
               ref,
-              ...(code === undefined ? {} : { code }),
-            },
-          });
+              Store.errnoOf(error),
+              error,
+            );
+          }
+          throw error;
         }
       },
       missing,
@@ -274,7 +330,7 @@ export abstract class Store implements ConfigStore {
    *
    * @param file - The file.
    * @returns The paths, spelled with `/`.
-   * @throws {@link ConfigError} When a reference leads outside the project.
+   * @throws {@link ZitadelConfigError} When a reference leads outside the project.
    */
   listReferencedPaths(file: ConfigFile): readonly string[] {
     return findFileReferences(file.body).map((item) => {
@@ -303,7 +359,7 @@ export abstract class Store implements ConfigStore {
    *
    * @param path - The project-relative path.
    * @returns The path to touch.
-   * @throws {@link ConfigError} When the path, or the real target behind a
+   * @throws {@link ZitadelConfigError} When the path, or the real target behind a
    *   symlink on the way, leaves `.zitadel/`.
    */
   private place(path: string): Path {
@@ -317,7 +373,7 @@ export abstract class Store implements ConfigStore {
       realTarget === undefined ||
       !realDirectory.contains(realTarget)
     ) {
-      throw outsideConfig(path);
+      throw new ZitadelConfigPathOutsideError(path);
     }
     return target;
   }
@@ -327,13 +383,13 @@ export abstract class Store implements ConfigStore {
    *
    * @param path - The project-relative path.
    * @returns The path to remove.
-   * @throws {@link ConfigError} When the path, or the real target behind a
+   * @throws {@link ZitadelConfigError} When the path, or the real target behind a
    *   symlink on the way, leaves `.zitadel/`, or it is a directory.
    */
   private removable(path: string): string {
     const target = this.place(path).toString();
     if (this.fs.existsSync(target) && this.fs.lstatSync(target).isDirectory()) {
-      throw Store.directoryInTheWay(path);
+      throw new ZitadelConfigDirectoryInTheWayError(path);
     }
     return target;
   }
@@ -349,7 +405,7 @@ export abstract class Store implements ConfigStore {
    * @param file - The file holding the reference.
    * @param ref - The reference as written.
    * @returns The path it names.
-   * @throws {@link ConfigError} When the path, or the real target behind a
+   * @throws {@link ZitadelConfigError} When the path, or the real target behind a
    *   symlink on the way, leaves the project.
    */
   private locate(file: ConfigFile, ref: string): Path {
@@ -362,7 +418,7 @@ export abstract class Store implements ConfigStore {
       realTarget === undefined ||
       !realRoot.contains(realTarget)
     ) {
-      throw outsideProject(ref);
+      throw new ZitadelConfigReferenceOutsideError(ref);
     }
     return target;
   }
@@ -373,61 +429,58 @@ export abstract class Store implements ConfigStore {
    * @param path - The project-relative path.
    * @returns The file; an {@link UnparsedFile} with the reason when it is not
    *   valid JSON, not a JSON object, or a directory.
-   * @throws {@link ConfigError} When the file cannot be read, naming the error
-   *   code.
+   * @throws {@link ZitadelConfigFileUnreadableError} When the operating system
+   *   refuses to let it be read, naming the error code.
+   * @throws {@link ZitadelConfigPathUnreadableError} When it cannot be read for
+   *   another reason, naming the error code when there is one.
    */
   private async readFileAt(path: string): Promise<StoredFile> {
-    const text = await this.fs.promises
-      .readFile(this.root.resolve(path).toString(), "utf8")
-      .then((contents) => {
-        return contents.toString();
-      })
-      .catch((error: unknown) => {
-        const code = Store.errnoOf(error);
-        // A directory named like a file cannot be parsed, but it hides nothing
-        // else: it is reported as the broken entry it is.
-        if (code === "EISDIR") {
-          return undefined;
+    try {
+      const contents = await this.fs.promises.readFile(this.root.resolve(path).toString(), "utf8");
+      const text = contents.toString();
+      try {
+        const body: unknown = JSON.parse(text);
+        if (!isJsonValue(body) || !isJsonObject(body)) {
+          return UnparsedFile.notAnObject(path);
         }
-        throw Store.unreadable(path, code);
-      });
-    if (text === undefined) {
-      return UnparsedFile.directory(path);
+        return { path, body };
+      } catch (error) {
+        if (error instanceof SyntaxError) {
+          return UnparsedFile.invalidJson(path, text);
+        }
+        throw error;
+      }
+    } catch (error) {
+      // A directory named like a file cannot be parsed, but it hides nothing
+      // else: it is reported as the broken entry it is.
+      if (fsFailure(error) instanceof FsIsDirectoryError) {
+        return UnparsedFile.directory(path);
+      }
+      if (isErrno(error, "EACCES")) {
+        throw new ZitadelConfigFileUnreadableError(path, "EACCES", error);
+      }
+      if (isErrno(error, "EPERM")) {
+        throw new ZitadelConfigFileUnreadableError(path, "EPERM", error);
+      }
+      throw new ZitadelConfigPathUnreadableError(path, Store.errnoOf(error), error);
     }
-    // `JSON.parse` never returns `undefined`, so it marks the text that is not JSON.
-    const body: unknown = await Promise.resolve(text)
-      .then(JSON.parse)
-      .catch(() => {
-        return undefined;
-      });
-    if (body === undefined) {
-      return UnparsedFile.invalidJson(path, text);
-    }
-    if (!isJsonValue(body) || !isJsonObject(body)) {
-      return UnparsedFile.notAnObject(path);
-    }
-    return { path, body };
   }
 
   /**
-   * The failure for a file or directory that cannot be read.
+   * The operating system's error code a failed call carries, read here where
+   * the injected file system's failures enter the library.
    *
-   * @remarks
-   * The errno is kept in `details.code`, so the CLI can tell a permission
-   * failure from the rest.
-   *
-   * @param path - The project-relative path.
-   * @param code - The errno of the failed operation, when it had one.
-   * @returns The error to throw.
+   * @param error - What the call failed with.
+   * @returns The code, or `undefined` when the failure carries none.
    */
-  private static unreadable(path: string, code: string | undefined): ConfigError {
-    return new ConfigError(`${path} cannot be read${code === undefined ? "" : ` (${code})`}`, {
-      hint: "Check that the file is readable, then run the command again.",
-      details: {
-        file: path,
-        ...(code === undefined ? {} : { code }),
-      },
-    });
+  private static errnoOf(error: unknown): string | undefined {
+    if (typeof error !== "object" || error === null || !("code" in error)) {
+      return undefined;
+    }
+    if (typeof error.code !== "string") {
+      return undefined;
+    }
+    return error.code;
   }
 
   /**
@@ -457,44 +510,12 @@ export abstract class Store implements ConfigStore {
    *
    * @param path - The project-relative path being written.
    * @param target - Where it is written.
-   * @throws {@link ConfigError} When a directory it needs is a file.
+   * @throws {@link ZitadelConfigError} When a directory it needs is a file.
    */
   private assertClear(path: string, target: Path): void {
     const blocker = this.blockerOf(target);
     if (blocker !== undefined) {
-      throw new ConfigError(`${path} cannot be written (ENOTDIR)`, {
-        hint: `Remove ${blocker}, which is a file where a directory is needed, then run the command again.`,
-        details: { file: path, code: "ENOTDIR", blocker },
-      });
+      throw new ZitadelConfigPathBlockedError(path, blocker);
     }
-  }
-
-  /**
-   * The failure for a directory where a file is to be removed.
-   *
-   * @param path - The project-relative path.
-   * @returns The error to throw.
-   */
-  private static directoryInTheWay(path: string): ConfigError {
-    return new ConfigError(`${path} cannot be removed (EISDIR)`, {
-      hint: `Remove ${path}, which is a directory where a file is expected, then run the command again.`,
-      details: { file: path, code: "EISDIR" },
-    });
-  }
-
-  /**
-   * The error code of a failed file operation.
-   *
-   * @param error - What the operation threw.
-   * @returns Its code, such as `ENOENT`, or `undefined` when it has none.
-   */
-  private static errnoOf(error: unknown): string | undefined {
-    if (typeof error !== "object" || error === null || !("code" in error)) {
-      return undefined;
-    }
-    if (typeof error.code !== "string") {
-      return undefined;
-    }
-    return error.code;
   }
 }

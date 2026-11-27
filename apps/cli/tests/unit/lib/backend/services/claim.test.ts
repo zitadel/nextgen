@@ -3,7 +3,7 @@ import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
 
-import { ConflictError, UnavailableError } from "@/lib/backend/errors";
+import { BackendConflictError, BackendUnavailableError } from "@/lib/backend";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { ClaimService } from "@/lib/backend/services/claim";
@@ -67,7 +67,7 @@ describe("ClaimService.start", () => {
 
     const error = await rejectionOf(() => service().start());
 
-    expect(error).toBeInstanceOf(ConflictError);
+    expect(error).toBeInstanceOf(BackendConflictError);
     expect(error).toMatchObject({ status: 409 });
   });
 
@@ -76,7 +76,7 @@ describe("ClaimService.start", () => {
 
     const error = await rejectionOf(() => service().start());
 
-    expect(error).toBeInstanceOf(UnavailableError);
+    expect(error).toBeInstanceOf(BackendUnavailableError);
     expect(error).toMatchObject({ status: 500 });
   });
 });
@@ -132,7 +132,7 @@ describe("ClaimService.status", () => {
 
     const error = await rejectionOf(() => service().status("clm_1"));
 
-    expect(error).toBeInstanceOf(UnavailableError);
+    expect(error).toBeInstanceOf(BackendUnavailableError);
     expect(error).toMatchObject({ status: 500 });
   });
 });

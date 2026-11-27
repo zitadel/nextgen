@@ -6,7 +6,12 @@ import { describe, expect } from "vitest";
 import { it } from "@tests/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
-import { ForbiddenError, NotFoundError, UnavailableError } from "@/lib/backend/errors";
+import {
+  BackendForbiddenError,
+  BackendUnavailableError,
+  BackendVariablePreviewMissingError,
+  BackendVariablePrimaryMissingError,
+} from "@/lib/backend";
 import {
   Variable,
   VariableRemoval,
@@ -171,11 +176,20 @@ describe("VariableService.get", () => {
 
     const error = await rejectionOf(() => service().get("CLIENT_ID", "preview"));
 
-    expect(error).toBeInstanceOf(NotFoundError);
+    expect(error).toBeInstanceOf(BackendVariablePreviewMissingError);
     expect(error).toMatchObject({
-      name: "NotFoundError",
       message: "Variable CLIENT_ID has no preview value.",
-      hint: "A name has a preview value only once one is set with `--preview`.",
+    });
+  });
+
+  it("refuses a name that holds no primary value", async ({ server }) => {
+    answering(server, "getVariable", {});
+
+    const error = await rejectionOf(() => service().get("CLIENT_ID", "primary"));
+
+    expect(error).toBeInstanceOf(BackendVariablePrimaryMissingError);
+    expect(error).toMatchObject({
+      message: "Variable CLIENT_ID has no primary value.",
     });
   });
 });
@@ -200,9 +214,9 @@ describe("VariableService.heldByName", () => {
 
     const error = await rejectionOf(() => service().heldByName("primary"));
 
-    expect(error).toBeInstanceOf(ForbiddenError);
+    expect(error).toBeInstanceOf(BackendForbiddenError);
     expect(error).toMatchObject({
-      name: "ForbiddenError",
+      name: "BackendForbiddenError",
     });
   });
 });
@@ -339,7 +353,7 @@ describe("VariableService.set", () => {
       },
     });
     expect(written).toMatchObject({
-      unverified: [{ kind: "preview", cause: expect.any(ForbiddenError) }],
+      unverified: [{ kind: "preview", cause: expect.any(BackendForbiddenError) }],
     });
   });
 
@@ -396,7 +410,7 @@ describe("VariableService.set", () => {
   }) => {
     expect(
       await rejectionOf(() => setPreviewOver(server, refusal(401, "auth.unauthenticated"))),
-    ).toMatchObject({ name: "UnauthorizedError" });
+    ).toMatchObject({ name: "BackendUnauthorizedError" });
   });
 
   it("fails on any other error, since writing on an unknown is the outcome it guards against", async ({
@@ -404,7 +418,7 @@ describe("VariableService.set", () => {
   }) => {
     const error = await rejectionOf(() => setPreviewOver(server, refusal(500, "internal")));
 
-    expect(error).toBeInstanceOf(UnavailableError);
+    expect(error).toBeInstanceOf(BackendUnavailableError);
     expect(error).toMatchObject({
       status: 500,
     });

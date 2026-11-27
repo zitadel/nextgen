@@ -457,6 +457,53 @@ describe("auth-method password and passkey", () => {
       });
     });
 
+    describe.skipIf(RUNS_AS_ROOT)("when the schema cannot be read", () => {
+      it("refuses as a permission failure, naming the file and its error code", async ({ dir }) => {
+        await writeProject(dir, aProject(BOTH));
+        await chmod(join(dir, SCHEMA_FILE), 0o000);
+
+        const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
+
+        expect(parseJson(result.stdout)).toMatchObject({
+          code: "E_AUTH",
+          message: `${SCHEMA_FILE} cannot be read (EACCES)`,
+          details: {
+            file: SCHEMA_FILE,
+            code: "EACCES",
+          },
+        });
+      });
+
+      it("says to make the file readable", async ({ dir }) => {
+        await writeProject(dir, aProject(BOTH));
+        await chmod(join(dir, SCHEMA_FILE), 0o000);
+
+        const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
+
+        expect(parseJson(result.stdout)).toMatchObject({
+          hint: "Check that the file is readable, then run the command again.",
+        });
+      });
+    });
+
+    it("refuses a configuration directory that is a file, naming its error code", async ({
+      dir,
+    }) => {
+      await writeProject(dir, aProject(BOTH), { ".zitadel/idps": "" });
+
+      const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        code: "E_VALIDATION",
+        message: ".zitadel/idps cannot be read (ENOTDIR)",
+        hint: "Check that the file is readable, then run the command again.",
+        details: {
+          file: ".zitadel/idps",
+          code: "ENOTDIR",
+        },
+      });
+    });
+
     it("refuses password on a schema with no x-identifier", async ({ dir }) => {
       const { "x-identifier": _, ...noIdentifier } = aSchema(PASSKEY_ONLY);
       await writeProject(dir, { schemas: { "default-human-user.json": noIdentifier } });
@@ -465,7 +512,7 @@ describe("auth-method password and passkey", () => {
 
       expect(parseJson(result.stdout)).toMatchObject({
         code: "E_VALIDATION",
-        details: { method: "password" },
+        message: expect.stringContaining("has no x-identifier for password"),
       });
     });
 
@@ -613,7 +660,7 @@ describe("auth-method password and passkey", () => {
 
         expect(parseJson(result.stdout)).toMatchObject({
           code: "E_VALIDATION",
-          details: { issues: [expect.objectContaining({ rule: "definition" })] },
+          message: expect.stringContaining(LOGIN_FLOW_FILE),
         });
       },
     );

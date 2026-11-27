@@ -1,7 +1,8 @@
-import { stat } from "node:fs/promises";
+import { FsError, FsNotFoundError, stat } from "@/lib/fs";
+import { PmManifestInvalidError } from "@/lib/pm";
 import { join } from "node:path";
 
-import { ZitadelError } from "@/lib/errors";
+import { OrcaPagesRouterError } from "@/lib/orca/errors";
 
 import { dependencyVersionMajor, hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
@@ -29,10 +30,19 @@ export class NextDetector implements Detector {
    * an empty directory to scaffold.
    */
   async detect(cwd: string): Promise<FrameworkFacts | null> {
-    const pkg = await readPackageJson(cwd).catch(() => {
-      return undefined;
+    const pkg = await readPackageJson(cwd).catch((error: unknown) => {
+      if (error instanceof FsError) {
+        return undefined;
+      }
+      if (error instanceof PmManifestInvalidError) {
+        return undefined;
+      }
+      throw error;
     });
-    if (!pkg || !hasDependency(pkg, "next")) {
+    if (pkg === undefined) {
+      return null;
+    }
+    if (!hasDependency(pkg, "next")) {
       return null;
     }
 
@@ -44,11 +54,7 @@ export class NextDetector implements Detector {
         ? "src/app"
         : undefined;
     if (!appDir) {
-      throw new ZitadelError(
-        "E_UNSUPPORTED_PROJECT_SHAPE",
-        "Next.js Pages Router projects are not supported in v1",
-        { hint: "Create an App Router project with an app/ or src/app/ directory." },
-      );
+      throw new OrcaPagesRouterError("Next.js Pages Router projects are not supported in v1");
     }
 
     const devPort = await detectDevPort(cwd, pkg);
@@ -67,12 +73,7 @@ async function dirExists(path: string): Promise<boolean> {
   try {
     return (await stat(path)).isDirectory();
   } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      (error as { code?: string }).code === "ENOENT"
-    ) {
+    if (error instanceof FsNotFoundError) {
       return false;
     }
     throw error;

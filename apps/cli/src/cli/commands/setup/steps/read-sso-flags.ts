@@ -99,6 +99,11 @@ export class ReadSsoFlags extends WizardStep<"ssoFlags", Fact<"ssoFromCommandLin
    * @param needs - The flags.
    * @returns The provider and the credentials collected so far, or `undefined` when none was asked
    *   for.
+   * @throws {@link IdpProviderUnknownError} When the provider is unknown.
+   * @throws {@link IdpSettingsInvalidError} When a custom setting is refused.
+   * @throws {@link IdpSettingsMissingError} When a custom setting is left out.
+   * @throws {@link IdpSettingsUnusedError} When custom settings are given beside
+   *   a catalog provider.
    */
   async run(needs: Needs): Promise<Fact<"ssoFromCommandLine">> {
     const { flags } = needs;

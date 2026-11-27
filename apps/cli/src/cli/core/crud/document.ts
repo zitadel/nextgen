@@ -172,9 +172,12 @@ export const typedValue = (schema: ZodLike | undefined, text: string, label: str
 export const jsonValue = (text: string, label: string): unknown => {
   try {
     return JSON.parse(text) as unknown;
-  } catch {
-    throw new ZitadelError("E_VALIDATION", `${label}:= expects JSON, got "${text}"`, {
-      hint: `Quote a JSON value, e.g. ${label}:=30, ${label}:=true, or ${label}:='{"a":1}'. For a plain string use ${label}=${text}.`,
-    });
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new ZitadelError("E_VALIDATION", `${label}:= expects JSON, got "${text}"`, {
+        hint: `Quote a JSON value, e.g. ${label}:=30, ${label}:=true, or ${label}:='{"a":1}'. For a plain string use ${label}=${text}.`,
+      });
+    }
+    throw error;
   }
 };

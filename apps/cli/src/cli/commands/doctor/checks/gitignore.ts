@@ -1,9 +1,8 @@
-import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
 
 import { errorMessage } from "@/lib/errors";
-import { isErrno } from "@/lib/errno";
+import { FsError, FsNotFoundError, readFile, writeFile } from "@/lib/fs";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 import { Project, type GitignoreRule } from "@/lib/project";
@@ -25,14 +24,19 @@ export class GitignoreCheck implements SanityCheck {
   readonly path = ".gitignore";
 
   async run(ctx: CheckContext): Promise<CheckOutcome> {
-    return this.evaluate(ctx).catch((error: unknown) => {
-      return {
-        name: this.name,
-        path: this.path,
-        status: "fail",
-        message: errorMessage(error),
-      };
-    });
+    try {
+      return await this.evaluate(ctx);
+    } catch (error) {
+      if (error instanceof FsError) {
+        return {
+          name: this.name,
+          path: this.path,
+          status: "fail",
+          message: errorMessage(error),
+        };
+      }
+      throw error;
+    }
   }
 
   /**
@@ -135,10 +139,12 @@ async function holdsNamesOnly(cwd: string, rules: ReadonlyArray<GitignoreRule>):
 }
 
 async function readText(path: string): Promise<string | undefined> {
-  return readFile(path, "utf8").catch((error: unknown) => {
-    if (isErrno(error, "ENOENT")) {
+  try {
+    return await readFile(path, "utf8");
+  } catch (error) {
+    if (error instanceof FsNotFoundError) {
       return undefined;
     }
     throw error;
-  });
+  }
 }

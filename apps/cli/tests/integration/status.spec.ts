@@ -155,6 +155,22 @@ describe("status", () => {
       });
     });
 
+    describe("that fails the read the user probe makes", () => {
+      it("still succeeds", async () => {
+        const app = await aSetUpApp();
+        platform.cannotQueryUsers();
+
+        const result = await app.status();
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "ok",
+          data: {
+            next_actions: [],
+          },
+        });
+      });
+    });
+
     describe("that accepts the connection and never answers", () => {
       // The presence probe degrades to "unknown" on its own deadline, and the
       // request it gave up on must be given up on too: left in flight it would
@@ -225,6 +241,22 @@ describe("status", () => {
             ],
           },
           warnings: [],
+        });
+      });
+
+      it("refuses a malformed record, and offers to reset it and start again", async () => {
+        const app = await aSetUpApp();
+        await app.writeMalformedServerRecord();
+
+        const result = await app.status();
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          hint: expect.any(String),
+          next_commands: [
+            expectedPublicCliCommand(`reset --force --cwd ${app.path}`),
+            expectedPublicCliCommand(`start --cwd ${app.path}`),
+          ],
         });
       });
 

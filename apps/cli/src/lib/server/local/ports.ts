@@ -1,11 +1,16 @@
-import { execa } from "execa";
+import { ExecaError, execa } from "execa";
 
+import { LocalServerProgramFailedError } from "@/lib/server/errors";
 import { isLoopbackHost } from "@/lib/server/host";
 
 /**
  * How a program is run: its name, its arguments and how long to wait, answering
  * with what it printed. The machine's own is `execa`; a test passes a function
  * that answers from a string.
+ *
+ * @remarks
+ * A program that cannot answer (not installed, exits non-zero, runs past the
+ * timeout) rejects with {@link LocalServerProgramFailedError}.
  */
 export type Run = (
   program: string,
@@ -13,9 +18,24 @@ export type Run = (
   options: { timeout: number },
 ) => Promise<{ stdout: string }>;
 
-/** Runs a program on this machine. */
-export const systemRun: Run = (program, args, options) => {
-  return execa(program, [...args], options);
+/**
+ * Runs a program on this machine.
+ *
+ * @param program - The program to run.
+ * @param args - Its arguments.
+ * @param options - How long to wait for it.
+ * @returns What it printed.
+ * @throws {LocalServerProgramFailedError} When it is not installed, exits non-zero or times out.
+ */
+export const systemRun: Run = async (program, args, options) => {
+  try {
+    return await execa(program, [...args], options);
+  } catch (error) {
+    if (error instanceof ExecaError) {
+      throw new LocalServerProgramFailedError(error.message, error);
+    }
+    throw error;
+  }
 };
 
 export type TcpListener = Readonly<{
@@ -48,8 +68,11 @@ export async function listListeningTcpListeners(opts?: {
       timeout: timeoutMs,
     });
     return parseLsofListeners(stdout);
-  } catch {
-    return [];
+  } catch (error) {
+    if (error instanceof LocalServerProgramFailedError) {
+      return [];
+    }
+    throw error;
   }
 }
 
@@ -94,8 +117,11 @@ export async function workingDirectories(
         return pidLine.startsWith("p") && pid > 0 && folder ? [[pid, folder]] : [];
       }),
     );
-  } catch {
-    return new Map();
+  } catch (error) {
+    if (error instanceof LocalServerProgramFailedError) {
+      return new Map();
+    }
+    throw error;
   }
 }
 

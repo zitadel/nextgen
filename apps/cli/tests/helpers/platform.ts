@@ -66,6 +66,9 @@ export interface PlatformMock {
   /** Holds a user of the login flow's schema that carries no email, the identifier the scaffold signs in with. */
   holdsAUserWithoutAnEmail(): void;
 
+  /** Answers a read of any variable with a value of neither kind. */
+  holdsAVariableWithNoValue(): void;
+
   /** Holds a deactivated user of the login flow's schema that carries no email. */
   holdsADeactivatedUserWithoutAnEmail(): void;
 
@@ -501,6 +504,10 @@ export function usePlatformMock(): PlatformMock {
           details: { details: { fields: ["oidc.issuer"] } },
         },
       ]);
+    },
+
+    holdsAVariableWithNoValue() {
+      server.use(http.get("*/variables/:name", () => HttpResponse.json({})));
     },
 
     isNotZitadel() {

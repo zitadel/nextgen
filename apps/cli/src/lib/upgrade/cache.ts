@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { FsError, mkdir, readFile, rename, rm, writeFile } from "@/lib/fs";
 import { dirname } from "node:path";
 
 /**
@@ -133,7 +133,8 @@ export class Cache {
   }
 
   /**
-   * Writes the remembered state to the file, and never throws.
+   * Writes the remembered state to the file, and never throws for a file it
+   * cannot write.
    *
    * @param file - Where entries are kept.
    */
@@ -144,8 +145,17 @@ export class Cache {
       await mkdir(dirname(file), { recursive: true });
       await writeFile(temporary, `${JSON.stringify(entries)}\n`);
       await rename(temporary, file);
-    } catch {
-      await rm(temporary, { force: true }).catch(() => undefined);
+    } catch (error) {
+      await rm(temporary, { force: true }).catch((error: unknown) => {
+        if (error instanceof FsError) {
+          return undefined;
+        }
+        throw error;
+      });
+      if (error instanceof FsError) {
+        return;
+      }
+      throw error;
     }
   }
 
@@ -182,8 +192,14 @@ export class Cache {
         }
       }
       return entries;
-    } catch {
-      return {};
+    } catch (error) {
+      if (error instanceof FsError) {
+        return {};
+      }
+      if (error instanceof SyntaxError) {
+        return {};
+      }
+      throw error;
     }
   }
 }

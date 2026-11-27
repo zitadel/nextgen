@@ -1,5 +1,4 @@
 import { dryRunResult } from "@/cli/core/crud/shared";
-import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { Flags } from "@oclif/core";
 import {
@@ -13,9 +12,7 @@ import {
 } from "@zitadel/config/defaults";
 import { BRANDING_FILE_SCHEMA_REF, META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 
-import { ZitadelError } from "@/lib/errors";
-import { isErrno } from "@/lib/errno";
-import { pathExists } from "@/lib/fs";
+import { FsExistsError, mkdir, pathExists, writeFile } from "@/lib/fs";
 import { MetaSchemas } from "@/lib/meta-schemas";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, CommandResult } from "@/cli/core";
@@ -29,7 +26,7 @@ import {
   BRANDING_DESIGN_INFO,
   CONFIG_DIRECTORIES,
   DiskStore,
-  FileExistsError,
+  ZitadelConfigFileExistsError,
   PAGE_LAYOUT_HINT,
   RETIRED_BRANDING_DESIGNS,
   ZitadelConfig,
@@ -66,6 +63,17 @@ const RETIRED_DESIGN_REFUSAL = {
 const UNKNOWN_DESIGN_REFUSAL = {
   message: "Unknown design {design}",
   hint: `Pick one of: ${DESIGN_CATALOG}.`,
+} as const satisfies Refusal;
+
+/** How a branding file that already exists is refused. */
+const FILE_EXISTS_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Rerun with --force to replace it, or edit the existing file directly.",
+  next: ["{again}"],
+  details: {
+    file: "{path}",
+  },
 } as const satisfies Refusal;
 
 /** Whether `value` names a design the CLI ships. */
@@ -271,10 +279,8 @@ export default class BrandingEject extends Telemetered(Promptable(Previewable(Ba
         await writeFile(dest, content, overwrite ? undefined : { flag: "wx" });
         filesWritten.push(relPath);
       } catch (error) {
-        if (isErrno(error, "EEXIST")) {
-          throw new ZitadelError("E_CONFLICT", `${relPath} already exists`, {
-            hint: "Rerun with --force to replace it, or edit the existing file directly.",
-          });
+        if (error instanceof FsExistsError) {
+          return;
         }
         throw error;
       }
@@ -300,12 +306,22 @@ export default class BrandingEject extends Telemetered(Promptable(Previewable(Ba
         );
       }
     } catch (error) {
-      if (error instanceof FileExistsError) {
-        throw new ZitadelError("E_CONFLICT", error.message, {
-          hint: "Rerun with --force to replace it, or edit the existing file directly.",
-          nextCommands: [await this.again("branding:eject", { with: { design, force: true } })],
-          details: error.details,
-        });
+      if (error instanceof ZitadelConfigFileExistsError) {
+        throw refusalError(
+          FILE_EXISTS_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+          },
+          {
+            again: await this.again("branding:eject", {
+              with: {
+                design,
+                force: true,
+              },
+            }),
+          },
+        );
       }
       throw error;
     }
@@ -314,12 +330,7 @@ export default class BrandingEject extends Telemetered(Promptable(Previewable(Ba
       join(CONFIG_DIRECTORIES.branding, "README.md"),
       Spelling.at(this.cliVersion).normalizeProse(brandingReadmeContent()),
       false,
-    ).catch((error: unknown) => {
-      if (error instanceof ZitadelError && error.code === "E_CONFLICT") {
-        return;
-      }
-      throw error;
-    });
+    );
     const brandingMeta = MetaSchemas.of(this.cliVersion).only((file) => {
       return file.path === `${META_SCHEMA_DIR}/branding.json`;
     });

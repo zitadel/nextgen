@@ -1,4 +1,4 @@
-import { ZitadelError } from "@/lib/errors";
+import { OrcaPackageJsonMissingError } from "@/lib/orca/errors";
 import { isObject, parseJsonObject, setTopLevelJsonKey } from "@/lib/json";
 import { extractPort, portFromIssuer, withDevPort } from "@/lib/orca/detectors/port";
 import type { FileOp } from "./file-writer/types";
@@ -54,9 +54,7 @@ export function devScriptPortEdit(
 ): (source: string | undefined) => string {
   return (source) => {
     if (source === undefined) {
-      throw new ZitadelError("E_VALIDATION", "package.json is required to pin the dev port", {
-        hint: "Run setup from a project that has a package.json.",
-      });
+      throw new OrcaPackageJsonMissingError("package.json is required to pin the dev port");
     }
     const devPort = portFromIssuer(issuer);
     if (devPort === undefined) {

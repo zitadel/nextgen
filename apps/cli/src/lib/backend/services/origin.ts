@@ -3,6 +3,7 @@ import escapeStringRegexp from "escape-string-regexp";
 
 import { ApiService } from "@/lib/backend/api-service";
 import { isCancelled, type ZitadelClient } from "@/lib/backend/client";
+import { BackendError } from "@/lib/backend/errors";
 
 /** The two kinds an origin pattern can be. */
 export type OriginKind = AddProjectOriginBody["kind"];
@@ -368,9 +369,15 @@ export class OriginService extends ApiService {
     try {
       await this.add(pattern, "primary");
     } catch (error) {
-      await this.add(pattern, "preview").catch(() => {
-        return undefined;
-      });
+      const failure = error;
+      try {
+        await this.add(pattern, "preview");
+      } catch (error) {
+        if (error instanceof BackendError) {
+          throw failure;
+        }
+        throw error;
+      }
       throw error;
     }
   }
@@ -393,17 +400,17 @@ export class OriginService extends ApiService {
         pattern,
         outcome: remaining.isEmpty ? "emptied" : "removed",
       };
-    } catch (cause) {
+    } catch (error) {
       // A cancellation is not a project that could not be read: the person
       // asked the command to stop, so it stops rather than reporting what the
       // removal left behind.
       if (isCancelled(this.client)) {
-        throw cause;
+        throw error;
       }
       return {
         pattern,
         outcome: "unverified",
-        cause,
+        cause: error,
       };
     }
   }

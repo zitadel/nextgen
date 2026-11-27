@@ -1,3 +1,5 @@
+// The build runs this file with plain Node, which does not resolve `@/`, so it
+// keeps Node's own file-system calls.
 import { cp, glob, mkdir, readFile, rm } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { parse } from "yaml";

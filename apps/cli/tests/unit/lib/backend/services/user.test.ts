@@ -4,7 +4,7 @@ import { describe, expect } from "vitest";
 import { it } from "@tests/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
-import { ForbiddenError } from "@/lib/backend/errors";
+import { BackendForbiddenError } from "@/lib/backend";
 import { UserService } from "@/lib/backend/services/user";
 import { answering, refusal, testClient } from "@tests/helpers/api-answers";
 
@@ -67,7 +67,7 @@ describe("UserService.hasIdentityLink", () => {
     answering(server, "listUserIdentityLinks", refusal(403, "usr.permission_denied"));
 
     expect(await rejectionOf(() => service().hasIdentityLink("usr_1"))).toBeInstanceOf(
-      ForbiddenError,
+      BackendForbiddenError,
     );
   });
 });
@@ -117,7 +117,7 @@ describe("UserService.credentials", () => {
     answering(server, "listUserPasskeys", refusal(403, "usr.permission_denied"));
 
     expect(await rejectionOf(() => service().credentials("usr_1", ["passkey"]))).toBeInstanceOf(
-      ForbiddenError,
+      BackendForbiddenError,
     );
   });
 });

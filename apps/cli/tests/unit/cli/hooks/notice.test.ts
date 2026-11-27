@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { http, HttpResponse } from "msw";
@@ -102,6 +102,12 @@ describe("updateNotice", () => {
 
   it("carries on past a package.json that does not parse", async ({ dir, notice }) => {
     await writeFile(join(dir, "package.json"), "{ not json");
+
+    await expect(notice("1.0.0")).resolves.toContain("CLI 1.0.0 → 2.0.0");
+  });
+
+  it("carries on past a package.json that cannot be read", async ({ dir, notice }) => {
+    await mkdir(join(dir, "package.json"));
 
     await expect(notice("1.0.0")).resolves.toContain("CLI 1.0.0 → 2.0.0");
   });

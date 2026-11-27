@@ -1,11 +1,16 @@
-import { constants } from "node:fs";
-import { open } from "node:fs/promises";
+import { FsError, readFile, stat } from "@/lib/fs";
 import { text } from "node:stream/consumers";
 
-import { Flags, type Command, type Interfaces, Parser } from "@oclif/core";
+import { Errors, Flags, type Command, type Interfaces, Parser } from "@oclif/core";
 
-import { ZitadelError } from "@/lib/errors";
-import { parseJsonObject, wordOf } from "@/lib/json";
+import { errorMessage, ZitadelError } from "@/lib/errors";
+import {
+  isObject,
+  JsonNotAnObjectError,
+  parseJsonObject,
+  parseJsonOrUndefined,
+  wordOf,
+} from "@/lib/json";
 import { kebab } from "@/lib/names";
 import { environmentFlags } from "./environment-flags";
 import { refusalError, type Refusal } from "./refusal";
@@ -294,17 +299,21 @@ export class Input {
           continue;
         }
         const value = word.includes("=") ? word.slice(word.indexOf("=") + 1) : argv[index + 1];
-        const asksForJson =
-          value !== undefined &&
-          (await Input.textOf(value)
-            .then((text) => {
-              return parseJsonObject(text, "--input").json === true;
-            })
-            .catch(() => {
-              return false;
-            }));
+        if (value !== undefined) {
+          try {
+            const parsed = parseJsonOrUndefined(await Input.textOf(value));
+            const asksForJson = isObject(parsed) && parsed.json === true;
 
-        return asksForJson && !argv.includes("--json") ? [...argv, "--json"] : argv;
+            return asksForJson && !argv.includes("--json") ? [...argv, "--json"] : argv;
+          } catch (error) {
+            if (error instanceof ZitadelError) {
+              return argv;
+            }
+            throw error;
+          }
+        }
+
+        return argv;
       }
 
       return argv;
@@ -312,34 +321,37 @@ export class Input {
     if (line.sources.length > 1) {
       return argv;
     }
-    const body = await Input.textOf(source).catch(() => {
-      return undefined;
-    });
-    if (body === undefined) {
-      return argv;
-    }
-    const asksForJson = await Promise.resolve(body)
-      .then((text) => {
-        return parseJsonObject(text, "--input").json === true;
-      })
-      .catch(() => {
-        return false;
-      });
-    const fallback = [
-      ...line.kept,
-      ...(asksForJson && !line.given.includes("json") ? ["--json"] : []),
-      ...line.others,
-      `--input=${Input.inline.test(body.trim()) ? body : JSON.stringify(body)}`,
-    ];
-    if (line.others.length > 0) {
-      return fallback;
-    }
     try {
-      const { flags, args } = await this.check(body, line.given);
+      const body = await Input.textOf(source);
+      const parsed = parseJsonOrUndefined(body);
+      const asked = isObject(parsed) && parsed.json === true;
+      const fallback = [
+        ...line.kept,
+        ...(asked && !line.given.includes("json") ? ["--json"] : []),
+        ...line.others,
+        `--input=${Input.inline.test(body.trim()) ? body : JSON.stringify(body)}`,
+      ];
+      if (line.others.length > 0) {
+        return fallback;
+      }
+      try {
+        const { flags, args } = await this.check(body, line.given);
 
-      return [...line.kept, ...flags, ...(args.length === 0 ? [] : ["--", ...args])];
-    } catch {
-      return fallback;
+        return [...line.kept, ...flags, ...(args.length === 0 ? [] : ["--", ...args])];
+      } catch (error) {
+        if (error instanceof ZitadelError) {
+          return fallback;
+        }
+        if (error instanceof SyntaxError) {
+          return fallback;
+        }
+        throw error;
+      }
+    } catch (error) {
+      if (error instanceof ZitadelError) {
+        return argv;
+      }
+      throw error;
     }
   }
 
@@ -360,17 +372,17 @@ export class Input {
     try {
       await this.check(await Input.textOf(source));
     } catch (error) {
-      if (error instanceof ZitadelError) {
-        throw error;
+      if (error instanceof JsonNotAnObjectError) {
+        throw refusalError(NOT_A_DOCUMENT_REFUSAL, {
+          problem: error.message,
+        });
       }
       if (error instanceof SyntaxError) {
         throw refusalError(NOT_A_DOCUMENT_REFUSAL, {
           problem: "--input is not valid JSON",
         });
       }
-      throw refusalError(NOT_A_DOCUMENT_REFUSAL, {
-        problem: error instanceof Error ? error.message : String(error),
-      });
+      throw error;
     }
   }
 
@@ -515,23 +527,24 @@ export class Input {
       return piped.replace(/^\uFEFF/u, "");
     }
     const path = trimmed.replace(/^@|^file:\/\//u, "");
-    const unreadable = (error: unknown): never => {
-      throw refusalError(UNREADABLE_REFUSAL, {
-        path,
-        problem: error instanceof Error ? error.message : String(error),
-      });
-    };
-    const handle = await open(path, constants.O_RDONLY | constants.O_NONBLOCK).catch(unreadable);
     try {
-      const found = await handle.stat().catch(unreadable);
+      // Checked before it is read, so a FIFO or a device is refused rather than
+      // opened, which could block the run.
+      const found = await stat(path);
       if (!found.isFile() || found.size > 8_000_000) {
         throw refusalError(NOT_A_SMALL_FILE_REFUSAL, { path });
       }
-      const content = await handle.readFile("utf8").catch(unreadable);
+      const content = await readFile(path, "utf8");
 
       return content.replace(/^\uFEFF/u, "");
-    } finally {
-      await handle.close();
+    } catch (error) {
+      if (error instanceof FsError) {
+        throw refusalError(UNREADABLE_REFUSAL, {
+          path,
+          problem: errorMessage(error.cause),
+        });
+      }
+      throw error;
     }
   }
 
@@ -546,51 +559,53 @@ export class Input {
    * @returns What the line holds.
    */
   private async scan(argv: readonly string[]): Promise<Line> {
-    const parsed = await Parser.parse([...argv], {
-      flags: this.tokenizing,
-      args: {},
-      strict: false,
-    }).catch(() => {
-      return undefined;
-    });
-    if (parsed === undefined) {
-      return {
-        kept: [],
-        given: [],
-        sources: [],
-        others: [],
+    try {
+      const parsed = await Parser.parse([...argv], {
+        flags: this.tokenizing,
+        args: {},
+        strict: false,
+      });
+      const typed = (name: string, input: string): string[] => {
+        const flag = this.byName.get(name);
+        if (flag?.flag.type === "option") {
+          return [`--${flag.name}=${input}`];
+        }
+
+        return [parsed.flags[flag?.name ?? name] === false ? `--no-${name}` : `--${name}`];
       };
-    }
-    const typed = (name: string, input: string): string[] => {
-      const flag = this.byName.get(name);
-      if (flag?.flag.type === "option") {
-        return [`--${flag.name}=${input}`];
+
+      const line = {
+        kept: [] as string[],
+        given: [] as string[],
+        sources: [] as string[],
+        others: [] as string[],
+      };
+      for (const token of parsed.raw) {
+        const flag = token.type === "flag" ? this.byName.get(token.flag) : undefined;
+        if (flag !== undefined && Input.names.has(flag.name)) {
+          line.sources.push(token.input);
+        } else if (flag !== undefined && this.globals.has(flag.name) && token.type === "flag") {
+          line.kept.push(...typed(token.flag, token.input));
+          line.given.push(flag.name);
+        } else {
+          line.others.push(
+            ...(token.type === "flag" ? typed(token.flag, token.input) : [token.input]),
+          );
+        }
       }
 
-      return [parsed.flags[flag?.name ?? name] === false ? `--no-${name}` : `--${name}`];
-    };
-
-    const line = {
-      kept: [] as string[],
-      given: [] as string[],
-      sources: [] as string[],
-      others: [] as string[],
-    };
-    for (const token of parsed.raw) {
-      const flag = token.type === "flag" ? this.byName.get(token.flag) : undefined;
-      if (flag !== undefined && Input.names.has(flag.name)) {
-        line.sources.push(token.input);
-      } else if (flag !== undefined && this.globals.has(flag.name) && token.type === "flag") {
-        line.kept.push(...typed(token.flag, token.input));
-        line.given.push(flag.name);
-      } else {
-        line.others.push(
-          ...(token.type === "flag" ? typed(token.flag, token.input) : [token.input]),
-        );
+      return line;
+    } catch (error) {
+      if (error instanceof Errors.CLIError) {
+        return {
+          kept: [],
+          given: [],
+          sources: [],
+          others: [],
+        };
       }
+      throw error;
     }
-
-    return line;
   }
 }
 

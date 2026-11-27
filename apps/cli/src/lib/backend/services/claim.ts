@@ -2,7 +2,14 @@ import type { GetProjectClaimStatus200, CreateProjectClaim201 } from "@zitadel/a
 
 import { ApiService } from "@/lib/backend/api-service";
 import type { ZitadelClient } from "@/lib/backend/client";
-import { BackendError } from "@/lib/backend/errors";
+import {
+  BackendClaimChallengeNotFoundError,
+  BackendClaimWindowExpiredError,
+  BackendConflictError,
+  BackendError,
+  BackendGoneError,
+  BackendTooManyRequestsError,
+} from "@/lib/backend/errors";
 
 /** A claim link, as the server mints it. */
 export type ClaimChallenge = CreateProjectClaim201;
@@ -133,7 +140,7 @@ export class ClaimService extends ApiService {
       if (!(error instanceof BackendError)) {
         throw error;
       }
-      if (error.status === 410 && error.serverCode === "proj.claim_window_expired") {
+      if (error instanceof BackendClaimWindowExpiredError) {
         return {
           outcome: "window-expired",
         };
@@ -175,22 +182,22 @@ export class ClaimService extends ApiService {
       if (!(error instanceof BackendError)) {
         throw error;
       }
-      if (error.status === 410 && error.serverCode === "proj.claim_window_expired") {
+      if (error instanceof BackendClaimWindowExpiredError) {
         return {
           outcome: "window-expired",
         };
       }
-      if (error.status === 410) {
+      if (error instanceof BackendGoneError) {
         return {
           outcome: "expired",
         };
       }
-      if (error.status === 404 && error.serverCode === "claim_challenge.not_found") {
+      if (error instanceof BackendClaimChallengeNotFoundError) {
         return {
           outcome: "not-found",
         };
       }
-      if (error.status === 429) {
+      if (error instanceof BackendTooManyRequestsError) {
         return {
           outcome: "pending",
         };
@@ -208,7 +215,13 @@ export class ClaimService extends ApiService {
    * @returns The owning team and its dashboard, or undefined when the body names none.
    */
   private static ownerOf(error: BackendError): ClaimOwner | undefined {
-    if (error.status !== 409 || !hasDetails(error.body) || !isOwner(error.body.details)) {
+    if (!(error instanceof BackendConflictError)) {
+      return undefined;
+    }
+    if (!hasDetails(error.body)) {
+      return undefined;
+    }
+    if (!isOwner(error.body.details)) {
       return undefined;
     }
     return {

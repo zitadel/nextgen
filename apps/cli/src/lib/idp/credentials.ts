@@ -157,6 +157,8 @@ async function publishSecret(
 
     return "stored";
   } catch (error) {
+    // The publisher is the caller's and may fail in any way; the delivery
+    // report says so rather than failing the command.
     log.debug(`Publishing ${name} to the project failed`, error);
     return "failed";
   }

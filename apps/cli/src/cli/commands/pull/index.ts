@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import type { ReleasePointer, ReleasePointerKind } from "@/lib/backend";
 import { GetDeploymentParams, GetReleaseParams } from "@/lib/backend/schemas";
-import { ZitadelError } from "@/lib/errors";
+import { ZitadelError, ZitadelLibError } from "@/lib/errors";
 import { mapBounded } from "@/lib/map-bounded";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, CommandResult } from "@/cli/core";
@@ -375,7 +375,7 @@ export default class Pull extends Telemetered(ChangeCommand) {
    */
   private async gathered(target: PullTarget) {
     const store = new DiskStore(this.cwd);
-    const config = await ZitadelConfig.loadKinds(store, ["schemas", "flows"]);
+    const config = await ZitadelConfig.loadKinds(new DiskStore(this.cwd), ["schemas", "flows"]);
 
     const configuration = await this.service(PublishedConfiguration);
     const releaseId = await this.resolveReleaseId(configuration, target);
@@ -396,10 +396,19 @@ export default class Pull extends Telemetered(ChangeCommand) {
             outcome: await this.fetchOne(configuration, config, pointer),
           };
         } catch (error) {
-          return {
-            kind: "failed",
-            error,
-          };
+          if (error instanceof ZitadelLibError) {
+            return {
+              kind: "failed",
+              error,
+            };
+          }
+          if (error instanceof ZitadelError) {
+            return {
+              kind: "failed",
+              error,
+            };
+          }
+          throw error;
         }
       },
     );

@@ -1,24 +1,28 @@
 import { spawn } from "node:child_process";
-import { createReadStream } from "node:fs";
-import { mkdir, open, readFile, stat } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { basename, dirname } from "node:path";
 import { StringDecoder } from "node:string_decoder";
 import { buffer } from "node:stream/consumers";
 
 import { resolveServerBinary, serverBinaryPath } from "@zitadel/server/binary";
-import { execa } from "execa";
+import { ExecaError, execa } from "execa";
 import pWaitFor from "p-wait-for";
 
-import { errorMessage } from "@/lib/errors";
-import { LocalServerError } from "../local-server-error";
+import { FsNotFoundError, mkdir, open, readFile, stat } from "@/lib/fs";
+import {
+  LocalServerLaunchFailedError,
+  LocalServerPackageMissingError,
+  LocalServerProcessDeniedError,
+  LocalServerProcessGoneError,
+} from "@/lib/server/errors";
 import { isErrno } from "@/lib/errno";
+import { errorMessage } from "@/lib/errors";
 import { EMPTY_ENV, type ResolvedEnv, envSummary } from "@/lib/server/local/env-vars";
 import type { BinaryRuntimeMetadata } from "@/lib/server/local/runtime";
 import type { LogSink } from "@/lib/server/local/server-log";
 import { type Clock, SystemClock } from "@/lib/clock";
 import { stopSignal } from "./stop-signal";
-import { type Launched, type Launcher, launched } from "./lifecycle";
+import { type LaunchFacts, type Launched, type Launcher, launched } from "./lifecycle";
 
 export const SERVER_NPM_PACKAGE = "@zitadel/server";
 const COMMAND_ENV = "ZITADEL_SERVER_BINARY";
@@ -176,16 +180,21 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     return BinaryLauncher.isRunning(server.pid);
   }
 
-  /** The pid and log file, which is where to look when a start fails. */
-  describe(record: BinaryRuntimeMetadata): Readonly<Record<string, unknown>> {
-    return { runtime: "binary", pid: record.pid, log_path: record.log_path };
-  }
-
   /**
    * Stops the recorded server, leaving alone a pid that no longer belongs to it.
    */
   terminate(record: BinaryRuntimeMetadata): Promise<StopBinaryRuntimeResult> {
     return BinaryLauncher.stopRecord(record);
+  }
+
+  /**
+   * How the server runs, which is where to look when a start fails.
+   *
+   * @param record - The server's record.
+   * @returns Its runtime and its process and the file it logs to.
+   */
+  describe(record: BinaryRuntimeMetadata): LaunchFacts {
+    return { runtime: "binary", pid: record.pid, logPath: record.log_path };
   }
 
   /**
@@ -235,12 +244,18 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
   static bundledVersion(env: NodeJS.ProcessEnv = process.env): string | undefined {
     try {
       return BinaryLauncher.version(env);
-    } catch {
-      return undefined;
+    } catch (error) {
+      if (error instanceof LocalServerPackageMissingError) {
+        return undefined;
+      }
+      if (error instanceof SyntaxError) {
+        return undefined;
+      }
+      throw error;
     }
   }
 
-  /** The bundled server version, or a `LocalServerError` of kind `package-missing`. */
+  /** The bundled server version, or a `LocalServerPackageMissingError`. */
   static assertAvailable(): string {
     return BinaryLauncher.available(() => {
       if (!process.env[COMMAND_ENV]) {
@@ -255,11 +270,13 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     try {
       return find();
     } catch (error) {
-      throw new LocalServerError(
-        "package-missing",
-        "E_VALIDATION",
+      if (error instanceof LocalServerPackageMissingError) {
+        throw error;
+      }
+      throw new LocalServerPackageMissingError(
         "Zitadel server npm package is not available",
-        { package: SERVER_NPM_PACKAGE, message: errorMessage(error) },
+        SERVER_NPM_PACKAGE,
+        error,
       );
     }
   }
@@ -289,10 +306,16 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
       return false;
     }
     try {
-      process.kill(-pid, 0);
+      signalProcess(-pid, 0);
       return true;
     } catch (error) {
-      return isErrno(error, "EPERM");
+      if (error instanceof LocalServerProcessDeniedError) {
+        return true;
+      }
+      if (error instanceof LocalServerProcessGoneError) {
+        return false;
+      }
+      throw error;
     }
   }
 
@@ -302,10 +325,16 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
    */
   static isPidRunning(pid: number): boolean {
     try {
-      process.kill(pid, 0);
+      signalProcess(pid, 0);
       return true;
     } catch (error) {
-      return isErrno(error, "EPERM");
+      if (error instanceof LocalServerProcessDeniedError) {
+        return true;
+      }
+      if (error instanceof LocalServerProcessGoneError) {
+        return false;
+      }
+      throw error;
     }
   }
 
@@ -341,7 +370,7 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     try {
       return await readFile(logPath, "utf8");
     } catch (error) {
-      if (isErrno(error, "ENOENT")) {
+      if (error instanceof FsNotFoundError) {
         return "";
       }
       throw error;
@@ -445,54 +474,58 @@ async function ownsProcess(record: BinaryRuntimeMetadata): Promise<boolean> {
   const programs = [started, SERVER_PROGRAM];
   // `ww`: without it `ps` cuts the command column to `COLUMNS` (which tools
   // such as pnpm export), and the server's long path is cut before its name.
-  const listing = await ps(["axww", "-o", "pid=,pgid=,command="]).catch(() => {
-    return undefined;
-  });
-  if (listing === undefined) {
-    return true;
-  }
-  const candidates = listing.split(/\r?\n/).flatMap((line) => {
-    const match = line.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/);
-    const named =
-      match !== null &&
-      programs.some((program) => {
-        return (match[3] ?? "").includes(program);
-      });
-    const ours =
-      match !== null && (Number(match[1]) === record.pid || Number(match[2]) === record.pid);
-    if (named && ours) {
-      return [Number(match[1])];
-    } else {
-      return [];
+  try {
+    const listing = await ps(["axww", "-o", "pid=,pgid=,command="]);
+    const candidates = listing.split(/\r?\n/).flatMap((line) => {
+      const match = line.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/);
+      const named =
+        match !== null &&
+        programs.some((program) => {
+          return (match[3] ?? "").includes(program);
+        });
+      const ours =
+        match !== null && (Number(match[1]) === record.pid || Number(match[2]) === record.pid);
+      if (named && ours) {
+        return [Number(match[1])];
+      } else {
+        return [];
+      }
+    });
+    for (const pid of candidates) {
+      if (await servesDataDir(pid, record.data_dir)) {
+        return true;
+      }
     }
-  });
-  for (const pid of candidates) {
-    if (await servesDataDir(pid, record.data_dir)) {
+    return false;
+  } catch (error) {
+    if (error instanceof ExecaError) {
       return true;
     }
+    throw error;
   }
-  return false;
 }
 
 const DATA_DIR_VARIABLE = "NEXTGEN_SERVER_DATA_DIR=";
 
 /** Whether a process serves a data directory, or its environment does not say. */
 async function servesDataDir(pid: number, dataDir: string): Promise<boolean> {
-  const command = await ps(["eww", "-p", String(pid), "-o", "command="]).catch(() => {
-    return undefined;
-  });
-  if (command === undefined) {
-    return true;
+  try {
+    const command = await ps(["eww", "-p", String(pid), "-o", "command="]);
+    const at = command.indexOf(DATA_DIR_VARIABLE);
+    if (at === -1) {
+      return true;
+    }
+    const rest = command.slice(at + DATA_DIR_VARIABLE.length);
+    return (
+      rest.startsWith(dataDir) &&
+      (rest.length === dataDir.length || /\s/.test(rest[dataDir.length] ?? ""))
+    );
+  } catch (error) {
+    if (error instanceof ExecaError) {
+      return true;
+    }
+    throw error;
   }
-  const at = command.indexOf(DATA_DIR_VARIABLE);
-  if (at === -1) {
-    return true;
-  }
-  const rest = command.slice(at + DATA_DIR_VARIABLE.length);
-  return (
-    rest.startsWith(dataDir) &&
-    (rest.length === dataDir.length || /\s/.test(rest[dataDir.length] ?? ""))
-  );
 }
 
 /**
@@ -527,11 +560,10 @@ async function spawned(child: ReturnType<typeof spawn>, command: string): Promis
     child.unref();
     return pid;
   } catch (error) {
-    throw new LocalServerError(
-      "cannot-launch",
-      "E_VALIDATION",
+    throw new LocalServerLaunchFailedError(
       "The Zitadel server could not be started",
-      { command, message: errorMessage(error) },
+      command,
+      error,
     );
   }
 }
@@ -540,7 +572,11 @@ function resolveServerPackageManifest(): string {
   try {
     return require.resolve(`${SERVER_NPM_PACKAGE}/package.json`);
   } catch (error) {
-    throw new Error(`Missing ${SERVER_NPM_PACKAGE}. Reinstall @zitadel/cli.`, { cause: error });
+    throw new LocalServerPackageMissingError(
+      "Zitadel server npm package is not available",
+      SERVER_NPM_PACKAGE,
+      error,
+    );
   }
 }
 
@@ -548,7 +584,7 @@ async function fileSize(path: string): Promise<number> {
   try {
     return (await stat(path)).size;
   } catch (error) {
-    if (isErrno(error, "ENOENT")) {
+    if (error instanceof FsNotFoundError) {
       return 0;
     }
     throw error;
@@ -558,9 +594,10 @@ async function fileSize(path: string): Promise<number> {
 /** Up to `length` bytes of a file from `position` on; none for a file that is gone. */
 async function readBytes(path: string, position: number, length: number): Promise<Buffer> {
   try {
-    return await buffer(createReadStream(path, { start: position, end: position + length - 1 }));
+    const handle = await open(path, "r");
+    return await buffer(handle.createReadStream({ start: position, end: position + length - 1 }));
   } catch (error) {
-    if (isErrno(error, "ENOENT")) {
+    if (error instanceof FsNotFoundError) {
       return Buffer.alloc(0);
     }
     throw error;
@@ -568,15 +605,20 @@ async function readBytes(path: string, position: number, length: number): Promis
 }
 
 /**
- * Signals one process. `false` when there is no such process, which is an answer, not an error.
+ * Signals one process, or the group a negative pid names.
+ *
+ * @throws {LocalServerProcessGoneError} When there is no such process.
+ * @throws {LocalServerProcessDeniedError} When the process is not the CLI's to signal.
  */
-function signalProcess(pid: number, signal: NodeJS.Signals): boolean {
+function signalProcess(pid: number, signal: NodeJS.Signals | 0): void {
   try {
     process.kill(pid, signal);
-    return true;
   } catch (error) {
     if (isErrno(error, "ESRCH")) {
-      return false;
+      throw new LocalServerProcessGoneError(`No process ${String(pid)}`, error);
+    }
+    if (isErrno(error, "EPERM")) {
+      throw new LocalServerProcessDeniedError(`Permission denied: ${errorMessage(error)}`, error);
     }
     throw error;
   }
@@ -594,15 +636,39 @@ function signalRuntime(
 ): { sent: boolean; target: "process" | "process-group" } {
   if (process.platform !== "win32") {
     try {
-      process.kill(-pid, signal);
+      signalProcess(-pid, signal);
       return { sent: true, target: "process-group" };
     } catch (error) {
-      if (!isErrno(error, "ESRCH")) {
-        throw error;
+      if (error instanceof LocalServerProcessGoneError) {
+        return signalLoneProcess(pid, signal);
       }
+      throw error;
     }
   }
-  return { sent: signalProcess(pid, signal), target: "process" };
+  return signalLoneProcess(pid, signal);
+}
+
+/**
+ * Signals one process on its own, for where its group is gone or there is none.
+ *
+ * @param pid - The process to signal.
+ * @param signal - The signal to send.
+ * @returns Whether the signal was sent, aimed at the process.
+ * @throws {LocalServerProcessDeniedError} When the process is not the CLI's to signal.
+ */
+function signalLoneProcess(
+  pid: number,
+  signal: NodeJS.Signals,
+): { sent: boolean; target: "process" | "process-group" } {
+  try {
+    signalProcess(pid, signal);
+    return { sent: true, target: "process" };
+  } catch (error) {
+    if (error instanceof LocalServerProcessGoneError) {
+      return { sent: false, target: "process" };
+    }
+    throw error;
+  }
 }
 
 /**

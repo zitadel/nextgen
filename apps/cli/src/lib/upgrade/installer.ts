@@ -1,7 +1,7 @@
 import { Output } from "@/lib/ui/output";
 import { type PackageCommand, PM } from "@/lib/pm";
 
-import { InstallError } from "./errors";
+import { UpgradeInstallFailedError } from "./errors";
 import type { UpgradePlan } from "./plan";
 
 /**
@@ -83,7 +83,7 @@ export class PackageInstaller {
    * Runs the install.
    *
    * @param install - What {@link PackageInstaller.plan} returned.
-   * @throws An {@link InstallError} when the package manager fails.
+   * @throws An {@link UpgradeInstallFailedError} when the package manager fails.
    */
   async install(install: PlannedInstall): Promise<void> {
     try {
@@ -92,7 +92,7 @@ export class PackageInstaller {
         redirectStdoutToStderr: this.options.redirectStdoutToStderr ?? Output.json,
       });
     } catch (error) {
-      throw new InstallError(install.shown, error);
+      throw new UpgradeInstallFailedError(install.shown, error);
     }
   }
 }

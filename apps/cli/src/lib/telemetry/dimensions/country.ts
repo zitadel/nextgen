@@ -97,8 +97,12 @@ class Country implements Property<string | undefined, string | undefined> {
       this.machineZoneResolved = true;
       try {
         this.machineZone = new Intl.DateTimeFormat().resolvedOptions().timeZone;
-      } catch {
-        this.machineZone = undefined;
+      } catch (error) {
+        if (error instanceof RangeError) {
+          this.machineZone = undefined;
+          return this.machineZone;
+        }
+        throw error;
       }
     }
     return this.machineZone;

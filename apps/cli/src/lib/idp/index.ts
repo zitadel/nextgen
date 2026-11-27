@@ -25,6 +25,13 @@
 
 export { callbackUriFor } from "./callback";
 export {
+  IdpError,
+  IdpProviderUnknownError,
+  IdpSettingsInvalidError,
+  IdpSettingsMissingError,
+  IdpSettingsUnusedError,
+} from "./errors";
+export {
   type CredentialNames,
   type GivenCredentials,
   type PublishedCredentials,

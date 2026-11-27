@@ -2,7 +2,10 @@ import { createRequire } from "node:module";
 
 import type { Mixpanel as MixpanelClient, Modifiers, Properties } from "mixpanel";
 
+import { errorMessage } from "@/lib/errors";
+
 import { resolveTelemetryEndpoint, type TelemetryEndpoint } from "./config";
+import { TelemetryError } from "./errors";
 import { Outbox } from "./outbox";
 import { type TelemetrySink, trace } from "./sink";
 
@@ -41,6 +44,8 @@ export class MixpanelSink implements TelemetrySink {
       const client = init(settings.token, resolveTelemetryEndpoint(settings.env));
       return new MixpanelSink(client, settings.distinctId, settings.debug);
     } catch {
+      // Telemetry fails open: an injected or third-party client that cannot
+      // be made, in any way, only means nothing is sent.
       return undefined;
     }
   }
@@ -82,23 +87,37 @@ export class MixpanelSink implements TelemetrySink {
     return this.outbox.drain(timeoutMs);
   }
 
-  /** Starts one send. It resolves when the client calls back, and also when the client throws. */
+  /** Starts one send. It resolves when the client calls back, and rejects with a {@link TelemetryError} when the client throws. */
   private deliver(send: (done: () => void) => void): Promise<void> {
     return new Promise<void>((resolve) => {
       try {
         send(() => {
           resolve();
         });
-      } catch {
-        resolve();
+      } catch (error) {
+        // The boundary: the client throws untyped errors. Rejecting ends the send; the outbox
+        // settles every send, so a failed one never fails the command.
+        throw new TelemetryError(errorMessage(error), error);
       }
     });
   }
 }
 
-/** Real Mixpanel client construction, kept apart so a test can swap it. */
+/**
+ * Real Mixpanel client construction, kept apart so a test can swap it.
+ *
+ * @param token - The project token.
+ * @param endpoint - Where the client sends.
+ * @returns The client.
+ * @throws {@link TelemetryError} When the SDK cannot make one.
+ */
 function defaultInit(token: string, { host, path }: TelemetryEndpoint): MixpanelClient {
-  return loadMixpanel().init(token, { host, path, geolocate: false });
+  try {
+    return loadMixpanel().init(token, { host, path, geolocate: false });
+  } catch (error) {
+    // The boundary: the SDK throws untyped errors.
+    throw new TelemetryError(errorMessage(error), error);
+  }
 }
 
 /**

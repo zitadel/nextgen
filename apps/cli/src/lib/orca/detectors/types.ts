@@ -48,7 +48,7 @@ export interface Detector {
   /**
    * Probe `cwd`. Returns {@link FrameworkFacts} when it is a project of this
    * framework, or `null` when it is not (so the orchestrator tries the next
-   * detector). MAY throw a `ZitadelError` when the framework is recognised but
+   * detector). MAY throw an `OrcaError` when the framework is recognised but
    * unsupported (e.g. Next.js Pages Router) — a hard error, distinct from "not
    * this framework", so an unsupported project is never mistaken for an empty
    * directory to scaffold.

@@ -1,5 +1,7 @@
 import { basename } from "node:path";
 
+import { LocalServerProgramFailedError } from "@/lib/server/errors";
+
 import { type Run, systemRun } from "./ports";
 
 import { errorMessage } from "@/lib/errors";
@@ -66,16 +68,15 @@ export async function discoverManagedRuntimeProcesses(opts?: {
   const listed = await run("ps", ["axww", "-o", "pid=,ppid=,command="], {
     timeout: opts?.timeoutMs ?? 1000,
   })
-    .then(({ stdout }) => stdout)
-    .then(parsePsRows)
-    .then(
-      (rows) => {
-        return { rows };
-      },
-      (error: unknown) => {
+    .then(({ stdout }) => {
+      return { rows: parsePsRows(stdout) };
+    })
+    .catch((error: unknown) => {
+      if (error instanceof LocalServerProgramFailedError) {
         return { error: errorMessage(error) };
-      },
-    );
+      }
+      throw error;
+    });
   if ("error" in listed) {
     return { supported: false, processes: [], error: listed.error };
   }
@@ -116,8 +117,11 @@ async function hydrateCommand(
       timeout: timeoutMs,
     });
     return stdout.trim() || fallback;
-  } catch {
-    return fallback;
+  } catch (error) {
+    if (error instanceof LocalServerProgramFailedError) {
+      return fallback;
+    }
+    throw error;
   }
 }
 

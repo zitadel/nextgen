@@ -11,10 +11,17 @@ import AuthMethodPasskeyDisable from "@/cli/commands/auth-method/passkey/disable
 import AuthMethodPasskeyEnable from "@/cli/commands/auth-method/passkey/enable";
 import AuthMethodPasswordEnable from "@/cli/commands/auth-method/password/enable";
 import AuthMethodSsoDisable from "@/cli/commands/auth-method/sso/disable";
-import { Consent } from "@/lib/consent";
+import { Consent, ConsentInternalError } from "@/lib/consent";
 import { ZitadelError } from "@/lib/errors";
 
-import { BrokenFilesError, type Change, DiskStore, Schemas, UserSchema } from "@/lib/zitadel";
+import { SyncStateMalformedError } from "@/lib/sync";
+import {
+  type Change,
+  DiskStore,
+  Schemas,
+  UserSchema,
+  ZitadelConfigFilesBrokenError,
+} from "@/lib/zitadel";
 import { answering, type Person } from "@tests/helpers/keyboard";
 import { recordLog } from "@tests/fixtures/log";
 import { aSchema, SCHEMA_FILE } from "@tests/helpers/auth-method";
@@ -717,7 +724,10 @@ describe("AuthMethodCommand.write", () => {
       return writer.writeChange(read, change);
     });
 
-    expect(error).toEqual(new Error("A destructive operation ran without consent"));
+    expect(error).toBeInstanceOf(ConsentInternalError);
+    expect(error).toMatchObject({
+      message: "A destructive operation ran without consent",
+    });
   });
 
   it("writes a change that removes the last way in with consent", async ({ dir }) => {
@@ -990,9 +1000,13 @@ describe("readSchemaTarget", () => {
         return target(cwd);
       });
 
-      expect(error).toBeInstanceOf(BrokenFilesError);
+      expect(error).toBeInstanceOf(ZitadelConfigFilesBrokenError);
       expect(error).toMatchObject({
-        problems: [expect.objectContaining({ path: ".zitadel/schemas/customers.json" })],
+        code: "E_VALIDATION",
+        message: expect.stringContaining(".zitadel/schemas/customers.json:"),
+        problems: expect.arrayContaining([
+          expect.objectContaining({ path: ".zitadel/schemas/customers.json" }),
+        ]),
       });
     });
 
@@ -1005,9 +1019,13 @@ describe("readSchemaTarget", () => {
         return target(cwd, { schema: "employees" });
       });
 
-      expect(error).toBeInstanceOf(BrokenFilesError);
+      expect(error).toBeInstanceOf(ZitadelConfigFilesBrokenError);
       expect(error).toMatchObject({
-        problems: [expect.objectContaining({ path: ".zitadel/schemas/employees.json" })],
+        code: "E_VALIDATION",
+        message: expect.stringContaining(".zitadel/schemas/employees.json:"),
+        problems: expect.arrayContaining([
+          expect.objectContaining({ path: ".zitadel/schemas/employees.json" }),
+        ]),
       });
     });
   });
@@ -1026,7 +1044,7 @@ describe("readSchemaTarget", () => {
         return target(cwd);
       });
 
-      expect(error).not.toBeInstanceOf(BrokenFilesError);
+      expect(error).not.toMatchObject({ details: { problems: expect.anything() } });
       expect(error).toMatchObject({
         message: "This project has more than one user schema",
       });
@@ -1045,7 +1063,11 @@ describe("readSchemaTarget", () => {
         return target(cwd, { schema: "employees.json" });
       });
 
-      expect(error).toBeInstanceOf(BrokenFilesError);
+      expect(error).toBeInstanceOf(ZitadelConfigFilesBrokenError);
+      expect(error).toMatchObject({
+        code: "E_VALIDATION",
+        problems: [expect.objectContaining({ path: ".zitadel/schemas/employees.json" })],
+      });
     });
 
     it("refuses a name no schema has as unknown, not as the broken file", async ({ dir }) => {
@@ -1091,8 +1113,10 @@ describe("readSchemaTarget", () => {
         return target(cwd);
       });
 
-      expect(error).toBeInstanceOf(BrokenFilesError);
+      expect(error).toBeInstanceOf(ZitadelConfigFilesBrokenError);
       expect(error).toMatchObject({
+        code: "E_VALIDATION",
+        message: expect.stringContaining(".zitadel/idps/broken.json:"),
         problems: expect.arrayContaining([
           expect.objectContaining({ path: ".zitadel/idps/broken.json" }),
         ]),
@@ -1152,8 +1176,10 @@ describe("readSchemaTarget", () => {
         return target(cwd);
       });
 
-      expect(error).toBeInstanceOf(ZitadelError);
-      expect(error).toMatchObject({ code: "E_VALIDATION" });
+      expect(error).toBeInstanceOf(SyncStateMalformedError);
+      expect(error).toMatchObject({
+        code: "E_VALIDATION",
+      });
     });
   });
 });

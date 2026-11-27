@@ -6,7 +6,7 @@ import { describe, expect } from "vitest";
 import { it } from "@tests/fixtures";
 
 import { allowDestructive } from "@/lib/backend";
-import { ConflictError } from "@/lib/backend/errors";
+import { BackendConflictError, BackendReleaseContentRevokedError } from "@/lib/backend";
 import { ReleaseService } from "@/lib/backend/services/release";
 import { answering, testClient } from "@tests/helpers/api-answers";
 import { PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
@@ -60,9 +60,8 @@ describe("ReleaseService.create", () => {
 
     const error = await rejectionOf(() => service().create(INPUT));
 
-    expect(error).toBeInstanceOf(ConflictError);
+    expect(error).toBeInstanceOf(BackendReleaseContentRevokedError);
     expect(error).toMatchObject({
-      name: "ConflictError",
       message: expect.stringContaining("rel_1"),
     });
   });
@@ -170,7 +169,7 @@ describe("ReleaseService.revoke", () => {
           return releaseService.revoke("rel_1");
         });
 
-        expect(refusal).toBeInstanceOf(ConflictError);
+        expect(refusal).toBeInstanceOf(BackendConflictError);
       },
     );
   });

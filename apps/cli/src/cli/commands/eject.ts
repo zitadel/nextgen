@@ -1,15 +1,14 @@
 import { dryRunResult } from "@/cli/core/crud/shared";
-import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { LocalRuntime } from "@/lib/server";
 import { Cmd } from "@/lib/cmd";
 import { Consent } from "@/lib/consent";
 import { CANCELLED } from "@/lib/errors";
-import { pathExists } from "@/lib/fs";
+import { FsError, pathExists, readFile, rename, rm, writeFile } from "@/lib/fs";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, CommandResult } from "@/cli/core";
-import { createOrca, Orca } from "@/lib/orca";
+import { createOrca, Orca, OrcaError } from "@/lib/orca";
 import { LAUNCHER_PATH } from "@/lib/orca/patchers/rule/angular/templates";
 import { AGENTS_HEADER, removeGuidanceSection } from "@/lib/orca/patchers/rule/guidance";
 import type { EjectActions } from "@/lib/orca/patchers/types";
@@ -21,7 +20,7 @@ import {
   suggestedCommandOf,
 } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { Project } from "@/lib/project";
+import { Project, ProjectError } from "@/lib/project";
 import { Previewable } from "@/cli/core/previewable";
 import { Destructive } from "@/cli/core/destructive";
 import { BaseCommand } from "@/cli/core";
@@ -54,8 +53,17 @@ async function resolveEjectActions(cwd: string): Promise<EjectActions> {
       framework,
       rendererId: config.rendererId,
     });
-  } catch {
-    return fallback;
+  } catch (error) {
+    if (error instanceof FsError) {
+      return fallback;
+    }
+    if (error instanceof ProjectError) {
+      return fallback;
+    }
+    if (error instanceof OrcaError) {
+      return fallback;
+    }
+    throw error;
   }
 }
 
@@ -100,8 +108,11 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
     if (!(await pathExists(abs))) {
       continue;
     }
-    const contents = await readFile(abs, "utf8").catch(() => {
-      return "";
+    const contents = await readFile(abs, "utf8").catch((error: unknown) => {
+      if (error instanceof FsError) {
+        return "";
+      }
+      throw error;
     });
     if (!Orca.isManaged(contents)) {
       preserved.push(rel);
@@ -158,8 +169,11 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
     if (!(await pathExists(abs))) {
       continue;
     }
-    const contents = await readFile(abs, "utf8").catch(() => {
-      return "";
+    const contents = await readFile(abs, "utf8").catch((error: unknown) => {
+      if (error instanceof FsError) {
+        return "";
+      }
+      throw error;
     });
     const stripped = removeGuidanceSection(contents);
     if (stripped === contents) {

@@ -7,8 +7,9 @@
  * given by an earlier one, and that no two steps share a name.
  *
  * It draws nothing and asks nothing: a step reaches the terminal through what
- * its own constructor was given. Nothing here imports the CLI, so the engine can
- * be lifted out unchanged.
+ * its own constructor was given. Nothing here imports the CLI except the shared
+ * error base in errors.ts.
  */
+export { WizardDefinitionError, WizardError } from "./errors";
 export { EndStep, WizardStep } from "./step";
-export { type RunWatcher, Wizard, WizardDefinitionError } from "./wizard";
+export { type RunWatcher, Wizard } from "./wizard";

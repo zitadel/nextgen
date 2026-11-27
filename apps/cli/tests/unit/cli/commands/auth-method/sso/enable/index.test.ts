@@ -963,6 +963,10 @@ describe("auth-method sso enable", () => {
         status: "error",
         code: "E_VALIDATION",
         message: MISSING,
+        hint: expect.stringContaining("Describe the connection, e.g."),
+        details: {
+          missing: ["--display-name", "--issuer"],
+        },
       });
     });
 

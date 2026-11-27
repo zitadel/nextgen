@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { ZitadelError } from "@/lib/errors";
+import { OrcaError } from "@/lib/orca";
 import { VueDetector } from "@/lib/orca/detectors/vue";
 import { it } from "@tests/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
@@ -38,8 +38,8 @@ describe("VueDetector", () => {
     const caught = await rejectionOf(async () =>
       new VueDetector().detect(await project(dir, { vue: "~3.1.0", vite: "^5" })),
     );
-    expect(caught).toBeInstanceOf(ZitadelError);
-    expect((caught as ZitadelError).code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
+    expect(caught).toBeInstanceOf(OrcaError);
+    expect((caught as OrcaError).code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
   });
 
   it("accepts Vue 3.2", async ({ dir }) => {

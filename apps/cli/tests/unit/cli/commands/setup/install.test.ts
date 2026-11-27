@@ -8,7 +8,7 @@ import { InstallDependencies } from "@/cli/commands/setup/steps/install-dependen
 import { Ui, log, warnings, type BoxAction } from "@/lib/ui";
 import { ZitadelError } from "@/lib/errors";
 import { createOrca } from "@/lib/orca";
-import type { PackageCommand, Runner } from "@/lib/pm";
+import { PmCommandFailedError, type PackageCommand, type Runner } from "@/lib/pm";
 import type { Suggest } from "@/lib/suggestion";
 import { it } from "@tests/fixtures";
 import { writeJson } from "@tests/helpers/local-project";
@@ -98,7 +98,7 @@ function aFailingRunner() {
 function aRunnerFailingAfterInstall(output = "") {
   return vi.fn<Runner>(async (command) => {
     if (command.verb === "run") {
-      throw Object.assign(new Error(`${command.display} failed with exit 1`), { output });
+      throw new PmCommandFailedError(`${command.display} failed with exit 1`, 1, output);
     }
   });
 }
@@ -756,6 +756,22 @@ describe("InstallDependencies", () => {
         message: "Dependency install failed: npm install",
         nextCommands: ["npm install"],
       });
+    });
+
+    it.for([
+      ["the errno of a package manager that could not start", "ENOENT"],
+      ["the exit code of an install that failed", 1],
+    ] as const)("reports %s as the original code", async ([, status], { dir }) => {
+      await aProject(dir);
+      const run: Runner = async () => {
+        throw new PmCommandFailedError("npm install failed", status);
+      };
+
+      const error = await rejectionOf(() => {
+        return installWith(anInstallInput({ cwd: dir, run }));
+      });
+
+      expect(error).toMatchObject({ details: { original: { code: status } } });
     });
   });
 });

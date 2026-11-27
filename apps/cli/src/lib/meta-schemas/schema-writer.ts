@@ -1,9 +1,18 @@
-import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import semver from "semver";
 
-import { pathExists } from "@/lib/fs";
+import {
+  FsDeniedError,
+  FsFailedError,
+  FsError,
+  FsIsDirectoryError,
+  FsNotDirectoryError,
+  mkdir,
+  pathExists,
+  writeFile,
+} from "@/lib/fs";
+import { PmManifestInvalidError } from "@/lib/pm";
 import { mapBounded } from "@/lib/map-bounded";
 import { ZITADEL_SCOPE } from "@/lib/upgrade/defaults";
 import { Dependencies } from "@/lib/upgrade/dependencies";
@@ -84,7 +93,14 @@ export class SchemaWriter {
         const state = await SchemaState.at(cwd).of(file);
         return { kind: "judged", file, state };
       } catch (error) {
-        return { kind: "unreadable", file, reason: this.readErrorReason(error) };
+        if (error instanceof FsError) {
+          return {
+            kind: "unreadable",
+            file,
+            reason: this.readErrorReason(error),
+          };
+        }
+        throw error;
       }
     });
     const wanted = judged.flatMap((entry): readonly Stale[] => {
@@ -168,16 +184,24 @@ export class SchemaWriter {
     if (semver.valid(cliVersion) === null) {
       return undefined;
     }
-    const dependencies = await Dependencies.read(cwd, ZITADEL_SCOPE).catch(() => {
-      return undefined;
-    });
-    const pin = dependencies?.exact().find((dependency) => {
-      return dependency.isAhead(cliVersion);
-    });
-    if (pin === undefined) {
-      return undefined;
+    try {
+      const dependencies = await Dependencies.read(cwd, ZITADEL_SCOPE);
+      const pin = dependencies?.exact().find((dependency) => {
+        return dependency.isAhead(cliVersion);
+      });
+      if (pin === undefined) {
+        return undefined;
+      }
+      return { name: pin.name, version: pin.specifier };
+    } catch (error) {
+      if (error instanceof FsError) {
+        return undefined;
+      }
+      if (error instanceof PmManifestInvalidError) {
+        return undefined;
+      }
+      throw error;
     }
-    return { name: pin.name, version: pin.specifier };
   }
 
   /**
@@ -204,8 +228,17 @@ export class SchemaWriter {
    * @returns The reason.
    */
   private readErrorReason(error: unknown): string {
-    if (error instanceof Error && "code" in error) {
-      return String(error.code);
+    if (error instanceof FsDeniedError) {
+      return "EACCES";
+    }
+    if (error instanceof FsIsDirectoryError) {
+      return "EISDIR";
+    }
+    if (error instanceof FsNotDirectoryError) {
+      return "ENOTDIR";
+    }
+    if (error instanceof FsFailedError) {
+      return error.errno;
     }
     return String(error);
   }

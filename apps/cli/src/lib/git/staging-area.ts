@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { copyFile, mkdtemp, rm, stat, utimes, writeFile } from "node:fs/promises";
+import { copyFile, FsError, mkdtemp, rm, stat, utimes, writeFile } from "@/lib/fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
@@ -41,8 +41,12 @@ export class StagingArea {
     try {
       return await work(new StagingArea(git, join(scratch, "index")));
     } finally {
-      await rm(scratch, { recursive: true, force: true }).catch(() => {
-        return undefined;
+      // A file-system failure is dropped, as the doc says: the work is done.
+      await rm(scratch, { recursive: true, force: true }).catch((error: unknown) => {
+        if (error instanceof FsError) {
+          return;
+        }
+        throw error;
       });
     }
   }

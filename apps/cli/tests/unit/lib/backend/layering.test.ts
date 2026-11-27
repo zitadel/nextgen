@@ -14,7 +14,14 @@ describe("the backend's dependencies", () => {
     // written through the `@/` alias.
     const reached = (await importsUnder(LAYER))
       .filter((found) => {
-        return found.target !== LAYER && !found.target.startsWith(`${LAYER}/`);
+        return (
+          found.target !== LAYER &&
+          !found.target.startsWith(`${LAYER}/`) &&
+          !(
+            (found.target === "lib/lib-error" || found.target === "lib/errors") &&
+            found.file === posix.join(LAYER, "errors.ts")
+          )
+        );
       })
       .map((found) => {
         return `${found.file} imports ${found.specifier}`;

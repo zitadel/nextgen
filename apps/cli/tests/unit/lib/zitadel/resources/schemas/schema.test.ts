@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { getDefaultHumanUserSchema } from "@zitadel/config/defaults";
 
-import { BrokenFilesError, RefusedEditError, UserSchema } from "@/lib/zitadel";
+import { ZitadelConfigError, UserSchema } from "@/lib/zitadel";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import { MemoryStore } from "@tests/helpers/storage/backend/memory";
 import { objectAt, toJsonObject } from "@/lib/zitadel/utils/json";
@@ -143,16 +143,6 @@ describe("UserSchema.read", () => {
   });
 });
 
-describe("UserSchema.refusesKey", () => {
-  it.each([
-    [true, "contract/schema", "properties.firstName minimumLength is not an allowed key"],
-    [false, "contract/schema", "objectType Expected string"],
-    [false, "contract/flow", "steps.0 foo is not an allowed key"],
-  ])("is %s for a %s finding saying %j", (expected, rule, message) => {
-    expect(UserSchema.refusesKey({ rule, message })).toBe(expected);
-  });
-});
-
 describe("UserSchema.of", () => {
   it("takes the file as read", () => {
     const schema = UserSchema.of(aFile("schemas", SCHEMA_FILE, SHIPPED));
@@ -165,8 +155,10 @@ describe("UserSchema.of", () => {
       return UserSchema.of(aFile("schemas", SCHEMA_FILE, REFUSED));
     });
 
-    expect(error).toBeInstanceOf(BrokenFilesError);
-    expect(error).toMatchObject({ problems: [expect.objectContaining({ path: PATH })] });
+    expect(error).toBeInstanceOf(ZitadelConfigError);
+    expect(error).toMatchObject({
+      message: expect.stringContaining(`${PATH}:`),
+    });
   });
 });
 
@@ -498,8 +490,10 @@ describe("UserSchema.withMethod", () => {
       return schema.withMethod("password");
     });
 
-    expect(error).toBeInstanceOf(RefusedEditError);
-    expect(error).toMatchObject({ message: `${PATH} has no x-identifier for password` });
+    expect(error).toBeInstanceOf(ZitadelConfigError);
+    expect(error).toMatchObject({
+      message: expect.stringContaining(`${PATH} has no x-identifier for password`),
+    });
   });
 });
 
@@ -571,6 +565,6 @@ describe("UserSchema edits of an external schema", () => {
       return edit(external);
     });
 
-    expect(error).toBeInstanceOf(RefusedEditError);
+    expect(error).toBeInstanceOf(ZitadelConfigError);
   });
 });

@@ -2,7 +2,7 @@ import type { VerifyAuthAttemptChallengeBody } from "@zitadel/api/generated/mode
 
 import { ApiService } from "@/lib/backend/api-service";
 import type { ZitadelClient } from "@/lib/backend/client";
-import { BackendError } from "@/lib/backend/errors";
+import { type BackendError, BackendProofRejectedError } from "@/lib/backend/errors";
 
 /** The factors an attempt can be asked to prove. */
 export type AttemptFactor = "identifier" | "password";
@@ -98,7 +98,7 @@ export class AuthAttemptService extends ApiService {
         outcome: "proved",
       };
     } catch (error) {
-      if (error instanceof BackendError && error.serverCode === "att.proof_rejected") {
+      if (error instanceof BackendProofRejectedError) {
         return {
           outcome: "rejected",
           cause: error,

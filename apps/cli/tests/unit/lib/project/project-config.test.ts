@@ -3,8 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { ZitadelError } from "@/lib/errors";
-import { Project } from "@/lib/project";
+import { Project, ProjectFileMissingError, ProjectInvalidError } from "@/lib/project";
 import { scratchDir } from "@tests/fixtures/scratch";
 
 async function makeTempDir(): Promise<string> {
@@ -35,12 +34,14 @@ describe("Project.config", () => {
       await Project.at(cwd).config();
       expect.unreachable("expected ProjectConfig.read to throw");
     } catch (error) {
-      expect(error).toBeInstanceOf(ZitadelError);
-      const zerr = error as ZitadelError;
-      expect(zerr.code).toBe("E_VALIDATION");
-      expect(zerr.message).toContain("zitadel.json was not found");
-      expect(zerr.hint).toBe("Set the project up first.");
-      expect(zerr.nextCommands).toEqual([{ id: "setup" }]);
+      expect(error).toBeInstanceOf(ProjectFileMissingError);
+      expect(error).toMatchObject({
+        code: "E_VALIDATION",
+      });
+      expect(error).toHaveProperty(
+        "message",
+        expect.stringContaining("zitadel.json was not found"),
+      );
     }
   });
 
@@ -49,7 +50,7 @@ describe("Project.config", () => {
     await writeFile(join(cwd, "zitadel.json"), "{ not valid json");
 
     await expect(Project.at(cwd).config()).rejects.toThrow();
-    await expect(Project.at(cwd).config()).rejects.not.toBeInstanceOf(ZitadelError);
+    await expect(Project.at(cwd).config()).rejects.not.toBeInstanceOf(ProjectFileMissingError);
   });
 
   it("rejects a non-object JSON root via parseJsonObject", async () => {
@@ -57,6 +58,13 @@ describe("Project.config", () => {
     await writeFile(join(cwd, "zitadel.json"), JSON.stringify([1, 2, 3]));
 
     await expect(Project.at(cwd).config()).rejects.toThrow("must contain a JSON object");
+  });
+
+  it("refuses a non-object JSON root as an invalid project file", async () => {
+    const cwd = await makeTempDir();
+    await writeFile(join(cwd, "zitadel.json"), "[]");
+
+    await expect(Project.at(cwd).config()).rejects.toBeInstanceOf(ProjectInvalidError);
   });
 });
 

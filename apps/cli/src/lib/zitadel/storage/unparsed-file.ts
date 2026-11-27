@@ -104,10 +104,21 @@ export class UnparsedFile {
     try {
       JSON.parse(text);
     } catch (error) {
-      const found = V8_PLACE.exec(error instanceof Error ? error.message : "")?.groups;
-      if (found?.line !== undefined && found.column !== undefined) {
+      if (error instanceof SyntaxError) {
+        const found = V8_PLACE.exec(error.message)?.groups;
+        if (found?.line === undefined) {
+          return undefined;
+        }
+        if (found.column === undefined) {
+          return undefined;
+        }
         return `line ${found.line}, column ${found.column}`;
       }
+      // A text nested deeper than the stack can follow has no place to give.
+      if (error instanceof RangeError) {
+        return undefined;
+      }
+      throw error;
     }
     return undefined;
   }
@@ -125,21 +136,25 @@ export class UnparsedFile {
    *   no error or cannot follow the text.
    */
   private static placeParserFinds(text: string): string | undefined {
-    // biome-ignore lint/plugin: first error wins inside a visitor callback
-    let place: string | undefined;
+    const places: string[] = [];
     try {
       visit(
         text,
         {
           onError: (_error, _offset, _length, line, character) => {
-            place ??= `line ${line + 1}, column ${character + 1}`;
+            places.push(`line ${line + 1}, column ${character + 1}`);
           },
         },
         STRICT_JSON,
       );
-    } catch {
-      return undefined;
+    } catch (error) {
+      // The visitor recurses: a text nested deeper than the stack can follow
+      // has no place to give.
+      if (error instanceof RangeError) {
+        return undefined;
+      }
+      throw error;
     }
-    return place;
+    return places[0];
   }
 }

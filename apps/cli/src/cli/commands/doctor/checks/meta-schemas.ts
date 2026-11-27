@@ -1,5 +1,12 @@
 import { META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 
+import {
+  FsDeniedError,
+  FsFailedError,
+  FsIsDirectoryError,
+  FsNotDirectoryError,
+  FsNotFoundError,
+} from "@/lib/fs";
 import { MetaSchemas, type ProjectMetaSchema } from "@/lib/meta-schemas";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
@@ -141,10 +148,42 @@ async function drift(ctx: CheckContext): Promise<MetaSchemaDrift> {
         result[state].push(file);
       }
     } catch (error) {
-      result.unreadable.push({
-        path: file.path,
-        reason: error instanceof Error && "code" in error ? String(error.code) : String(error),
-      });
+      if (error instanceof FsDeniedError) {
+        result.unreadable.push({
+          path: file.path,
+          reason: "EACCES",
+        });
+        continue;
+      }
+      if (error instanceof FsIsDirectoryError) {
+        result.unreadable.push({
+          path: file.path,
+          reason: "EISDIR",
+        });
+        continue;
+      }
+      if (error instanceof FsNotDirectoryError) {
+        result.unreadable.push({
+          path: file.path,
+          reason: "ENOTDIR",
+        });
+        continue;
+      }
+      if (error instanceof FsNotFoundError) {
+        result.unreadable.push({
+          path: file.path,
+          reason: "ENOENT",
+        });
+        continue;
+      }
+      if (error instanceof FsFailedError) {
+        result.unreadable.push({
+          path: file.path,
+          reason: error.errno,
+        });
+        continue;
+      }
+      throw error;
     }
   }
   return result;

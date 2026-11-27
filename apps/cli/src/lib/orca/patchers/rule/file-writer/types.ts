@@ -66,7 +66,7 @@ export type FileOp =
        * writes the result — staying framework-agnostic. The transform owns ALL
        * framework knowledge (e.g. a magicast merge into `vite.config.ts`, or a
        * structured edit of `angular.json`) and lives next to its patcher. It must
-       * be pure (no I/O) and may throw a `ZitadelError` when it cannot proceed.
+       * be pure (no I/O) and may throw an `OrcaError` when it cannot proceed.
        * Idempotent: a transform whose output equals the input is skipped.
        *
        * `path` may be a single path or a priority list of candidate paths (e.g.

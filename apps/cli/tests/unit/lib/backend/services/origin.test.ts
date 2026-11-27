@@ -4,7 +4,7 @@ import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
 
-import { ConflictError, ForbiddenError } from "@/lib/backend/errors";
+import { BackendConflictError, BackendForbiddenError } from "@/lib/backend";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { Origin, Origins, OriginService } from "@/lib/backend/services/origin";
@@ -280,7 +280,7 @@ describe("OriginService.promote", () => {
 
     const error = await rejectionOf(() => service().promote(ISSUER));
 
-    expect(error).toBeInstanceOf(ConflictError);
+    expect(error).toBeInstanceOf(BackendConflictError);
     expect(error).toMatchObject({ status: 409 });
     expect(added.map(({ body }) => body)).toEqual([
       { pattern: ISSUER, kind: "primary" },
@@ -296,7 +296,7 @@ describe("OriginService.promote", () => {
 
     const error = await rejectionOf(() => service().promote(ISSUER));
 
-    expect(error).toBeInstanceOf(ConflictError);
+    expect(error).toBeInstanceOf(BackendConflictError);
     expect(error).toMatchObject({ status: 409 });
   });
 });
@@ -340,7 +340,7 @@ describe("OriginService.remove", () => {
 
     const error = await rejectionOf(() => service().remove(ISSUER));
 
-    expect(error).toBeInstanceOf(ForbiddenError);
+    expect(error).toBeInstanceOf(BackendForbiddenError);
     expect(error).toMatchObject({ status: 403 });
   });
 });

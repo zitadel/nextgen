@@ -6,7 +6,7 @@ import { describe, expect } from "vitest";
 import { it } from "@tests/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
-import { ForbiddenError } from "@/lib/backend/errors";
+import { BackendForbiddenError } from "@/lib/backend";
 import { Deployment, DeploymentService } from "@/lib/backend/services/deployment";
 import { allowDestructive, createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
@@ -649,7 +649,7 @@ describe("DeploymentService.deployToPrimary", () => {
 
     expect(
       await rejectionOf(() => service().deployToPrimary({ releaseId: "rel_1" })),
-    ).toBeInstanceOf(ForbiddenError);
+    ).toBeInstanceOf(BackendForbiddenError);
   });
 });
 

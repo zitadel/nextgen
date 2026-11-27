@@ -1,8 +1,43 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
-import { toZitadelError } from "@/lib/errors";
+import { ZitadelLibError } from "@/lib/errors";
+import { OrcaCommandFailedError } from "@/lib/orca";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
+
+import { type Refusal, refusalError } from "@/cli/core/refusal";
+
+/**
+ * How a scaffold whose command exited non-zero, and wrote something, is refused.
+ */
+const COMMAND_FAILED_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Command output:\n{output}",
+  details: {
+    command: "{command}",
+    args: "{args}",
+    cwd: "{cwd}",
+    stdout: "{stdout}",
+    stderr: "{stderr}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * How a scaffold whose command exited non-zero, and wrote nothing, is refused.
+ */
+const COMMAND_FAILED_SILENTLY_REFUSAL = {
+  code: "E_VALIDATION",
+  message: "{message}",
+  hint: "Run the command directly for more detail.",
+  details: {
+    command: "{command}",
+    args: "{args}",
+    cwd: "{cwd}",
+    stdout: "{stdout}",
+    stderr: "{stderr}",
+  },
+} as const satisfies Refusal;
 
 /**
  * What the step reads from what is known.
@@ -66,29 +101,38 @@ export class ScaffoldApp extends WizardStep<"scaffold", Fact<"newApp" | "framewo
     const current = scaffolding
       ? this.deps.ui.begin(`Scaffolding a new ${app.framework} project`)
       : undefined;
-    const newApp = scaffolding
-      ? await orca
-          .scaffoldUndoably(this.deps.cwd, app.framework, this.deps.force)
-          .catch((error) => {
-            current?.fail();
-            throw error;
-          })
-      : undefined;
-    if (newApp !== undefined) {
-      current?.done(`Scaffolded ${newApp.facts.id} skeleton`);
+    try {
+      const newApp = scaffolding
+        ? await orca.scaffoldUndoably(this.deps.cwd, app.framework, this.deps.force)
+        : undefined;
+      if (newApp !== undefined) {
+        current?.done(`Scaffolded ${newApp.facts.id} skeleton`);
+      }
+      const created = detected ?? newApp?.facts;
+      return {
+        newApp,
+        framework:
+          created === undefined
+            ? undefined
+            : {
+                ...created,
+                devPort: answers.devPort,
+                url: issuer,
+              },
+      };
+    } catch (error) {
+      current?.fail();
+      if (error instanceof OrcaCommandFailedError) {
+        throw refusalError(
+          error.output === "" ? COMMAND_FAILED_SILENTLY_REFUSAL : COMMAND_FAILED_REFUSAL,
+          {
+            ...error,
+            message: error.message,
+          },
+        );
+      }
+      throw error;
     }
-    const created = detected ?? newApp?.facts;
-    return {
-      newApp,
-      framework:
-        created === undefined
-          ? undefined
-          : {
-              ...created,
-              devPort: answers.devPort,
-              url: issuer,
-            },
-    };
   }
 
   /**
@@ -117,9 +161,13 @@ export class ScaffoldApp extends WizardStep<"scaffold", Fact<"newApp" | "framewo
           )} holds what it did before setup`,
         );
       } catch (error) {
-        warnings.report(
-          `Could not remove the new app setup scaffolded in ${this.deps.cwd}: ${toZitadelError(error).message}`,
-        );
+        if (error instanceof ZitadelLibError) {
+          warnings.report(
+            `Could not remove the new app setup scaffolded in ${this.deps.cwd}: ${error.message}`,
+          );
+          return;
+        }
+        throw error;
       }
     }
   }

@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
+import { LocalServerBusyError } from "@/lib/server";
 import {
   clearStale,
   tryLock,
@@ -282,16 +283,19 @@ describe("withStartLock", () => {
     const lock = lockPath(dir);
     const release = await tryLock(lock);
 
-    await expect(
+    const rejection = expect(
       withStartLock(lock, async () => undefined, {
         timeoutMs: 100,
         pollMs: 10,
         clock: new ManualClock(),
       }),
-    ).rejects.toMatchObject({
+    ).rejects;
+    await rejection.toBeInstanceOf(LocalServerBusyError);
+    await rejection.toMatchObject({
       code: "E_CONFLICT",
-      kind: "start-in-progress",
-      details: expect.objectContaining({ lock_file: lock }),
+      retryable: true,
+      message: "Another `zitadel start` is still running in this directory",
+      lockFile: lock,
     });
     await release?.();
   });

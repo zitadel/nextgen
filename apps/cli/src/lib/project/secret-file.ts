@@ -1,5 +1,15 @@
-import { chmod, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+
+import {
+  chmod,
+  FsDeniedError,
+  FsError,
+  FsFailedError,
+  FsNotFoundError,
+  rm,
+  stat,
+  writeFile,
+} from "@/lib/fs";
 
 import { warnings } from "@/lib/ui/warnings";
 
@@ -30,7 +40,7 @@ export class SecretFile {
    * re-prompting, so a throw would be one confusing failure followed by silent
    * success with the same file. It warns once that the file could not be locked
    * down, and proceeds. This is the only place the CLI calls `chmod` after a
-   * write: a bare `chmod(...).catch(() => undefined)` hides the failure from
+   * write: a bare `chmod` whose failure is swallowed hides the failure from
    * the user and the JSON envelope, and a lint rule (`no-swallowed-chmod`)
    * rejects it.
    *
@@ -41,9 +51,13 @@ export class SecretFile {
     try {
       await chmod(path, mode);
     } catch (error) {
-      warnings.report(
-        `Wrote ${path} but could not set it to ${mode.toString(8).padStart(4, "0")} (${(error as NodeJS.ErrnoException).code ?? "unknown"}); its permissions may be broader than intended.`,
-      );
+      if (error instanceof FsError) {
+        warnings.report(
+          `Wrote ${path} but could not set it to ${mode.toString(8).padStart(4, "0")} (${error instanceof FsNotFoundError ? "ENOENT" : error instanceof FsDeniedError ? "EACCES" : error instanceof FsFailedError ? error.errno : "unknown"}); its permissions may be broader than intended.`,
+        );
+        return;
+      }
+      throw error;
     }
   }
 
@@ -83,20 +97,27 @@ export class SecretFile {
     const probe = join(dir, `.modes-probe-${process.pid}`);
     try {
       await writeFile(probe, "", { mode: SECRET_MODE });
-      const accepted = await chmod(probe, 0o640).then(
-        () => {
-          return true;
-        },
-        () => {
+      try {
+        await chmod(probe, 0o640);
+      } catch (error) {
+        if (error instanceof FsError) {
           return false;
-        },
-      );
-      return accepted && ((await stat(probe)).mode & 0o777) === 0o640;
-    } catch {
-      return true;
+        }
+        throw error;
+      }
+      return ((await stat(probe)).mode & 0o777) === 0o640;
+    } catch (error) {
+      if (error instanceof FsError) {
+        return true;
+      }
+      throw error;
     } finally {
-      await rm(probe, { force: true }).catch(() => {
-        return undefined;
+      // A probe that cannot be removed stays: its failure must not replace the answer.
+      await rm(probe, { force: true }).catch((error: unknown) => {
+        if (error instanceof FsError) {
+          return undefined;
+        }
+        throw error;
       });
     }
   }

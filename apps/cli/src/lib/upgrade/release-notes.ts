@@ -70,8 +70,19 @@ export class ReleaseNotes {
         .sort((a, b) => {
           return semver.compare(a.version, b.version);
         });
-    } catch {
-      return [];
+    } catch (error) {
+      // No network, or an answer that is not the list of releases.
+      if (error instanceof TypeError) {
+        return [];
+      }
+      // The time budget ran out.
+      if (error instanceof DOMException) {
+        return [];
+      }
+      if (error instanceof SyntaxError) {
+        return [];
+      }
+      throw error;
     }
   }
 

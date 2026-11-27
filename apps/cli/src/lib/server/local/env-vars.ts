@@ -15,12 +15,11 @@
  * stays on disk. Values travel through the child's environment, never argv,
  * so they do not show up in `ps -ef`, and only names are recorded or printed.
  */
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
 
-import { errorMessage } from "@/lib/errors";
-import { LocalServerError } from "./local-server-error";
+import { FsNotFoundError, readFile } from "@/lib/fs";
+import { LocalServerEnvUnreadableError } from "@/lib/server/errors";
 import { isObject } from "@/lib/json";
 
 /** Highest priority first. */
@@ -94,26 +93,22 @@ export const loadEnvFiles = async (
 };
 
 const readEnvFile = async (path: string): Promise<Readonly<Record<string, string>>> => {
-  const contents = await readFile(path, "utf8").catch((error: unknown) => {
-    if (isObject(error) && error.code === "ENOENT") {
-      return undefined;
+  try {
+    const contents = await readFile(path, "utf8");
+    // parseEnv types values as possibly-undefined (it never emits them); drop them for the string map.
+    return Object.fromEntries(
+      Object.entries(parseEnv(contents.replace(/^\uFEFF/, ""))).filter(
+        (entry): entry is [string, string] => {
+          return entry[1] !== undefined;
+        },
+      ),
+    );
+  } catch (error) {
+    if (error instanceof FsNotFoundError) {
+      return {};
     }
-    throw new LocalServerError("env-unreadable", "E_VALIDATION", `Cannot read ${path}`, {
-      path,
-      message: errorMessage(error),
-    });
-  });
-  if (contents === undefined) {
-    return {};
+    throw new LocalServerEnvUnreadableError(`Cannot read ${path}`, path, error);
   }
-  // parseEnv types values as possibly-undefined (it never emits them); drop them for the string map.
-  return Object.fromEntries(
-    Object.entries(parseEnv(contents.replace(/^\uFEFF/, ""))).filter(
-      (entry): entry is [string, string] => {
-        return entry[1] !== undefined;
-      },
-    ),
-  );
 };
 
 /**

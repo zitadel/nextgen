@@ -3,6 +3,7 @@ import { basename, dirname, join } from "node:path";
 
 import { describe, expect } from "vitest";
 
+import { FsNotFoundError } from "@/lib/fs";
 import { ScaffoldWorkspace } from "@/lib/orca/scaffold-workspace";
 import { it } from "@tests/fixtures";
 
@@ -92,7 +93,7 @@ describe("ScaffoldWorkspace", () => {
     const workspace = await ScaffoldWorkspace.open(cwd, ["a.txt"]);
     await rm(workspace?.work ?? "", { recursive: true });
 
-    await expect(workspace?.moveInto(cwd)).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(workspace?.moveInto(cwd)).rejects.toBeInstanceOf(FsNotFoundError);
   });
 
   it.skipIf(process.platform === "win32")("keeps the backup to its owner", async ({ dir }) => {

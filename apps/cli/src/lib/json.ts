@@ -78,15 +78,35 @@ function detectIndent(source: string): string | number {
 }
 
 /**
+ * JSON whose root is not an object. A {@link SyntaxError}, so a caller that
+ * refuses text that is not JSON refuses this the same way; a caller that words
+ * the two apart catches this one first.
+ */
+export class JsonNotAnObjectError extends SyntaxError {
+  /**
+   * Make the failure.
+   *
+   * @param message - What went wrong, naming the file.
+   */
+  constructor(message: string) {
+    super(message);
+    this.name = "JsonNotAnObjectError";
+  }
+}
+
+/**
  * Parse `contents` as JSON and assert the root is a plain object (not an
  * array or scalar). The CLI's config and secret files are always objects, so
  * this guards callers from the `JSON.parse` return type of `any` and produces
  * a `path`-qualified error message pointing at the offending file.
+ *
+ * @throws {SyntaxError} When the text is not JSON, or its root is not an object,
+ *   so a caller handles both the same way.
  */
 export function parseJsonObject(contents: string, path: string): Record<string, unknown> {
   const value = JSON.parse(contents) as unknown;
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error(`${path} must contain a JSON object`);
+    throw new JsonNotAnObjectError(`${path} must contain a JSON object`);
   }
   return value as Record<string, unknown>;
 }
@@ -113,8 +133,11 @@ export function parseJsonObject(contents: string, path: string): Record<string, 
 export function parseJsonOrUndefined(text: string): unknown {
   try {
     return JSON.parse(text) as unknown;
-  } catch {
-    return undefined;
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      return undefined;
+    }
+    throw error;
   }
 }
 

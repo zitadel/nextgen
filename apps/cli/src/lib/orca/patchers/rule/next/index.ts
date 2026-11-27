@@ -1,11 +1,15 @@
 import { basename, join } from "node:path";
 
-import { ZitadelError } from "@/lib/errors";
+import {
+  OrcaBoundaryDuplicateError,
+  OrcaBoundaryRenamedError,
+  OrcaBoundaryVersionUnknownError,
+} from "@/lib/orca/errors";
 import { isFile } from "@/lib/fs";
 import { ManagedFile } from "@/lib/orca/managed-file";
 import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
 import type { PatchContext, PatchView } from "@/lib/orca/patchers/types";
-import { AbstractRulePatcher, PREFLIGHT_FORCE_NOTE } from "@/lib/orca/patchers/rule/base";
+import { AbstractRulePatcher } from "@/lib/orca/patchers/rule/base";
 import { devScriptPortOp } from "@/lib/orca/patchers/rule/dev-script-port";
 import { PUBLIC_PROJECT_ID_VARIABLE } from "@/lib/orca/patchers/rule/public-project-id";
 import { getRenderer } from "./renderers/registry";
@@ -80,7 +84,25 @@ export class NextPatcher extends AbstractRulePatcher {
         for (const extension of BOUNDARY_EXTENSIONS) {
           const path = join(dir, `${name}.${extension}`);
           if (path !== target && (await isFile(join(cwd, path)))) {
-            throw boundaryConflict(path, target, unknownVersion);
+            if (basename(path).split(".")[0] === basename(target, ".ts")) {
+              throw new OrcaBoundaryDuplicateError(
+                `Next.js runs one ${basename(target, ".ts")} file, and this app already has ${path}`,
+                path,
+                target,
+              );
+            }
+            if (unknownVersion) {
+              throw new OrcaBoundaryVersionUnknownError(
+                `Next.js 16 will not start with both ${path} and the ${target} setup writes`,
+                path,
+                target,
+              );
+            }
+            throw new OrcaBoundaryRenamedError(
+              `Next.js 16 will not start with both ${path} and the ${target} setup writes`,
+              path,
+              target,
+            );
           }
         }
       }
@@ -335,37 +357,3 @@ function requestBoundaryFile(framework: PatchContext["framework"]): {
 
 /** The extensions Next.js reads a request boundary under: its default `pageExtensions`. */
 const BOUNDARY_EXTENSIONS = ["tsx", "ts", "jsx", "js"] as const;
-
-/** Why the app's own request boundary at `existing` stops setup, which writes `target`. */
-function boundaryConflict(existing: string, target: string, unknownVersion: boolean): ZitadelError {
-  const existingName = basename(existing).split(".")[0];
-  const targetName = basename(target, ".ts");
-  const details = { path: existing, writes: target };
-  if (existingName === targetName) {
-    return new ZitadelError(
-      "E_CONFLICT",
-      `Next.js runs one ${targetName} file, and this app already has ${existing}`,
-      {
-        hint:
-          `Setup writes ${target}, and one of the two would never run. Move ${existing} ` +
-          `aside and rerun setup, then merge it into ${target}. ${PREFLIGHT_FORCE_NOTE}`,
-        details,
-      },
-    );
-  }
-  // With no version, the existing proxy.ts may be Next 16's boundary or, on
-  // Next 15, just a module of the app's: only the version decides, so pinning
-  // it is the fix, not moving the file.
-  const remedy = unknownVersion
-    ? 'Setup reads no Next.js version from package.json (a tag such as "latest" names ' +
-      `none), so it writes the ${target} of Next 15. Pin next to the version range the app ` +
-      'runs, such as "^16.0.0", and rerun setup: on Next 16 it then writes proxy.ts, and on ' +
-      `Next 15 it leaves your ${existing} alone.`
-    : "Next.js 16 renamed middleware.ts to proxy.ts. Move " +
-      `${existing} aside and rerun setup, then merge it into ${target}.`;
-  return new ZitadelError(
-    "E_CONFLICT",
-    `Next.js 16 will not start with both ${existing} and the ${target} setup writes`,
-    { hint: `${remedy} ${PREFLIGHT_FORCE_NOTE}`, details },
-  );
-}

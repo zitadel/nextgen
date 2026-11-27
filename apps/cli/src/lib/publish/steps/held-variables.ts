@@ -1,4 +1,4 @@
-import { ForbiddenError, type VariableService } from "@/lib/backend";
+import { BackendForbiddenError, type VariableService } from "@/lib/backend";
 import type { PipelineMode, StepContext } from "@/lib/publish/pipeline";
 
 /**
@@ -28,7 +28,7 @@ const READS = new WeakMap<StepContext, Promise<ReadonlyMap<string, boolean> | un
  * @param ctx - The step's context.
  * @returns Each variable's name and whether it is a secret, or `undefined`
  *   when a preview's token may not read them.
- * @throws {@link ForbiddenError} When a deploy's token may not read them.
+ * @throws {@link BackendForbiddenError} When a deploy's token may not read them.
  */
 export async function heldVariables(
   ctx: StepContext,
@@ -36,7 +36,7 @@ export async function heldVariables(
   const read =
     READS.get(ctx) ??
     ctx.variables.heldByName(VARIABLE_KIND[ctx.mode]).catch((error: unknown) => {
-      if (ctx.mode === "preview" && error instanceof ForbiddenError) {
+      if (ctx.mode === "preview" && error instanceof BackendForbiddenError) {
         return undefined;
       }
       throw error;

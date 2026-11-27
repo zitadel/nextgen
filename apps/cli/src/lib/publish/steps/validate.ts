@@ -1,5 +1,8 @@
-import { ZitadelError } from "@/lib/errors";
 import { mapBounded } from "@/lib/map-bounded";
+import {
+  PublishConfigInvalidError,
+  PublishConnectionSecretLiteralError,
+} from "@/lib/publish/errors";
 import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
 import { CONFIG_DIRECTORIES, type Issue, type RuleId, UserSchema } from "@/lib/zitadel";
 
@@ -65,35 +68,17 @@ type ServerFinding = {
 };
 
 /**
- * A finding as `--json` lists it under `details.issues`.
+ * What a user schema's check says of a key it does not allow.
  */
-type ReportedFinding = {
-  readonly rule: string;
-  readonly path: string;
-  readonly steps?: Issue["steps"];
-  readonly message: string;
-};
+const REFUSED_KEY = " is not an allowed key";
 
 /**
- * One finding as `--json` lists it.
- *
- * @param finding - A rule's issue or a server finding.
- * @returns Its rule, file, steps when the rule named any, and message.
- */
-function reported(finding: Issue | ServerFinding): ReportedFinding {
-  const base = { rule: finding.rule, path: finding.file };
-  if ("steps" in finding && finding.steps !== undefined) {
-    return { ...base, steps: finding.steps, message: finding.message };
-  }
-  return { ...base, message: finding.message };
-}
-
-/**
- * Stop the deploy on every error, named in one `E_VALIDATION`, before anything
- * is sent.
+ * Stop the deploy on every error, named in one refusal, before anything is
+ * sent.
  *
  * @param findings - Every finding.
- * @throws {@link ZitadelError} `E_VALIDATION` when any finding is an error.
+ * @throws {@link PublishConnectionSecretLiteralError} when a connection holds its secret itself.
+ * @throws {@link PublishConfigInvalidError} when any other finding is an error.
  */
 function refuseErrors(findings: readonly (Issue | ServerFinding)[]): void {
   const errors = findings.filter((finding) => {
@@ -102,38 +87,34 @@ function refuseErrors(findings: readonly (Issue | ServerFinding)[]): void {
   if (errors.length === 0) {
     return;
   }
-  const literalSecret = errors.some((finding) => {
-    return finding.rule === "connection/literal-secret";
-  });
   const lines = errors.map((finding) => {
     return `  - ${finding.file}: ${finding.message}`;
   });
-  // Any refused key may be one a newer server declares and this CLI's
-  // meta-schema does not know yet, so the hint says what fixes that too.
-  const refusedKey = errors.some((finding) => {
-    return UserSchema.refusesKey(finding);
+  const message = `Configuration validation failed (${errors.length} ${new Intl.PluralRules("en").select(errors.length) === "one" ? "issue" : "issues"}):\n${lines.join("\n")}`;
+  const literalSecret = errors.some((finding) => {
+    return finding.rule === "connection/literal-secret";
   });
-  const fix = literalSecret
-    ? 'Publish a secret with the command below and reference it as "${{ NAME }}".'
-    : "Fix the files named above and rerun; no changes were made.";
-  const hint = refusedKey
-    ? `${fix} A key a newer Zitadel server added needs a CLI as new as the server.`
-    : fix;
-  throw new ZitadelError(
-    "E_VALIDATION",
-    `Configuration validation failed (${errors.length} ${new Intl.PluralRules("en").select(errors.length) === "one" ? "issue" : "issues"}):\n${lines.join("\n")}`,
-    {
-      hint,
-      ...(literalSecret
+  const issues = errors.map((finding) => {
+    return {
+      rule: finding.rule,
+      path: finding.file,
+      ...("steps" in finding && finding.steps !== undefined
         ? {
-            nextCommands: [{ id: "variable:set", args: { name: "NAME" }, flags: { secret: true } }],
+            steps: finding.steps,
           }
         : {}),
-      details: {
-        issues: errors.map(reported),
-      },
-    },
-  );
+      message: finding.message,
+    };
+  });
+  // Any refused key may be one a newer server declares and this CLI's
+  // meta-schema does not know yet, so the refusal says what fixes that too.
+  const refusedKey = errors.some((finding) => {
+    return finding.rule === UserSchema.CONTRACT.rule && finding.message.includes(REFUSED_KEY);
+  });
+  if (literalSecret) {
+    throw new PublishConnectionSecretLiteralError(message, issues, refusedKey);
+  }
+  throw new PublishConfigInvalidError(message, issues, refusedKey);
 }
 
 /**

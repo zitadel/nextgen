@@ -1,4 +1,4 @@
-import { mkdir, stat, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, stat, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { describe, expect } from "vitest";
@@ -13,10 +13,20 @@ import {
   writeRuntimeMetadata,
 } from "@/lib/server/local/runtime";
 import {
+  LocalServerDockerMissingError,
+  LocalServerNotStartedError,
+  LocalServerPermitMismatchError,
+  LocalServerProcessesUnlistableError,
+  LocalServerNotRespondingElsewhereError,
+  LocalServerNotRespondingError,
+  LocalServerNotRunningError,
+  LocalServerPortBusyError,
+  LocalServerStopError,
+  LocalServerUrlInvalidError,
+} from "@/lib/server";
+import {
   DestroyPermit,
-  DockerUnavailableError,
   LocalRuntime,
-  PortInUseError,
   ZitadelRuntime,
   type DockerEngine,
   type LocalServers,
@@ -280,7 +290,7 @@ describe("LocalRuntime", () => {
       await mkdir(join(cwd, LOCAL_DATA_DIR), { recursive: true });
       await writeFile(join(cwd, LOCAL_RUNTIME_FILE), "{not json");
 
-      await expect(
+      const rejection = expect(
         at(cwd, {
           servers: {
             current: async () => ({
@@ -297,7 +307,11 @@ describe("LocalRuntime", () => {
           },
           stopPid: async (pid) => ({ pid, status: "failed", target: "process", signal: "SIGKILL" }),
         }).reset(DestroyPermit.forFolder(cwd)),
-      ).rejects.toMatchObject({ kind: "server-did-not-stop" });
+      ).rejects;
+      await rejection.toBeInstanceOf(LocalServerStopError);
+      await rejection.toMatchObject({
+        code: "E_VALIDATION",
+      });
 
       await expect(stat(join(cwd, LOCAL_DATA_DIR))).resolves.toBeDefined();
       await expect(stat(join(cwd, LOCAL_RUNTIME_FILE))).resolves.toBeDefined();
@@ -309,14 +323,33 @@ describe("LocalRuntime", () => {
       await mkdir(join(cwd, LOCAL_DATA_DIR), { recursive: true });
       await writeFile(join(cwd, LOCAL_RUNTIME_FILE), "{not json");
 
-      await expect(
+      const rejection = expect(
         at(cwd, {
           servers: { current: async () => ({ supported: false, processes: [], error: "no ps" }) },
         }).reset(DestroyPermit.forFolder(cwd)),
-      ).rejects.toMatchObject({ kind: "processes-unlistable" });
+      ).rejects;
+      await rejection.toBeInstanceOf(LocalServerProcessesUnlistableError);
+      await rejection.toMatchObject({
+        code: "E_VALIDATION",
+      });
 
       await expect(stat(join(cwd, LOCAL_DATA_DIR))).resolves.toBeDefined();
     });
+
+    it.skipIf(process.getuid?.() === 0 || process.platform === "win32")(
+      "resets a folder whose record it may not read on a machine whose processes cannot be listed",
+      async ({ dir: cwd }) => {
+        await mkdir(join(cwd, LOCAL_DATA_DIR), { recursive: true });
+        await writeFile(join(cwd, LOCAL_RUNTIME_FILE), "{}");
+        await chmod(join(cwd, LOCAL_RUNTIME_FILE), 0o000);
+
+        await at(cwd, {
+          servers: { current: async () => ({ supported: false, processes: [], error: "no ps" }) },
+        }).reset(DestroyPermit.forFolder(cwd));
+
+        await expect(stat(join(cwd, LOCAL_DATA_DIR))).rejects.toMatchObject({ code: "ENOENT" });
+      },
+    );
 
     it("resets a folder that never started a server on a machine whose processes cannot be listed", async ({
       dir: cwd,
@@ -366,9 +399,9 @@ describe("LocalRuntime", () => {
     it("refuses a permit for another folder, and deletes nothing", async ({ dir: cwd, other }) => {
       await directoryWithAGoneServer(cwd);
 
-      await expect(at(cwd).reset(DestroyPermit.forFolder(other))).rejects.toThrow(
-        "The permit is for",
-      );
+      const rejection = expect(at(cwd).reset(DestroyPermit.forFolder(other))).rejects;
+      await rejection.toBeInstanceOf(LocalServerPermitMismatchError);
+      await rejection.toThrow("The permit is for");
       await expect(stat(join(cwd, LOCAL_DATA_DIR))).resolves.toBeDefined();
     });
   });
@@ -384,9 +417,15 @@ describe("LocalRuntime", () => {
 
   describe("logs", () => {
     it("refuses a directory that never started a server", async ({ dir }) => {
-      await expect(at(dir).logs({ tail: 10 })).rejects.toMatchObject({
+      const rejection = expect(
+        at(dir).logs({
+          tail: 10,
+        }),
+      ).rejects;
+      await rejection.toBeInstanceOf(LocalServerNotStartedError);
+      await rejection.toMatchObject({
         code: "E_VALIDATION",
-        kind: "not-started",
+        message: "Local Zitadel runtime has not been started",
       });
     });
 
@@ -517,7 +556,9 @@ describe("LocalRuntime", () => {
       await directoryWithAGoneServer(cwd);
       const fetcher = answeringAt(url);
 
-      await expect(LocalRuntime.resolveUrl(cwd, fetcher)).rejects.toMatchObject({
+      const rejection = expect(LocalRuntime.resolveUrl(cwd, fetcher)).rejects;
+      await rejection.toBeInstanceOf(LocalServerNotRespondingError);
+      await rejection.toMatchObject({
         code: "E_LOCAL_SERVER_NOT_RUNNING",
       });
     });
@@ -530,7 +571,9 @@ describe("LocalRuntime", () => {
       await directoryRecording(cwd, child.pid, "/opt/zitadel/nextgen --migrate");
       const fetcher = answeringAt(url);
 
-      await expect(LocalRuntime.resolveUrl(cwd, fetcher)).rejects.toMatchObject({
+      const rejection = expect(LocalRuntime.resolveUrl(cwd, fetcher)).rejects;
+      await rejection.toBeInstanceOf(LocalServerNotRespondingError);
+      await rejection.toMatchObject({
         code: "E_LOCAL_SERVER_NOT_RUNNING",
       });
     });
@@ -543,9 +586,13 @@ describe("LocalRuntime", () => {
       const app = join(cwd, "my-app");
       await mkdir(app);
 
-      await expect(LocalRuntime.resolveUrl(app, answeringAt())).rejects.toMatchObject({
-        kind: "not-responding",
-        details: { server_url: url, directory: cwd },
+      const rejection = expect(LocalRuntime.resolveUrl(app, answeringAt())).rejects;
+      await rejection.toBeInstanceOf(LocalServerNotRespondingElsewhereError);
+      await rejection.toMatchObject({
+        code: "E_LOCAL_SERVER_NOT_RUNNING",
+        message: "Local Zitadel server is not running",
+        directory: cwd,
+        serverUrl: url,
       });
     });
 
@@ -553,7 +600,9 @@ describe("LocalRuntime", () => {
       await directoryWithARunningServer(cwd, daemon);
       const fetcher = answeringAt();
 
-      await expect(LocalRuntime.resolveUrl(cwd, fetcher)).rejects.toMatchObject({
+      const rejection = expect(LocalRuntime.resolveUrl(cwd, fetcher)).rejects;
+      await rejection.toBeInstanceOf(LocalServerNotRespondingError);
+      await rejection.toMatchObject({
         code: "E_LOCAL_SERVER_NOT_RUNNING",
       });
     });
@@ -563,9 +612,10 @@ describe("LocalRuntime", () => {
     }) => {
       const fetcher = answeringAt("http://localhost:8080");
 
-      await expect(LocalRuntime.resolveUrl(dir, fetcher)).rejects.toMatchObject({
+      const rejection = expect(LocalRuntime.resolveUrl(dir, fetcher)).rejects;
+      await rejection.toBeInstanceOf(LocalServerNotRunningError);
+      await rejection.toMatchObject({
         code: "E_LOCAL_SERVER_NOT_RUNNING",
-        kind: "not-running",
       });
     });
 
@@ -632,7 +682,7 @@ describe("LocalRuntime", () => {
 
       await expect(
         at(cwd, { docker }).start({ backend: "binary", env: none }, { port: await occupiedPort() }),
-      ).rejects.toBeInstanceOf(PortInUseError);
+      ).rejects.toBeInstanceOf(LocalServerPortBusyError);
 
       expect(removed).toEqual([]);
     });
@@ -708,8 +758,11 @@ describe("LocalRuntime launch", () => {
   it("refuses a Docker start when Docker does not answer", async ({ dir }) => {
     const launching = at(dir, { docker: refusingDocker }).launch(request({}));
 
-    await expect(launching).rejects.toBeInstanceOf(DockerUnavailableError);
-    await expect(launching).rejects.toMatchObject({ detail: "no daemon" });
+    await expect(launching).rejects.toBeInstanceOf(LocalServerDockerMissingError);
+    await expect(launching).rejects.toMatchObject({
+      message: "Docker is not reachable",
+      detail: "no daemon",
+    });
   });
 
   it("refuses a Docker start when the daemon answers with a failure", async ({ dir }) => {
@@ -717,8 +770,14 @@ describe("LocalRuntime launch", () => {
       available: async () => ({ status: 1, stdout: "", stderr: "daemon is down" }),
     });
 
-    await expect(at(dir, { docker }).launch(request({}))).rejects.toMatchObject({
-      name: "DockerUnavailableError",
+    const rejection = expect(
+      at(dir, {
+        docker,
+      }).launch(request({})),
+    ).rejects;
+    await rejection.toBeInstanceOf(LocalServerDockerMissingError);
+    await rejection.toMatchObject({
+      message: "Docker is not reachable",
       detail: "daemon is down",
     });
   });
@@ -827,15 +886,27 @@ describe("ZitadelRuntime.resolve", () => {
   });
 
   it("rejects a non-http(s) URL with E_VALIDATION", async ({ dir }) => {
-    await expect(
-      ZitadelRuntime.resolve({ cwd: dir, serverFlag: "ftp://flag.example.com" }),
-    ).rejects.toMatchObject({ code: "E_VALIDATION" });
+    const rejection = expect(
+      ZitadelRuntime.resolve({
+        cwd: dir,
+        serverFlag: "ftp://flag.example.com",
+      }),
+    ).rejects;
+    await rejection.toBeInstanceOf(LocalServerUrlInvalidError);
+    await rejection.toMatchObject({
+      code: "E_VALIDATION",
+    });
   });
 
   it("rejects an unparseable URL with E_VALIDATION", async ({ dir }) => {
-    await expect(
-      ZitadelRuntime.resolve({ cwd: dir, serverFlag: "not a url" }),
-    ).rejects.toMatchObject({
+    const rejection = expect(
+      ZitadelRuntime.resolve({
+        cwd: dir,
+        serverFlag: "not a url",
+      }),
+    ).rejects;
+    await rejection.toBeInstanceOf(LocalServerUrlInvalidError);
+    await rejection.toMatchObject({
       code: "E_VALIDATION",
     });
   });
@@ -854,7 +925,14 @@ describe("ZitadelRuntime.resolve", () => {
   }) => {
     await writeLocalRuntime(dir, "http://localhost:9");
 
-    await expect(ZitadelRuntime.resolve({ cwd: dir, serverFlag: "local" })).rejects.toMatchObject({
+    const rejection = expect(
+      ZitadelRuntime.resolve({
+        cwd: dir,
+        serverFlag: "local",
+      }),
+    ).rejects;
+    await rejection.toBeInstanceOf(LocalServerNotRespondingError);
+    await rejection.toMatchObject({
       code: "E_LOCAL_SERVER_NOT_RUNNING",
     });
   });
@@ -906,6 +984,14 @@ describe("ZitadelRuntime.parse", () => {
       ok: false,
       problem: "The server URL cannot be empty",
     });
+  });
+});
+
+describe("ZitadelRuntime.origin", () => {
+  it("throws a LocalServerUrlInvalidError for an address that is not http(s)", () => {
+    expect(() => {
+      return ZitadelRuntime.origin("ftp://acme.example");
+    }).toThrow(LocalServerUrlInvalidError);
   });
 });
 

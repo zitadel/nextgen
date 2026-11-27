@@ -19,7 +19,10 @@ import { isDeepStrictEqual } from "node:util";
 import { getDefaultLoginFlow, SETUP_PRESETS } from "@zitadel/config/defaults";
 import type { ConnectionSlug } from "@zitadel/config/idp";
 
-import { RefusedEditError } from "@/lib/zitadel/errors";
+import {
+  ZitadelConfigActionClashError,
+  ZitadelConfigRenameRouteLossError,
+} from "@/lib/zitadel/errors";
 import { type StepName, stepName } from "@/lib/zitadel/names";
 import type { Edit, SkippedRegion } from "@/lib/zitadel/resources/document";
 import type { Flow } from "@/lib/zitadel/resources/flows/flow";
@@ -115,7 +118,7 @@ export class SsoGenerator {
    *   the conflict step may offer.
    * @returns The edit: the flow offering the provider, or the flow it was given
    *   when it already does, and what was left alone.
-   * @throws {@link RefusedEditError} When a step the edit writes has an action
+   * @throws {@link ZitadelConfigError} When a step the edit writes has an action
    *   named like an outcome it writes there, or renaming a legacy outcome would
    *   drop a route the author wrote.
    */
@@ -901,7 +904,7 @@ export class SsoGenerator {
    *
    * @param steps - The flow's steps.
    * @returns New steps with the old keys renamed.
-   * @throws {@link RefusedEditError} When a rename would drop a route the author
+   * @throws {@link ZitadelConfigError} When a rename would drop a route the author
    *   wrote: the new key is an action, or the old one declares purpose or action.
    */
   private static migrateLegacyOutcomes(steps: readonly JsonObject[]): readonly JsonObject[] {
@@ -953,7 +956,7 @@ export class SsoGenerator {
    * @param actionNames - The names of the step's actions.
    * @param old - The key the previous CLI wrote.
    * @param next - The key it is renamed to.
-   * @throws {@link RefusedEditError} When the new key is an action, or the old
+   * @throws {@link ZitadelConfigError} When the new key is an action, or the old
    *   one declares a purpose or an action and the new one is not there yet.
    */
   private static refuseLossyRename(
@@ -964,12 +967,10 @@ export class SsoGenerator {
     next: string,
   ): void {
     if (actionNames.has(next)) {
-      throw new RefusedEditError(
+      throw new ZitadelConfigActionClashError(
         `steps.${step}: transition "${old}" is renamed to "${next}", which is an action on this step`,
-        {
-          hint: `Rename the action "${next}" on step "${step}" (and its transition), then run auth-method sso enable again.`,
-          details: { step, action: next },
-        },
+        step,
+        next,
       );
     }
     if (next in transitions) {
@@ -982,13 +983,7 @@ export class SsoGenerator {
     const purpose = transition.purpose ?? null;
     const action = transition.action ?? null;
     if (purpose !== null || action !== null) {
-      throw new RefusedEditError(
-        `steps.${step}: transition "${old}" declares purpose or action, which "${next}" cannot`,
-        {
-          hint: `Remove purpose and action from the transition "${old}" on step "${step}", then run auth-method sso enable again.`,
-          details: { step, transition: old },
-        },
-      );
+      throw new ZitadelConfigRenameRouteLossError(step, old, next);
     }
   }
 
@@ -1002,7 +997,7 @@ export class SsoGenerator {
    * the union of every entry, never just the last one.
    *
    * @param flow - The flow.
-   * @throws {@link RefusedEditError} When such an action exists.
+   * @throws {@link ZitadelConfigError} When such an action exists.
    */
   private static refuseOutcomeActionCollision(flow: FlowValue): void {
     const providerSteps = SsoGenerator.providerSteps(flow);
@@ -1035,12 +1030,10 @@ export class SsoGenerator {
       for (const action of actions) {
         const actionName = action.name;
         if (keys.has(actionName)) {
-          throw new RefusedEditError(
-            `steps.${name}: action "${actionName}" uses a name auth-method sso enable writes as an outcome on this step`,
-            {
-              hint: `Rename the action "${actionName}" on step "${name}" (and its transition), then run auth-method sso enable again.`,
-              details: { step: name, action: actionName },
-            },
+          throw new ZitadelConfigActionClashError(
+            `steps.${name}: action "${String(actionName)}" uses a name auth-method sso enable writes as an outcome on this step`,
+            name,
+            String(actionName),
           );
         }
       }

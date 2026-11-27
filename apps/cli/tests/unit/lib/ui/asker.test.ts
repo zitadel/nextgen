@@ -448,9 +448,8 @@ describe("Asker", () => {
       ).rejects.toMatchObject({
         code: "E_CONFIRMATION_REQUIRED",
         message: "Cannot delete the thing without --force in non-interactive mode",
-        hint: "Ask a person first: Delete? Pass --force only once they agree.",
-        nextCommands: ["npx @zitadel/cli@0.1.0 reset --force"],
-        details: { question: "Delete?" },
+        question: "Delete?",
+        retry: "npx @zitadel/cli@0.1.0 reset --force",
       });
     });
   });
@@ -463,8 +462,7 @@ describe("Asker", () => {
       await expect(
         Asker.for(scripted).confirm({ name: "remove a", message: raw }),
       ).rejects.toMatchObject({
-        hint: `Ask a person first: ${raw} Pass --force only once they agree.`,
-        details: { question: raw },
+        question: raw,
       });
     });
 

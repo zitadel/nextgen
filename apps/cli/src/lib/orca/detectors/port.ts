@@ -1,5 +1,6 @@
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+
+import { FsError, readFile } from "@/lib/fs";
 
 import type { PackageJson } from "./package-json";
 
@@ -31,14 +32,17 @@ export async function detectDevPort(cwd: string, pkg: PackageJson): Promise<numb
 
 async function portFromEnvFile(cwd: string): Promise<number | undefined> {
   for (const candidate of [".env.local", ".env"]) {
-    try {
-      const contents = await readFile(join(cwd, candidate), "utf8");
-      const match = contents.match(/^\s*PORT\s*=\s*(\d+)/m);
-      const rawPort = match?.[1];
-      if (rawPort) {
-        return Number.parseInt(rawPort, 10);
+    const contents = await readFile(join(cwd, candidate), "utf8").catch((error: unknown) => {
+      if (error instanceof FsError) {
+        return "";
       }
-    } catch {}
+      throw error;
+    });
+    const match = contents.match(/^\s*PORT\s*=\s*(\d+)/m);
+    const rawPort = match?.[1];
+    if (rawPort) {
+      return Number.parseInt(rawPort, 10);
+    }
   }
   return undefined;
 }
@@ -125,13 +129,11 @@ export function issuerFromPort(port: number): string {
  * registered origin, not as the new truth.
  */
 export function portFromIssuer(issuer: string): number | undefined {
-  try {
-    // Validity gate only. `.port` cannot be read off this: WHATWG drops a
-    // port matching the scheme's default, so `http://localhost:80` — a port
-    // `--dev-port` accepts — would come back portless and silently disable
-    // the dev-script pinning, reintroducing the very mismatch it prevents.
-    new URL(issuer);
-  } catch {
+  // Validity gate only. `.port` cannot be read off this: WHATWG drops a
+  // port matching the scheme's default, so `http://localhost:80` — a port
+  // `--dev-port` accepts — would come back portless and silently disable
+  // the dev-script pinning, reintroducing the very mismatch it prevents.
+  if (!URL.canParse(issuer)) {
     return undefined;
   }
   // Re-parse under a scheme the URL standard treats as non-special. Those

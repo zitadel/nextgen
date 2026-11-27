@@ -1,4 +1,4 @@
-import { ConfigError } from "@/lib/zitadel/errors";
+import { ZitadelConfigReferenceMissingError } from "@/lib/zitadel/errors";
 import type { JsonObject, JsonValue } from "@/lib/zitadel/types";
 import type { MissingReference } from "@/lib/zitadel/storage/types";
 import { isJsonArray, isJsonObject } from "@/lib/zitadel/utils/json";
@@ -105,7 +105,7 @@ export function findFileReferences(document: JsonValue): readonly FoundReference
  * @param missing - `throw` to refuse a reference that cannot be read, `omit`
  *   to leave its value out (the key from an object, the element from a list).
  * @returns The document with its references inlined.
- * @throws {@link ConfigError} When a reference cannot be read, under `throw`.
+ * @throws {@link ZitadelConfigError} When a reference cannot be read, under `throw`.
  */
 export function inlineFileReferences(
   document: JsonObject,
@@ -117,7 +117,7 @@ export function inlineFileReferences(
    *
    * @param node - The value.
    * @returns The inlined value, or {@link omitted} for a reference left out.
-   * @throws {@link ConfigError} When a reference cannot be read, under `throw`.
+   * @throws {@link ZitadelConfigError} When a reference cannot be read, under `throw`.
    */
   const inline = (node: JsonValue | undefined): JsonValue | undefined | typeof omitted => {
     const ref = referenceIn(node);
@@ -129,9 +129,7 @@ export function inlineFileReferences(
       if (missing === "omit") {
         return omitted;
       }
-      throw new ConfigError(`$file ${JSON.stringify(ref)} cannot be read`, {
-        hint: "Create the referenced file or fix the path.",
-      });
+      throw new ZitadelConfigReferenceMissingError(ref);
     }
     if (isJsonArray(node)) {
       return node.map(inline).filter((item): item is JsonValue => {
@@ -160,36 +158,7 @@ export function inlineFileReferences(
 }
 
 /**
- * The failure for a `$file` reference that leads outside the project, which
- * every store refuses alike: a deploy uploads what a reference names.
- *
- * @param ref - The reference as written.
- * @returns The error to throw.
- */
-export function outsideProject(ref: string): ConfigError {
-  return new ConfigError(`$file ${JSON.stringify(ref)} points outside the project`, {
-    hint:
-      "Keep referenced files inside the project, next to the file that references them; " +
-      "a symlink on the way must resolve inside the project too.",
-  });
-}
-
-/**
  * The directory, relative to the project, that every file a store writes or
  * removes must stay inside.
  */
 export const CONFIG_ROOT = ".zitadel";
-
-/**
- * The failure for a file to write or remove that leads outside `.zitadel/`,
- * which every store refuses alike.
- *
- * @param path - The project-relative path as given.
- * @returns The error to throw.
- */
-export function outsideConfig(path: string): ConfigError {
-  return new ConfigError(`${path} points outside ${CONFIG_ROOT}/`, {
-    hint: "Files are only written and removed inside .zitadel/.",
-    details: { file: path },
-  });
-}

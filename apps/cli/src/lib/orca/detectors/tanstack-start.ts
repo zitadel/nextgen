@@ -1,3 +1,5 @@
+import { FsError } from "@/lib/fs";
+import { PmManifestInvalidError } from "@/lib/pm";
 import { hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
@@ -23,16 +25,24 @@ export class TanStackStartDetector implements Detector {
   readonly versionFloor = "1.168.10";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
-    const pkg = await readPackageJson(cwd).catch(() => {
-      return undefined;
-    });
-    if (!pkg || !hasDependency(pkg, "react") || !hasDependency(pkg, "@tanstack/react-start")) {
-      return null;
+    try {
+      const pkg = await readPackageJson(cwd);
+      if (!hasDependency(pkg, "react") || !hasDependency(pkg, "@tanstack/react-start")) {
+        return null;
+      }
+
+      await enforceVersionFloor(this, pkg, cwd);
+
+      const devPort = await detectDevPort(cwd, pkg);
+      return { id: "tanstack-start", appDir: "src", devPort, url: issuerFromPort(devPort) };
+    } catch (error) {
+      if (error instanceof FsError) {
+        return null;
+      }
+      if (error instanceof PmManifestInvalidError) {
+        return null;
+      }
+      throw error;
     }
-
-    await enforceVersionFloor(this, pkg, cwd);
-
-    const devPort = await detectDevPort(cwd, pkg);
-    return { id: "tanstack-start", appDir: "src", devPort, url: issuerFromPort(devPort) };
   }
 }

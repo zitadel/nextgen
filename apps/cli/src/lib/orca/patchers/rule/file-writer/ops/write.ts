@@ -1,4 +1,4 @@
-import { ZitadelError } from "@/lib/errors";
+import { OrcaFileOverwriteError } from "@/lib/orca/errors";
 import {
   type Change,
   Operation,
@@ -22,19 +22,15 @@ export class WriteOp extends Operation<"write"> {
 
   /**
    * @returns The file as the op wants it, written atomically.
-   * @throws `E_CONFLICT` when the file holds something else and `force` is not set.
+   * @throws {@link OrcaConflictError} when the file holds something
+   * else and `force` is not set.
    */
   protected change(source: Source): Change {
     const isConflict =
       source.before !== undefined && source.before !== this.op.contents && !source.force;
 
     if (isConflict) {
-      throw new ZitadelError("E_CONFLICT", `Refusing to overwrite ${source.path}`, {
-        hint: "Rerun with --force if you want the CLI to replace this file.",
-        details: {
-          path: source.path,
-        },
-      });
+      throw new OrcaFileOverwriteError(`Refusing to overwrite ${source.path}`, source.path);
     }
 
     return this.file(source, this.op.contents, {

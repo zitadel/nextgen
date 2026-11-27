@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  AmbiguousSchemaError,
-  BrokenFlowsError,
-  NoSignInLeftError,
-  RefusedEditError,
-  SchemaNotFoundError,
+  ZitadelConfigSchemaAmbiguousError,
+  ZitadelConfigError,
+  ZitadelConfigEditLockoutError,
+  ZitadelConfigSchemaMissingError,
   ZitadelConfig,
 } from "@/lib/zitadel";
 import { aConfig, authMethods, aUserSchema } from "@tests/helpers/config";
@@ -227,10 +226,9 @@ describe("Schemas.enable", () => {
       return config.schemas.enable(schema, "password");
     });
 
-    expect(error).toBeInstanceOf(RefusedEditError);
+    expect(error).toBeInstanceOf(ZitadelConfigError);
     expect(error).toMatchObject({
       message: `${SCHEMA_PATH} has no x-identifier for password`,
-      details: { file: SCHEMA_PATH, method: "password" },
     });
   });
 });
@@ -277,9 +275,9 @@ describe("Schemas.disable", () => {
       return config.schemas.disable(schema, "password");
     });
 
-    expect(error).toBeInstanceOf(BrokenFlowsError);
+    expect(error).toBeInstanceOf(ZitadelConfigError);
     expect(error).toMatchObject({
-      details: { steps: [{ path: FLOW_PATH, step: "password" }] },
+      message: expect.stringContaining(`${FLOW_PATH}: step "password"`),
     });
   });
 
@@ -291,7 +289,7 @@ describe("Schemas.disable", () => {
       return config.schemas.disable(schema, "password");
     });
 
-    expect(error).toBeInstanceOf(NoSignInLeftError);
+    expect(error).toBeInstanceOf(ZitadelConfigEditLockoutError);
     expect(error).toMatchObject({
       disabling: "password",
       usable: ["password"],
@@ -310,7 +308,7 @@ describe("Schemas.disable", () => {
       return config.schemas.disable(schema, "password");
     });
 
-    expect(error).toBeInstanceOf(BrokenFlowsError);
+    expect(error).toBeInstanceOf(ZitadelConfigError);
   });
 
   it("turns off the last way to sign in when forced", () => {
@@ -411,7 +409,7 @@ describe("Schemas.assertSignInLeft", () => {
         config.schemas.assertSignInLeft(edit, "password", false);
       });
 
-      expect(error).toBeInstanceOf(NoSignInLeftError);
+      expect(error).toBeInstanceOf(ZitadelConfigEditLockoutError);
       expect(error).toMatchObject({
         path: SCHEMA_PATH,
         schema: "customers",
@@ -427,7 +425,7 @@ describe("Schemas.assertSignInLeft", () => {
         config.schemas.assertSignInLeft(edit, "password", false);
       });
 
-      expect(error).toBeInstanceOf(NoSignInLeftError);
+      expect(error).toBeInstanceOf(ZitadelConfigEditLockoutError);
       expect(error).toMatchObject({ alternatives: ["passkey"] });
     });
 
@@ -439,7 +437,7 @@ describe("Schemas.assertSignInLeft", () => {
         config.schemas.assertSignInLeft(edit, "password", false);
       });
 
-      expect(error).toBeInstanceOf(NoSignInLeftError);
+      expect(error).toBeInstanceOf(ZitadelConfigEditLockoutError);
       expect(error).toMatchObject({ usable: ["password"] });
     });
 
@@ -472,7 +470,7 @@ describe("Schemas.assertSignInLeft", () => {
       config.schemas.assertSignInLeft(edit, "passkey", false);
     });
 
-    expect(error).toBeInstanceOf(NoSignInLeftError);
+    expect(error).toBeInstanceOf(ZitadelConfigEditLockoutError);
     expect(error).toMatchObject({ alternatives: [] });
   });
 
@@ -486,7 +484,7 @@ describe("Schemas.assertSignInLeft", () => {
       config.schemas.assertSignInLeft(edit, "google", false);
     });
 
-    expect(error).toBeInstanceOf(NoSignInLeftError);
+    expect(error).toBeInstanceOf(ZitadelConfigEditLockoutError);
     expect(error).toMatchObject({ disabling: "google" });
   });
 
@@ -533,7 +531,7 @@ describe("Schemas.assertSignInLeft", () => {
       config.schemas.assertSignInLeft(edit, "password", false);
     });
 
-    expect(error).toBeInstanceOf(NoSignInLeftError);
+    expect(error).toBeInstanceOf(ZitadelConfigEditLockoutError);
   });
 });
 
@@ -732,10 +730,10 @@ describe("Schemas.resolve", () => {
         return config.schemas.resolve("customer");
       });
 
-      expect(error).toBeInstanceOf(AmbiguousSchemaError);
+      expect(error).toBeInstanceOf(ZitadelConfigSchemaAmbiguousError);
       expect(error).toMatchObject({
-        requested: "customer",
-        details: { requested: "customer", candidates: ["customer", "customers"] },
+        message: "More than one user schema is named customer",
+        candidates: config.schemas.all.slice(0, 2),
       });
     });
 
@@ -746,11 +744,10 @@ describe("Schemas.resolve", () => {
         return config.schemas.resolve();
       });
 
-      expect(error).toBeInstanceOf(AmbiguousSchemaError);
+      expect(error).toBeInstanceOf(ZitadelConfigSchemaAmbiguousError);
       expect(error).toMatchObject({
-        requested: undefined,
+        message: "There is more than one user schema, and none was named",
         candidates: config.schemas.all,
-        details: { requested: null },
       });
     });
 
@@ -761,11 +758,10 @@ describe("Schemas.resolve", () => {
         return config.schemas.resolve("staff.json");
       });
 
-      expect(error).toBeInstanceOf(SchemaNotFoundError);
+      expect(error).toBeInstanceOf(ZitadelConfigSchemaMissingError);
       expect(error).toMatchObject({
         message: "No user schema is named staff",
-        requested: "staff",
-        details: { requested: "staff", known: ["customer", "customers", "employees"] },
+        known: config.schemas.all,
       });
     });
   });
@@ -778,7 +774,7 @@ describe("Schemas.resolve", () => {
         return config.schemas.resolve("customers");
       });
 
-      expect(error).toBeInstanceOf(SchemaNotFoundError);
+      expect(error).toBeInstanceOf(ZitadelConfigSchemaMissingError);
       expect(error).toMatchObject({
         message: "There is no user schema under .zitadel/schemas",
         known: [],

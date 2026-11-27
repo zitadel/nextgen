@@ -408,7 +408,9 @@ Each invocation prints one JSON object:
   the real command to run.
 - On failure: `code` (e.g. `E_VALIDATION`, `E_NETWORK`, `E_NOT_FOUND`,
   `E_CONFLICT`) and `message`, usually with a `hint`, and `details` when there
-  is structured context.
+  is structured context. `details` holds the facts of what failed, keyed in
+  snake_case (`path`, `lock_file`, `owner_pid`, `consulted`, `variable`), so a
+  script reads them there rather than parsing `message` or `hint`.
 - `next_commands`: the suggested follow-ups, inside `data` on success and at
   the top level on a no-op or failure. Prefer these over free-text hints. Each
   is runnable as written: it names flags by their long form (`--message`, not
@@ -450,7 +452,7 @@ Each invocation prints one JSON object:
   meta-schema does not declare is refused as
   `<schema>: <path> <key> is not an allowed key`, with
   `. Did you mean minLength?` when a keyword is close. `deploy` fails with
-  `E_VALIDATION` and lists these lines in `details.issues`; `doctor` fails
+  `E_VALIDATION` and lists these lines in its `message`; `doctor` fails
   its `schema` check with them in the check's `message`. Keys inside
   `items`, `$defs` or `oneOf`/`anyOf`/`allOf` are not checked.
 - `deploy` warns that a password step cannot tell which user to challenge only
@@ -612,15 +614,15 @@ Common error codes point at their own fix in `next_commands`:
 - `E_VALIDATION`: the body or flags are wrong; `message` names what, and
   `details` often lists the missing or available values.
   A file under `.zitadel/` that cannot be written because a directory it needs
-  is a file fails with `<path> cannot be written (ENOTDIR)`; `details.blocker`
-  is that file. Remove it, then run the command again. A directory where a
+  is a file fails with `<path> cannot be written (ENOTDIR): <file> is a file
+  where a directory is needed`; the message names that file. Remove it, then run the command again. A directory where a
   file is to be removed fails with `<path> cannot be removed (EISDIR)`; remove
   the directory, then run the command again.
 - `E_CONFIRMATION_REQUIRED`: a destructive change waits for the user's yes;
   see "Ask the user before `--force`" above. Never add `--force` on your own.
 - `E_CREDENTIAL_MISSING`: a connection's `client_id` or `client_secret` names a
-  project variable that does not exist; `details.variable` is the name. Publish it
-  with `variable set NAME` (add `--secret` for the secret), then retry.
+  project variable that does not exist; the message names it, and
+  `next_commands` holds the `variable set` that publishes it, then retry.
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime, then retry with
   `--server local`.
 - `E_NOT_FOUND`: an HTTP 404 — a missing resource, an operation the server's
@@ -1150,10 +1152,8 @@ the project's connections on the server, using `zitadel.json` and
 out rather than give it for connections already deployed.
 `deploy`, `preview` and `release create`, `--dry-run` included, check
 `.zitadel/` locally before anything is written, and refuse with one
-`E_VALIDATION`, `Configuration validation failed (N issues)`. `details.issues`
-lists every error as `{rule, path, steps?, message}`: the rule's id, the file,
-the flow steps when the rule names any, and what is wrong. There is no
-`handle` or `step` field. Every failure a file can have is an issue of that one
+`E_VALIDATION`, `Configuration validation failed (N issues)`, whose message
+lists every error on its own line as `<file>: <what is wrong>`. Every failure a file can have is an issue of that one
 error: a file that does not parse or fails its contract, a flow the server's
 flow rules refuse, a connection that disagrees with a schema or flow, and a
 variable the environment lacks (`environment/missing-variable`, one issue per

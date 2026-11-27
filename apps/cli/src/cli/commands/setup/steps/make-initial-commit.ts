@@ -1,6 +1,6 @@
 import type { Fact, SetupServices } from "@/cli/commands/setup/shared";
-import { errorMessage } from "@/lib/errors";
-import { Repository, RepositoryError } from "@/lib/git";
+import { FsError } from "@/lib/fs";
+import { GitError, Repository } from "@/lib/git";
 import { warnings } from "@/lib/ui";
 import { WizardStep } from "@/lib/wizard";
 import { Project } from "@/lib/project";
@@ -151,52 +151,48 @@ export class MakeInitialCommit extends WizardStep<"commit", Fact<"commit">, Need
       };
     }
     const committing = this.deps.ui.begin("Committing the scaffolded project");
+    const opened = {
+      created: false,
+    };
     const outcome: InitialCommitOutcome = await Repository.open(this.deps.cwd)
-      .then(async (existing) => {
+      .then(async (existing): Promise<InitialCommitOutcome> => {
         const repository = existing ?? (await Repository.create(this.deps.cwd));
-        return repository
-          .commitAll(INITIAL_COMMIT_SUBJECT, {
-            except: (path) => {
-              return Project.isSecret(path);
-            },
-            authorIfGitHasNone: FALLBACK_AUTHOR,
-          })
-          .then(
-            (committed): InitialCommitOutcome => {
-              return committed.committed
-                ? {
-                    kind: existing === null ? "created" : "committed",
-                    sha: committed.sha,
-                    guessedIdentity: committed.author !== "yours",
-                    invented: committed.author === "fallback",
-                  }
-                : {
-                    kind: "unavailable",
-                    reason: committed.reason,
-                    createdRepository: existing === null,
-                  };
-            },
-            (error: unknown): InitialCommitOutcome => {
-              return {
-                kind: "unavailable",
-                reason:
-                  error instanceof RepositoryError
-                    ? error.headline()
-                    : (errorMessage(error).split("\n")[0] ?? ""),
-                createdRepository: existing === null,
-              };
-            },
-          );
+        opened.created = existing === null;
+        const committed = await repository.commitAll(INITIAL_COMMIT_SUBJECT, {
+          except: (path) => {
+            return Project.isSecret(path);
+          },
+          authorIfGitHasNone: FALLBACK_AUTHOR,
+        });
+        return committed.committed
+          ? {
+              kind: existing === null ? "created" : "committed",
+              sha: committed.sha,
+              guessedIdentity: committed.author !== "yours",
+              invented: committed.author === "fallback",
+            }
+          : {
+              kind: "unavailable",
+              reason: committed.reason,
+              createdRepository: existing === null,
+            };
       })
-      .catch((error: unknown): InitialCommitOutcome => {
-        return {
-          kind: "unavailable",
-          reason:
-            error instanceof RepositoryError
-              ? error.headline()
-              : (errorMessage(error).split("\n")[0] ?? ""),
-          createdRepository: false,
-        };
+      .catch((error: unknown) => {
+        if (error instanceof GitError) {
+          return {
+            kind: "unavailable",
+            reason: error.headline(),
+            createdRepository: opened.created,
+          };
+        }
+        if (error instanceof FsError) {
+          return {
+            kind: "unavailable",
+            reason: error.message,
+            createdRepository: opened.created,
+          };
+        }
+        throw error;
       });
     if (outcome.kind === "created" || outcome.kind === "committed") {
       committing.done(`Committed the project as ${outcome.sha.slice(0, 7)}`);

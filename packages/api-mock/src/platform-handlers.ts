@@ -3252,7 +3252,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/flow_definitions", ({ request }) => {
-      const query = parse(ListFlowDefinitionsQueryParams, queryRecord(request));
+      const query = parse(ListFlowDefinitionsQueryParams, listQueryRecord(request));
       if (!query.ok) {
         return query.response;
       }

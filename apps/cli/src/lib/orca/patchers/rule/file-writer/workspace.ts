@@ -1,8 +1,6 @@
-import { mkdir, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { isErrno } from "@/lib/errno";
-import { readIfExists } from "@/lib/fs";
+import { FsNotFoundError, mkdir, readIfExists, rename, stat, writeFile } from "@/lib/fs";
 import type { Change, DirChange, FileChange } from "./operation";
 import type { Outcome } from "./report";
 import { SecretFile } from "@/lib/project/secret-file";
@@ -113,7 +111,7 @@ export class Workspace {
         mode: stats.mode & 0o777,
       };
     } catch (error) {
-      if (isErrno(error, "ENOENT")) {
+      if (error instanceof FsNotFoundError) {
         return undefined;
       }
 

@@ -1,6 +1,12 @@
 import { createZitadelClient } from "@/lib/backend";
 import { Environment } from "@/lib/environment";
-import { isCancellation, toZitadelError } from "@/lib/errors";
+import {
+  isCancellation,
+  toZitadelError,
+  ZitadelError,
+  ZitadelLibError,
+  errorMessage,
+} from "@/lib/errors";
 import { abbreviate } from "@/lib/publish";
 import { WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -91,21 +97,54 @@ export class DoInitialDeploy extends WizardStep<"deploy", Fact<"deployment">, Ne
         deployment,
       };
     } catch (error) {
-      if (isCancellation(error) || this.deps.signal.aborted) {
+      if (this.deps.signal.aborted) {
         throw error;
       }
-      deploying.done("Left .zitadel/ undeployed");
-      warnings.report(
-        `The project was set up but its first deploy failed: ${toZitadelError(error).message}. Run ${this.deps.suggest(
-          {
-            id: "deploy",
-            flags: { message: WHAT_CHANGED },
-          },
-        )} to publish .zitadel/.`,
-      );
-      return {
-        deployment: undefined,
-      };
+      if (error instanceof ZitadelLibError) {
+        deploying.done("Left .zitadel/ undeployed");
+        warnings.report(
+          `The project was set up but its first deploy failed: ${toZitadelError(error).message}. Run ${this.deps.suggest(
+            {
+              id: "deploy",
+              flags: { message: WHAT_CHANGED },
+            },
+          )} to publish .zitadel/.`,
+        );
+        return {
+          deployment: undefined,
+        };
+      }
+      if (error instanceof ZitadelError) {
+        if (isCancellation(error)) {
+          // A safety net: the project exists by now, so a first deploy that fails in a
+          // way nobody anticipated is a warning, not a failed setup.
+          deploying.done("Left .zitadel/ undeployed");
+          warnings.report(
+            `The project was set up but its first deploy failed: ${errorMessage(error)}. Run ${this.deps.suggest(
+              {
+                id: "deploy",
+                flags: { message: WHAT_CHANGED },
+              },
+            )} to publish .zitadel/.`,
+          );
+          return {
+            deployment: undefined,
+          };
+        }
+        deploying.done("Left .zitadel/ undeployed");
+        warnings.report(
+          `The project was set up but its first deploy failed: ${error.message}. Run ${this.deps.suggest(
+            {
+              id: "deploy",
+              flags: { message: WHAT_CHANGED },
+            },
+          )} to publish .zitadel/.`,
+        );
+        return {
+          deployment: undefined,
+        };
+      }
+      throw error;
     }
   }
 }

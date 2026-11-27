@@ -1,13 +1,38 @@
 export { AdminSession } from "./admin-session";
 export {
-  DockerUnavailableError,
-  NoFreePortError,
-  PortInUseError,
-  ServerStartError,
-  ServerStopError,
-} from "./local/internal/lifecycle";
-export { LocalServerError } from "./local/local-server-error";
-export type { LocalServerErrorKind } from "./local/local-server-error";
+  LocalServerBusyError,
+  LocalServerAdminNotFoundError,
+  LocalServerSessionRefusedError,
+  LocalServerDockerMissingError,
+  LocalServerError,
+  LocalServerAdminMalformedError,
+  LocalServerAdminUnreadableError,
+  LocalServerDockerFailedError,
+  LocalServerEnvUnreadableError,
+  LocalServerLaunchFailedError,
+  LocalServerNotStartedError,
+  LocalServerPackageMissingError,
+  LocalServerPermitMismatchError,
+  LocalServerProcessDeniedError,
+  LocalServerProcessesUnlistableError,
+  LocalServerProcessGoneError,
+  LocalServerProgramFailedError,
+  LocalServerStopAllFailedError,
+  LocalServerUrlInvalidError,
+  LocalServerNotRespondingElsewhereError,
+  LocalServerNotRespondingError,
+  LocalServerNotRunningError,
+  LocalServerPlatformMissingError,
+  LocalServerPortBusyError,
+  LocalServerPortFullError,
+  LocalServerRecordMalformedError,
+  LocalServerRecordUnreadableError,
+  LocalServerStartCleanupFailedError,
+  LocalServerStartExitedError,
+  LocalServerStartFailedError,
+  LocalServerStartTimeoutError,
+  LocalServerStopError,
+} from "./errors";
 export { DestroyPermit } from "./local/destroy-permit";
 export type { EnvSummary, ResolvedEnv } from "./local/env-vars";
 export type { LocalAdmin } from "./local/admin-credential";

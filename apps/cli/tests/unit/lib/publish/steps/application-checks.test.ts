@@ -1,7 +1,10 @@
 import { describe, expect } from "vitest";
 
-import { ForbiddenError } from "@/lib/backend/errors";
-import { ZitadelError } from "@/lib/errors";
+import { BackendForbiddenError } from "@/lib/backend";
+import {
+  PublishApplicationSecretMissingError,
+  PublishApplicationSecretPlainError,
+} from "@/lib/publish";
 import { validateApplications } from "@/lib/publish/steps/application-checks";
 import { it } from "@tests/fixtures";
 import { answering, answeringVariables, refusal } from "@tests/helpers/api-answers";
@@ -52,18 +55,16 @@ describe("validateApplications", () => {
       return validateApplications(context);
     });
 
-    expect(error).toBeInstanceOf(ZitadelError);
+    expect(error).toBeInstanceOf(PublishApplicationSecretMissingError);
     expect(error).toMatchObject({
-      code: "E_CREDENTIAL_MISSING",
       message:
         '.zitadel/applications/shop.json: client "web" names the variable SHOP_WEB_CLIENT_SECRET as its secret, which the project does not have',
-      nextCommands: [
-        {
-          id: "variable:set",
-          args: { name: "SHOP_WEB_CLIENT_SECRET" },
-          flags: { secret: true, preview: false },
-        },
-      ],
+      use: {
+        variable: "SHOP_WEB_CLIENT_SECRET",
+        client: "web",
+        file: ".zitadel/applications/shop.json",
+        preview: false,
+      },
     });
   });
 
@@ -77,9 +78,8 @@ describe("validateApplications", () => {
       return validateApplications(context);
     });
 
-    expect(error).toBeInstanceOf(ZitadelError);
+    expect(error).toBeInstanceOf(PublishApplicationSecretPlainError);
     expect(error).toMatchObject({
-      code: "E_VALIDATION",
       message: expect.stringContaining("which is not a secret"),
     });
   });
@@ -92,7 +92,7 @@ describe("validateApplications", () => {
       return validateApplications(context);
     });
 
-    expect(error).toBeInstanceOf(ForbiddenError);
+    expect(error).toBeInstanceOf(BackendForbiddenError);
   });
 
   describe("with a preview", () => {

@@ -494,6 +494,49 @@ describe("doctor", () => {
         });
       });
 
+      it("refuses an app whose framework it cannot detect", async () => {
+        const app = await aSetUpApp();
+        await app.removeTheFramework();
+
+        const result = await app.doctor();
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_FRAMEWORK_NOT_DETECTED",
+          hint: expect.stringContaining(
+            "Run setup from your app project directory, pass --cwd <path-to-app>, or run setup from an empty directory to scaffold a new app.",
+          ),
+        });
+      });
+
+      it("refuses a project whose secret the developer deleted", async () => {
+        const app = await aSetUpApp();
+        await app.losesItsLocalSecret();
+
+        const result = await app.doctor();
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint: expect.stringContaining(
+            `Run ${expectedPublicCliCommand("doctor --fix")} to restore the project secret from .env.development.local.`,
+          ),
+        });
+      });
+
+      it("still reports its managed files when the project's configuration cannot be loaded", async () => {
+        const app = await aSetUpApp();
+        await app.writeConfig({ project: "p", userSchemas: "not a list" });
+
+        const result = await app.doctor();
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          details: {
+            checks: expect.arrayContaining([expect.objectContaining({ name: "managed-files" })]),
+          },
+        });
+      });
+
       it("reports an unsupported framework version, pointing at the upgrade and offering no repair", async () => {
         const app = await aSetUpApp();
         await downgradeTheFramework(app);
@@ -507,7 +550,9 @@ describe("doctor", () => {
           source: expect.stringMatching(/^http:\/\/localhost:\d+$/),
           code: "E_UNSUPPORTED_PROJECT_SHAPE",
           message: "Zitadel doctor found issues",
-          hint: "Upgrade the app to Next.js 15.2.3 or later and rerun. Earlier releases let a request skip middleware (CVE-2025-29927).",
+          hint: expect.stringContaining(
+            "Upgrade the app to Next.js 15.2.3 or later and rerun. Earlier releases let a request skip middleware (CVE-2025-29927).",
+          ),
           next_commands: [
             expectedPublicCliCommand(
               `doctor --port ${app.doctoredPortOf(result)} --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
@@ -554,7 +599,9 @@ describe("doctor", () => {
           source: expect.stringMatching(/^http:\/\/localhost:\d+$/),
           code: "E_UNSUPPORTED_PROJECT_SHAPE",
           message: "Zitadel doctor found issues",
-          hint: "Upgrade the app to Next.js 15.2.3 or later and rerun. Earlier releases let a request skip middleware (CVE-2025-29927).",
+          hint: expect.stringContaining(
+            "Upgrade the app to Next.js 15.2.3 or later and rerun. Earlier releases let a request skip middleware (CVE-2025-29927).",
+          ),
           next_commands: [
             expectedPublicCliCommand(
               `doctor --port ${app.doctoredPortOf(result)} --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
@@ -1053,7 +1100,7 @@ describe("doctor", () => {
     });
 
     describe("whose record is malformed", () => {
-      it("fails, and offers to reset it and start it where it was started", async () => {
+      it("fails, and offers to reset it and start it again", async () => {
         const parent = await aSetUpApp();
         await parent.writeMalformedServerRecord();
         const app = await parent.appInside("my-app");
@@ -1072,13 +1119,6 @@ describe("doctor", () => {
             expectedPublicCliCommand(`reset --force --cwd ${parent.path}`),
             expectedPublicCliCommand(`start --cwd ${parent.path}`),
           ],
-          details: {
-            x: 1,
-            suggested_args: [
-              ["reset", "--force", "--cwd", parent.path],
-              ["start", "--cwd", parent.path],
-            ],
-          },
         });
       });
     });
@@ -1088,6 +1128,31 @@ describe("doctor", () => {
         const outer = await aSetUpApp();
         return outer.appInside(name);
       }
+
+      it.each(["my app", "it's"])(
+        "quotes the directory in the commands that reset a malformed record and start it again (%s)",
+        async (name) => {
+          const parent = await parentNamed(name);
+          await parent.writeMalformedServerRecord();
+          const app = await parent.appInside("my-app");
+
+          const result = await app.doctorAtItsServer();
+
+          expect(app.envelopeOf(result)).toEqual({
+            status: "error",
+            cli_version: CLI_VERSION,
+            command: "doctor",
+            source: "http://localhost:8080",
+            code: "E_VALIDATION",
+            message: ".zitadel/local/runtime.json is malformed",
+            hint: RESET_AND_START_HINT,
+            next_commands: [
+              expectedPublicCliCommand(`reset --force --cwd ${Cmd.quote(parent.path)}`),
+              expectedPublicCliCommand(`start --cwd ${Cmd.quote(parent.path)}`),
+            ],
+          });
+        },
+      );
 
       it.each(["my app", "it's"])(
         "quotes the directory in the commands that start it again and reset it, and hands it over as it is in the arguments (%s)",
@@ -1141,38 +1206,6 @@ describe("doctor", () => {
                 ["start", "--cwd", parent.path],
                 ["start", "--cwd", app.path],
                 ["reset", "--force", "--cwd", parent.path],
-              ],
-            },
-          });
-        },
-      );
-
-      it.each(["my app", "it's"])(
-        "quotes the directory in the commands that reset a malformed record and start it again (%s)",
-        async (name) => {
-          const parent = await parentNamed(name);
-          await parent.writeMalformedServerRecord();
-          const app = await parent.appInside("my-app");
-
-          const result = await app.doctorAtItsServer();
-
-          expect(app.envelopeOf(result)).toEqual({
-            status: "error",
-            cli_version: CLI_VERSION,
-            command: "doctor",
-            source: "http://localhost:8080",
-            code: "E_VALIDATION",
-            message: ".zitadel/local/runtime.json is malformed",
-            hint: RESET_AND_START_HINT,
-            next_commands: [
-              expectedPublicCliCommand(`reset --force --cwd ${Cmd.quote(parent.path)}`),
-              expectedPublicCliCommand(`start --cwd ${Cmd.quote(parent.path)}`),
-            ],
-            details: {
-              x: 1,
-              suggested_args: [
-                ["reset", "--force", "--cwd", parent.path],
-                ["start", "--cwd", parent.path],
               ],
             },
           });

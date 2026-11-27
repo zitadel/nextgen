@@ -249,7 +249,7 @@ export function Telemetered<
      */
     protected override async catch(error: unknown): Promise<never> {
       try {
-        return await super.catch(error);
+        return await super.catch.call(this, error);
       } finally {
         this.reportGuard(() => {
           this.reportBegin(this.argv.includes("--no-telemetry") ? false : undefined, false);
@@ -279,7 +279,11 @@ export function Telemetered<
      */
     protected override async finally(error: Error | undefined): Promise<void> {
       await super.finally(error);
-      await this.reportClient?.shutdown(1000).catch(() => undefined);
+      try {
+        await this.reportClient?.shutdown(1000);
+      } catch {
+        // A safety net: flushing reports must never fail a run that finished.
+      }
       if (this.reportClient?.enabled) {
         this.armExitWatchdog();
       }
@@ -338,7 +342,8 @@ export function Telemetered<
       try {
         return this.describe();
       } catch {
-        // A run that failed before its flags were read has no facts of its own.
+        // A safety net: a run that failed before its flags were read has no facts
+        // of its own, and reporting must never fail the run.
         return {};
       }
     }
@@ -367,7 +372,7 @@ export function Telemetered<
       try {
         work();
       } catch {
-        // Reporting never changes what a command does.
+        // A safety net: reporting never changes what a command does.
       }
     }
 

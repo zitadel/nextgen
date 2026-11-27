@@ -1,3 +1,5 @@
+import { FsError } from "@/lib/fs";
+import { PmManifestInvalidError } from "@/lib/pm";
 import { hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
@@ -16,11 +18,19 @@ export class SvelteDetector implements Detector {
   readonly versionFloor = "5";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
-    const pkg = await readPackageJson(cwd).catch(() => {
-      return undefined;
+    const pkg = await readPackageJson(cwd).catch((error: unknown) => {
+      if (error instanceof FsError) {
+        return undefined;
+      }
+      if (error instanceof PmManifestInvalidError) {
+        return undefined;
+      }
+      throw error;
     });
+    if (pkg === undefined) {
+      return null;
+    }
     if (
-      !pkg ||
       hasDependency(pkg, "@sveltejs/kit") ||
       !hasDependency(pkg, this.versionPackage) ||
       !hasDependency(pkg, "vite")

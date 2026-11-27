@@ -1,4 +1,6 @@
+import { FsError } from "@/lib/fs";
 import { EnvFile } from "./env-file";
+import { ProjectError } from "./errors";
 import { Gitignore, type GitignoreRule } from "./gitignore";
 import { ProjectConfig } from "./project-config";
 import { ProjectSecret, type ProjectSecretData } from "./project-secret";
@@ -90,7 +92,7 @@ export class Project {
    * @param key - The variable.
    * @param value - Its value.
    * @returns The line, without its line break.
-   * @throws {@link ZitadelError} When the value has a line break, or no
+   * @throws {@link ProjectInvalidError} When the value has a line break, or no
    *   quoting reads it back unchanged.
    */
   static envLine(key: string, value: string): string {
@@ -145,7 +147,7 @@ export class Project {
    * Reads `zitadel.json`.
    *
    * @returns The project's configuration.
-   * @throws {@link ZitadelError} When there is no `zitadel.json`.
+   * @throws {@link ProjectFileMissingError} When there is no `zitadel.json`.
    */
   config(): Promise<ProjectConfig> {
     return ProjectConfig.read(this.cwd);
@@ -158,9 +160,17 @@ export class Project {
    * @returns The project's configuration, empty when it cannot be read.
    */
   async configOrEmpty(): Promise<ProjectConfig> {
-    return this.config().catch(() => {
-      return new ProjectConfig();
-    });
+    try {
+      return await this.config();
+    } catch (error) {
+      if (error instanceof ProjectError) {
+        return new ProjectConfig();
+      }
+      if (error instanceof FsError) {
+        return new ProjectConfig();
+      }
+      throw error;
+    }
   }
 
   /**
@@ -177,8 +187,8 @@ export class Project {
    * Reads and validates `.zitadel/secret`.
    *
    * @returns The secret.
-   * @throws {@link ZitadelError} When there is none.
-   * @throws {Error} When it lacks a required field.
+   * @throws {@link ProjectFileMissingError} When there is none.
+   * @throws {@link ProjectInvalidError} When it lacks a required field.
    */
   secret(): Promise<ProjectSecret> {
     return ProjectSecret.read(this.cwd);

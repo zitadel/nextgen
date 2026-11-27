@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
-import { cp, readdir, rm } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { cp, FsError, mkdirSync, readdir, rm, unlinkSync, writeFileSync } from "@/lib/fs";
 import { dirname, join } from "node:path";
 import * as rosie from "rosie-skills";
 
@@ -111,7 +111,8 @@ export class Skills {
     try {
       return (await this.pendingOffer()) !== undefined;
     } catch {
-      // Nothing here may fail the command the person actually ran.
+      // Nothing here may fail the command the person actually ran, and agent
+      // detection is third-party code that may fail in any way.
       return false;
     }
   }
@@ -138,8 +139,12 @@ export class Skills {
         text: "Using an AI coding agent? Add the Zitadel skills to your project so it can work with the CLI:",
         command: skillsAdd,
       };
-    } catch {
-      return undefined;
+    } catch (error) {
+      // Another run holding the marker, or a config directory that cannot be written.
+      if (error instanceof FsError) {
+        return undefined;
+      }
+      throw error;
     }
   }
 
@@ -193,7 +198,8 @@ export class Skills {
         throw error;
       }
     } catch {
-      // A hint must never break `setup` or the root help.
+      // A hint must never break `setup` or the root help, whatever failed:
+      // agent detection, the marker, or the stream it is shown on.
     }
   }
 
@@ -253,6 +259,7 @@ export class Skills {
         return agent.name === "claude" && agent.detected;
       });
     } catch {
+      // Agent detection is third-party code; one that fails counts as no.
       return false;
     }
   }

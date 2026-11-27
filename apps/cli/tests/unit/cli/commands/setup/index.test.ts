@@ -44,7 +44,8 @@ import { ReadSsoFlags } from "@/cli/commands/setup/steps/read-sso-flags";
 import { askCustomSettings } from "@/cli/commands/setup/shared";
 import { createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
-import { customExample, SETUP_FLAG_NAMES } from "@/lib/idp";
+import { customExample, IdpSettingsMissingError, SETUP_FLAG_NAMES } from "@/lib/idp";
+import { FsFailedError, FsIsDirectoryError } from "@/lib/fs";
 import { Ui, warnings } from "@/lib/ui";
 import { LocalRuntime, type LocalMachine, type RuntimeMetadata } from "@/lib/server";
 import { FakeMachine } from "@tests/helpers/local-machine";
@@ -353,6 +354,8 @@ type CapturingPlatform = {
   rejectsReleases(): void;
   /** Refuses a sign-up policy's evaluation as malformed, as a server from before the policy does. */
   predatesTheSignupPolicy(): void;
+  /** Refuses a sign-up policy's evaluation for another reason (`422 pol.invalid`), as a server that knows the policy does. */
+  refusesTheSignupPolicyEvaluation(): void;
   /** Leaves a sign-up policy's evaluation unanswered; resolves once it has been asked. */
   hangsOnTheSignupPolicy(): Promise<void>;
 };
@@ -428,7 +431,12 @@ async function aCapturingPlatform(
   const createBodies: unknown[] = [];
   const projects: CreatedOnPlatform[] = [];
   const deployments: RequestedDeployment[] = [];
-  const failing = { releases: false, signupPolicy: false, signupPolicyHangs: false };
+  const failing = {
+    releases: false,
+    signupPolicy: false,
+    signupPolicyRefused: false,
+    signupPolicyHangs: false,
+  };
   const signupPolicyAsked = new EventEmitter();
   const url = await serve(async (req, res) => {
     const path = new URL(req.url ?? "/", "http://localhost").pathname;
@@ -462,6 +470,16 @@ async function aCapturingPlatform(
       res
         .writeHead(400, { "content-type": "application/json" })
         .end(JSON.stringify({ code: "req.invalid", message: "the request is invalid" }));
+      return;
+    }
+    if (
+      req.method === "POST" &&
+      path === "/api/v1/policies/evaluate" &&
+      failing.signupPolicyRefused
+    ) {
+      res
+        .writeHead(422, { "content-type": "application/json" })
+        .end(JSON.stringify({ code: "pol.invalid", message: "the policy is invalid" }));
       return;
     }
     if (req.method === "POST" && path === "/api/v1/releases/build") {
@@ -507,6 +525,9 @@ async function aCapturingPlatform(
     },
     predatesTheSignupPolicy() {
       failing.signupPolicy = true;
+    },
+    refusesTheSignupPolicyEvaluation() {
+      failing.signupPolicyRefused = true;
     },
     async hangsOnTheSignupPolicy() {
       failing.signupPolicyHangs = true;
@@ -1067,6 +1088,20 @@ describe("setup", () => {
     });
   });
 
+  describe("when no local server was ever started", () => {
+    it("refuses, saying the local server is not running", async ({ dir }) => {
+      const res = await runCliForTest(setupIn(dir, "--framework", "next", ...LOCAL, ...SCRIPTED));
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        code: "E_LOCAL_SERVER_NOT_RUNNING",
+        message: "Local Zitadel server is not running",
+        hint: expect.stringContaining(
+          `No local server has been started in this directory or a parent. Run ${expectedPublicCliCommand("start")}, or name a server another directory started with --server <url>. Start local Zitadel first, then rerun setup.`,
+        ),
+      });
+    });
+  });
+
   describe("when the local server is not running", () => {
     beforeEach(() => {
       passingThrough(DOWN_SERVER_URL);
@@ -1410,6 +1445,51 @@ describe("setup", () => {
       expect(parseJson(res.stdout)).toMatchObject({
         message: "Setup detects Next.js here, not React (Vite)",
         hint: expect.stringContaining("--force or not"),
+      });
+    });
+
+    it("hints at the --framework the app is and the app that was asked for", async ({
+      dir,
+      serve,
+    }) => {
+      await aNextApp(dir);
+      const platform = await aCapturingPlatform(serve);
+
+      const res = await runCliForTest(scriptedAgainst(dir, platform.url, "--framework", "react"));
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        hint: "Rerun setup without --framework, or with --framework next, to set up this app, or point --cwd at the React (Vite) app you meant. Setup never scaffolds a new app over one it detects, --force or not.",
+      });
+    });
+
+    it("names the requested and the detected framework", async ({ dir, serve }) => {
+      await aNextApp(dir);
+      const platform = await aCapturingPlatform(serve);
+
+      const res = await runCliForTest(scriptedAgainst(dir, platform.url, "--framework", "react"));
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        details: {
+          requested: "react",
+          detected: "next",
+        },
+      });
+    });
+  });
+
+  describe("in a Next.js app on the Pages Router", () => {
+    it("refuses, saying the Pages Router is not supported", async ({ dir }) => {
+      await write(dir, {
+        "package.json": JSON.stringify({ name: "demo", dependencies: { next: "^16" } }),
+        "pages/index.tsx": "export default function Page() {}\n",
+      });
+
+      const res = await runCliForTest(setupIn(dir, "--framework", "next", ...SCRIPTED));
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        code: "E_UNSUPPORTED_PROJECT_SHAPE",
+        message: "Next.js Pages Router projects are not supported in v1",
+        hint: "Create an App Router project with an app/ or src/app/ directory.",
       });
     });
 
@@ -2180,6 +2260,34 @@ describe("setup", () => {
     });
   });
 
+  describe("with a local runtime record it cannot read", () => {
+    it("still sets up the app", async ({ dir, serve }) => {
+      await aNextApp(dir);
+      await mkdir(join(dir, ".zitadel/local/runtime.json"), { recursive: true });
+      const platform = await aCapturingPlatform(serve);
+
+      const res = await runCliForTest(
+        scriptedAgainst(dir, platform.url, "--no-git", ...PINNED_DEV_PORT),
+      );
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        status: "ok",
+      });
+    });
+  });
+
+  describe("against a server that refuses the sign-up evaluation for another reason", () => {
+    it("still writes the sign-up policy", async ({ dir, serve }) => {
+      await aNextApp(dir);
+      const platform = await aCapturingPlatform(serve);
+      platform.refusesTheSignupPolicyEvaluation();
+
+      await runCliForTest(scriptedAgainst(dir, platform.url, "--no-git", ...PINNED_DEV_PORT));
+
+      expect(existsSync(join(dir, ".zitadel/policies/user.create.json"))).toBe(true);
+    });
+  });
+
   describe("when Ctrl-C is pressed while it asks whether the server takes a sign-up policy", () => {
     it("ends cancelled and leaves no zitadel.json behind", async ({ dir, serve }) => {
       await aNextApp(dir);
@@ -2693,7 +2801,7 @@ describe("setup", () => {
 
       expect(res).toFail();
       expect(parseJson(res.stdout)).toMatchObject({
-        message: "--sso-issuer only applies to a custom connection",
+        message: expect.stringContaining("--sso-issuer only applies to a custom connection"),
       });
     });
 
@@ -3198,7 +3306,9 @@ describe("Setup.run", () => {
     it("says in the chain that a step it could not finish gave up", async ({ dir }) => {
       await aNextApp(dir);
       answeringEveryQuestion();
-      vi.spyOn(Orca, "writeManifest").mockRejectedValueOnce(new Error("disk full"));
+      vi.spyOn(Orca, "writeManifest").mockRejectedValueOnce(
+        new FsFailedError("Could not write .zitadel/sync.json: disk full (ENOSPC)", "ENOSPC"),
+      );
 
       await asTerminal(() => {
         return Setup.run(["--cwd", dir, "--server", CLOUD, "--skip-install"], config);
@@ -3428,8 +3538,7 @@ describe("PatchApp", () => {
         return readingCredentialFiles(dir);
       });
 
-      expect(error).toBeInstanceOf(Error);
-      expect(error).toMatchObject({ code: "EISDIR" });
+      expect(error).toBeInstanceOf(FsIsDirectoryError);
     });
   });
 
@@ -3615,7 +3724,9 @@ describe("refuseUnusableFlags", () => {
       refusal: {
         message: "--sso-slug, --sso-issuer only applies to a custom connection",
         hint: expect.stringContaining("remove them"),
-        details: { flags: ["--sso-slug", "--sso-issuer"] },
+        details: {
+          flags: ["--sso-slug", "--sso-issuer"],
+        },
       },
     },
     {
@@ -3631,7 +3742,9 @@ describe("refuseUnusableFlags", () => {
       refusal: {
         message: "A custom connection needs --sso-display-name, --sso-issuer",
         hint: expect.stringContaining("--sso custom --sso-slug"),
-        details: { missing: ["--sso-display-name", "--sso-issuer"] },
+        details: {
+          missing: ["--sso-display-name", "--sso-issuer"],
+        },
       },
     },
     {
@@ -4078,8 +4191,11 @@ describe("ReadSsoFlags", () => {
           return readingFlags(true);
         });
 
-        expect(error).toBeInstanceOf(ZitadelError);
-        expect(error).toMatchObject({ code: "E_VALIDATION" });
+        expect(error).toBeInstanceOf(IdpSettingsMissingError);
+        expect(error).toMatchObject({
+          code: "E_VALIDATION",
+          example: expect.stringContaining("--sso custom"),
+        });
       });
 
       it("does not ask", async () => {

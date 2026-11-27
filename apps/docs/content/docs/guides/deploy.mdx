@@ -71,7 +71,7 @@ Your origin appears in the `origins` column. The terminal output of `deploy` sho
 
 - `E_VALIDATION`, "The project has no primary origin to deploy to": run `origin add <url> --kind primary` with your app's URL, then deploy. If the hint says the issuer is held as a preview origin, a project from `zitadel setup` 0.1.0 registered its URL that way. Run the commands the hint names. For the project setup recorded, that is `doctor --fix`, which asks first (non-interactive, add `--force`). For another project, it is `origin rm <url> --force`, then `origin add <url> --kind primary`.
 - `E_VALIDATION`, "A deploy needs a message in non-interactive mode": pass `-m "<why this release changes>"`.
-- `E_VALIDATION`, "Configuration validation failed (N issues)": the configuration breaks a rule ([What deploy checks](#what-deploy-checks-before-it-publishes)). Each issue names its file; with `--json`, `details.issues` lists `{rule, path, steps?, message}`. Fix the files it names, then run `deploy --dry-run`.
+- `E_VALIDATION`, "Configuration validation failed (N issues)": the configuration breaks a rule ([What deploy checks](#what-deploy-checks-before-it-publishes)). Each issue names its file, one per line of the message. Fix the files it names, then run `deploy --dry-run`.
 - `E_CONFLICT`, "Another deploy changed the targets since this one was prepared": run `deployment list --live` to see it, then run `deploy` again.
 - `E_CONFLICT`, "This content was already released as `<release>`, which is revoked": a revoked release can never be served again. Change the configuration so it builds a new release, then deploy.
 

@@ -1,8 +1,16 @@
 import { ZitadelError } from "@/lib/errors";
 import { LocalRuntime } from "@/lib/server";
-import { createOrca } from "@/lib/orca";
+import {
+  createOrca,
+  OrcaFrameworkMismatchError,
+  OrcaFrameworkMissingError,
+  OrcaPagesRouterError,
+  OrcaVersionBelowFloorError,
+} from "@/lib/orca";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { WizardStep } from "@/lib/wizard";
+
+import { type Refusal, refusalError } from "@/cli/core/refusal";
 
 import {
   type Fact,
@@ -15,6 +23,38 @@ import {
  * The framework a rerun is told to scaffold when the available ones include it.
  */
 const PREFERRED_FRAMEWORK = "next";
+
+/**
+ * How a `--framework` the app is not is refused: setup never scaffolds a new
+ * app over one it detects.
+ */
+const FRAMEWORK_MISMATCH_REFUSAL = {
+  code: "E_CONFLICT",
+  message: "{message}",
+  hint: "Rerun setup without --framework, or with --framework {detected}, to set up this app, or point --cwd at the {requestedName} app you meant. Setup never scaffolds a new app over one it detects, --force or not.",
+  details: {
+    requested: "{requested}",
+    detected: "{detected}",
+  },
+} as const satisfies Refusal;
+
+/**
+ * How an app below the framework version the CLI integrates is refused.
+ */
+const VERSION_BELOW_FLOOR_REFUSAL = {
+  code: "E_UNSUPPORTED_PROJECT_SHAPE",
+  message: "{message}",
+  hint: "Upgrade the app to {displayName} {versionFloor} or later and rerun.{note}",
+} as const satisfies Refusal;
+
+/**
+ * How a Next.js app on the Pages Router is refused.
+ */
+const PAGES_ROUTER_REFUSAL = {
+  code: "E_UNSUPPORTED_PROJECT_SHAPE",
+  message: "{message}",
+  hint: "Create an App Router project with an app/ or src/app/ directory.",
+} as const satisfies Refusal;
 
 /**
  * What the step reads from what is known.
@@ -98,26 +138,48 @@ export class DetectFramework extends WizardStep<
           : this.deps.cwd,
       )}`,
     );
-    const found = await orca
-      .detect(this.deps.cwd, flags.framework)
-      .then((facts) => {
-        detecting.done(
-          `Detected ${orca.displayName(facts.id)}${facts.devPort ? ` (dev port ${facts.devPort})` : ""}`,
-        );
-        return {
-          app: {
-            framework: facts.id,
-            devPort: facts.devPort,
-          },
-          detected: facts,
-          scaffoldedBesideFiles: false,
-        };
-      })
-      .catch(async (error) => {
-        if (!(error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED")) {
-          detecting.fail();
-          throw error;
-        }
+    try {
+      const facts = await orca.detect(this.deps.cwd, flags.framework);
+      detecting.done(
+        `Detected ${orca.displayName(facts.id)}${facts.devPort ? ` (dev port ${facts.devPort})` : ""}`,
+      );
+      const found = {
+        app: {
+          framework: facts.id,
+          devPort: facts.devPort,
+        },
+        detected: facts,
+        scaffoldedBesideFiles: false,
+      };
+      return {
+        orca,
+        found,
+        scaffoldedFramework: found.detected === undefined,
+      };
+    } catch (error) {
+      if (error instanceof OrcaFrameworkMismatchError) {
+        detecting.fail();
+        throw refusalError(FRAMEWORK_MISMATCH_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof OrcaVersionBelowFloorError) {
+        detecting.fail();
+        throw refusalError(VERSION_BELOW_FLOOR_REFUSAL, {
+          ...error,
+          message: error.message,
+          note: error.note === undefined ? "" : ` ${error.note}`,
+        });
+      }
+      if (error instanceof OrcaPagesRouterError) {
+        detecting.fail();
+        throw refusalError(PAGES_ROUTER_REFUSAL, {
+          ...error,
+          message: error.message,
+        });
+      }
+      if (error instanceof OrcaFrameworkMissingError) {
         const target = await orca.inspectScaffoldTarget(this.deps.cwd);
         if (!target.scaffoldable && !this.deps.force) {
           detecting.fail();
@@ -163,7 +225,7 @@ export class DetectFramework extends WizardStep<
             details: { frameworks: choices },
           });
         }
-        return {
+        const found = {
           app: await orca.planScaffold(
             this.deps.cwd,
             flags.framework ||
@@ -181,11 +243,14 @@ export class DetectFramework extends WizardStep<
           detected: undefined,
           scaffoldedBesideFiles: !target.scaffoldable,
         };
-      });
-    return {
-      orca,
-      found,
-      scaffoldedFramework: found.detected === undefined,
-    };
+        return {
+          orca,
+          found,
+          scaffoldedFramework: found.detected === undefined,
+        };
+      }
+      detecting.fail();
+      throw error;
+    }
   }
 }

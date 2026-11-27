@@ -1,7 +1,7 @@
-import { chmod, readdir, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, onTestFinished } from "vitest";
 
 import { warnings } from "@/lib/ui";
 import { Project } from "@/lib/project";
@@ -18,6 +18,28 @@ describe("Project.lockDown", () => {
     expect(warnings.take()).toEqual([expect.stringContaining("could not set it to 0600 (ENOENT)")]);
   });
 });
+
+describe.skipIf(process.getuid?.() === 0 || process.platform === "win32")(
+  "Project.lockDown when the folder cannot be searched",
+  () => {
+    it("names EACCES", async () => {
+      warnings.take();
+      const locked = join(await scratchDir("zitadel-secret-file-"), "locked");
+      await mkdir(locked);
+      await writeFile(join(locked, "secret"), "x");
+      await chmod(locked, 0o000);
+      onTestFinished(async () => {
+        await chmod(locked, 0o700);
+      });
+
+      await Project.lockDown(join(locked, "secret"), 0o600);
+
+      expect(warnings.take()).toEqual([
+        expect.stringContaining("could not set it to 0600 (EACCES)"),
+      ]);
+    });
+  },
+);
 
 describe("SecretFile.isSecure", () => {
   it("is true for an owner-only file", async () => {

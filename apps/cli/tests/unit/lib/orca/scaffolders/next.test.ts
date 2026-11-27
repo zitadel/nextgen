@@ -46,8 +46,9 @@ describe("NextScaffolder", () => {
       new NextScaffolder(SUPPORTED_NODE).scaffold("/tmp/proj", "next"),
     ).rejects.toMatchObject({
       code: "E_VALIDATION",
-      hint: expect.stringContaining("boom"),
-      details: expect.objectContaining({ stderr: "boom", stdout: "hello" }),
+      output: expect.stringContaining("boom"),
+      stderr: "boom",
+      stdout: "hello",
     });
   });
 
@@ -66,7 +67,6 @@ describe("NextScaffolder", () => {
     ).rejects.toMatchObject({
       code: "E_VALIDATION",
       message: expect.stringContaining("Command not found"),
-      hint: expect.stringContaining("PATH"),
     });
   });
 

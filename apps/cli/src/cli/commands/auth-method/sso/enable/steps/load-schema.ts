@@ -38,8 +38,9 @@ export class LoadSchema extends WizardStep<"target", Fact<"target">, Fact<"flags
    *
    * @param needs - What the run starts from.
    * @returns What the run read.
-   * @throws {@link ZitadelError} When the schema cannot be chosen, or no flow
-   *   can offer the provider.
+   * @throws {@link ZitadelError} When the schema cannot be chosen.
+   * @throws {@link ZitadelConfigError} When no flow can offer the provider, or
+   *   the flow region the edit writes is not the shape it writes.
    */
   async run(needs: Fact<"flags">): Promise<Fact<"target">> {
     const target = await this.deps.loadSchemaTarget(needs.flags);

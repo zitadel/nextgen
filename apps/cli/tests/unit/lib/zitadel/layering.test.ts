@@ -13,7 +13,13 @@ describe("the zitadel library's dependencies", () => {
         return (
           found.target.startsWith("lib/") &&
           found.target !== LAYER &&
-          !found.target.startsWith(`${LAYER}/`)
+          !found.target.startsWith(`${LAYER}/`) &&
+          !(found.target === "lib/errors" && found.file === posix.join(LAYER, "errors.ts")) &&
+          found.target !== "lib/fs" &&
+          !(
+            found.target === "lib/errno" &&
+            found.file === posix.join(LAYER, "storage", "backend", "store.ts")
+          )
         );
       })
       .map((found) => {

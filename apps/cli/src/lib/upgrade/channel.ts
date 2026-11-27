@@ -1,4 +1,6 @@
 import type { Cache, CacheEntry } from "./cache";
+import { isObject } from "@/lib/json";
+
 import { Release } from "./release";
 
 /**
@@ -105,21 +107,33 @@ export class ReleaseChannel {
     }
 
     const path = `/-/package/${packageName.replaceAll("/", "%2f")}/dist-tags`;
-    const answered = await fetch(`${registry}${path}`, {
+    const response = await fetch(`${registry}${path}`, {
       signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          return {};
-        }
-        return (await response.json()) as Record<string, unknown>;
-      })
-      .then((tags) => {
-        return Release.from(tags[distTag]);
-      })
-      .catch(() => {
+    }).catch((error: unknown) => {
+      if (error instanceof TypeError) {
         return undefined;
-      });
+      }
+      if (error instanceof DOMException) {
+        return undefined;
+      }
+      throw error;
+    });
+    const parsed: unknown = response?.ok
+      ? await (response.json() as Promise<unknown>).catch((error: unknown) => {
+          if (error instanceof SyntaxError) {
+            return undefined;
+          }
+          if (error instanceof TypeError) {
+            return undefined;
+          }
+          if (error instanceof DOMException) {
+            return undefined;
+          }
+          throw error;
+        })
+      : undefined;
+    const tags: Record<string, unknown> = isObject(parsed) ? parsed : {};
+    const answered = Release.from(tags[distTag]);
 
     if (fresh && answered === undefined) {
       return undefined;

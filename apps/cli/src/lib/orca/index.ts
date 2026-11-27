@@ -1,13 +1,29 @@
-import { mkdir, readdir, readFile, rm, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
-import { ZitadelError } from "@/lib/errors";
-import { isErrno } from "@/lib/errno";
-import { readDirIfExists } from "@/lib/fs";
+import {
+  FsError,
+  FsNotDirectoryError,
+  FsNotFoundError,
+  mkdir,
+  readDirIfExists,
+  readdir,
+  readFile,
+  rm,
+  stat,
+} from "@/lib/fs";
 
 import { detectors } from "./detectors";
 import { detectDevPort } from "./detectors/port";
 import type { Detector, FrameworkFacts } from "./detectors/types";
+import {
+  OrcaDirectoryNotEmptyError,
+  OrcaFrameworkMismatchError,
+  OrcaFrameworkMissingError,
+  OrcaFrameworkUnknownError,
+  OrcaFrameworkUnsupportedError,
+  OrcaPatcherMissingError,
+  OrcaScaffolderMissingError,
+} from "./errors";
 import { ManagedFile } from "./managed-file";
 import { patchers } from "./patchers";
 import type { Patcher } from "./patchers/types";
@@ -18,6 +34,56 @@ import { ScaffoldWorkspace } from "./scaffold-workspace";
 import type { Scaffolder } from "./scaffolders/types";
 
 export { issuerFromPort } from "./detectors/port";
+export {
+  OrcaAngularJsonMissingError,
+  OrcaAngularProjectAmbiguousError,
+  OrcaAngularProjectMissingError,
+  OrcaAngularRoutesNotInlineError,
+  OrcaAngularServeTargetMissingError,
+  OrcaBoundaryConflictError,
+  OrcaBoundaryDuplicateError,
+  OrcaBoundaryRenamedError,
+  OrcaBoundaryVersionUnknownError,
+  OrcaCommandFailedError,
+  OrcaCommandNotFoundError,
+  OrcaCommandSpawnFailedError,
+  OrcaConfigArrayExpectedError,
+  OrcaConfigCommonJsError,
+  OrcaConfigFileMissingError,
+  OrcaConfigKeyError,
+  OrcaConfigObjectExpectedError,
+  OrcaConfigObjectMissingError,
+  OrcaConfigShapeError,
+  OrcaConfigUnparseableError,
+  OrcaConfigUnwritableError,
+  OrcaConflictError,
+  OrcaDirectoryNotEmptyError,
+  OrcaError,
+  OrcaFileOverwriteError,
+  OrcaFrameworkMismatchError,
+  OrcaFrameworkMissingError,
+  OrcaFrameworkUnknownError,
+  OrcaFrameworkUnsupportedError,
+  OrcaInternalError,
+  OrcaInvalidError,
+  OrcaNodeUnsupportedError,
+  OrcaPackageJsonMissingError,
+  OrcaPagesRouterError,
+  OrcaPatchFileMissingError,
+  OrcaPatchOpEmptyError,
+  OrcaPatcherMissingError,
+  OrcaProxyCredentialLeakError,
+  OrcaRendererPendingError,
+  OrcaRendererUnknownError,
+  OrcaRootComponentMountError,
+  OrcaScaffolderMissingError,
+  OrcaSolidStartConfigMissingError,
+  OrcaSolidStartOptionsError,
+  OrcaSolidStartPluginMissingError,
+  OrcaSvelteKitEnvVarsError,
+  OrcaVersionBelowFloorError,
+  OrcaZitadelConfigMissingError,
+} from "./errors";
 export type { Detector, FrameworkFacts } from "./detectors/types";
 
 /** One framework the CLI can scaffold from scratch, surfaced to the picker. */
@@ -140,9 +206,11 @@ export class Orca {
   /**
    * Detects the framework in `cwd` and extracts its {@link FrameworkFacts},
    * honouring an explicit `requested` framework. Throws
-   * `E_FRAMEWORK_NOT_DETECTED` when nothing matches, and `E_CONFLICT` when
-   * `cwd` holds an app of a framework other than `requested`; a detector's
-   * `E_UNSUPPORTED_PROJECT_SHAPE` (recognised but unsupported) propagates.
+   * {@link OrcaFrameworkMissingError} when nothing matches or
+   * `requested` has no detector, {@link OrcaFrameworkMismatchError} when
+   * `cwd` holds an app of a framework other than `requested`, and
+   * {@link OrcaFrameworkUnsupportedError} when a detector recognises an app
+   * it does not support.
    */
   async detect(cwd: string, requested?: string): Promise<FrameworkFacts> {
     const candidates = requested
@@ -151,9 +219,10 @@ export class Orca {
         })
       : this.detectors;
     if (requested && candidates.length === 0) {
-      throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", `Unsupported framework "${requested}"`, {
-        hint: `Supported frameworks: ${this.frameworkIds().join(", ")}.`,
-      });
+      throw new OrcaFrameworkUnknownError(
+        `Unsupported framework "${requested}"`,
+        this.frameworkIds().join(", "),
+      );
     }
     for (const detector of candidates) {
       const facts = await detector.detect(cwd);
@@ -171,17 +240,16 @@ export class Orca {
         }
         const facts = await detector.detect(cwd);
         if (facts) {
-          throw this.frameworkMismatch(requested, facts.id);
+          throw new OrcaFrameworkMismatchError(
+            `Setup detects ${this.displayName(facts.id)} here, not ${this.displayName(requested)}`,
+            requested,
+            facts.id,
+            this.displayName(requested),
+          );
         }
       }
     }
-    throw new ZitadelError(
-      "E_FRAMEWORK_NOT_DETECTED",
-      "Could not detect a supported app framework",
-      {
-        hint: "Run setup from your app project directory, pass --cwd <path-to-app>, or run setup from an empty directory to scaffold a new app.",
-      },
-    );
+    throw new OrcaFrameworkMissingError("Could not detect a supported app framework");
   }
 
   /**
@@ -193,10 +261,10 @@ export class Orca {
     try {
       return await this.detect(cwd);
     } catch (error) {
-      if (
-        error instanceof ZitadelError &&
-        (error.code === "E_FRAMEWORK_NOT_DETECTED" || error.code === "E_UNSUPPORTED_PROJECT_SHAPE")
-      ) {
+      if (error instanceof OrcaFrameworkMissingError) {
+        return undefined;
+      }
+      if (error instanceof OrcaFrameworkUnsupportedError) {
         return undefined;
       }
       throw error;
@@ -233,9 +301,9 @@ export class Orca {
 
   /**
    * Creates a new `framework` project in `cwd`, then re-detects it to return
-   * the resulting {@link FrameworkFacts}. Throws `E_CONFLICT` when the directory
-   * already contains a project ("already scaffolded") and `E_VALIDATION` when no
-   * scaffolder supports the framework.
+   * the resulting {@link FrameworkFacts}. Throws OrcaDirectoryNotEmptyError when the
+   * directory already contains a project ("already scaffolded") and OrcaInternalError
+   * when no scaffolder supports the framework.
    */
   async scaffold(cwd: string, framework: string, force = false): Promise<FrameworkFacts> {
     const scaffold = await this.scaffoldUndoably(cwd, framework, force);
@@ -252,12 +320,11 @@ export class Orca {
   async scaffoldUndoably(cwd: string, framework: string, force = false): Promise<UndoableScaffold> {
     const target = await this.inspectScaffoldTarget(cwd);
     if (!target.scaffoldable && !force) {
-      throw new ZitadelError("E_CONFLICT", `Cannot scaffold: ${cwd} is not empty`, {
-        hint:
-          `${target.reason ? `${target.reason} ` : ""}Pass --force to scaffold into a ` +
-          "non-empty directory, or run setup from an existing supported app project.",
-        details: { entries: target.entries },
-      });
+      throw new OrcaDirectoryNotEmptyError(
+        `Cannot scaffold: ${cwd} is not empty`,
+        target.reason,
+        target.entries,
+      );
     }
     // A directory that does not exist yet is created only now, so a refusal or
     // a dry run leaves no trace of it, and an undo removes it again with any
@@ -270,33 +337,27 @@ export class Orca {
         ? undoScaffold(cwd, before, workspace)
         : rm(created, { recursive: true, force: true });
     };
-    // Starting from a resolved promise puts the scaffolder lookup, which throws
-    // for an unknown framework, under the same undo as the scaffold itself.
-    const facts = await Promise.resolve()
-      .then(() => {
-        return this.scaffolderFor(framework).scaffold(workspace?.work ?? cwd, framework);
-      })
-      .then(() => {
-        return workspace?.moveInto(cwd);
-      })
-      .then(() => {
-        return this.detect(cwd, framework);
-      })
-      .catch(async (error: unknown) => {
-        await undo();
-        throw error;
-      });
-    return {
-      facts,
-      undo,
-      keep: async () => {
-        await workspace?.drop();
-      },
-    };
+    // The scaffolder lookup throws for an unknown framework, so it sits under
+    // the same undo as the scaffold itself.
+    try {
+      await this.scaffolderFor(framework).scaffold(workspace?.work ?? cwd, framework);
+      await workspace?.moveInto(cwd);
+      const facts = await this.detect(cwd, framework);
+      return {
+        facts,
+        undo,
+        keep: async () => {
+          await workspace?.drop();
+        },
+      };
+    } catch (error) {
+      await undo();
+      throw error;
+    }
   }
 
   /**
-   * Resolves the scaffolder for a framework, throwing `E_VALIDATION` (with the
+   * Resolves the scaffolder for a framework, throwing OrcaScaffolderMissingError (with the
    * available list) when none matches.
    */
   scaffolderFor(framework: string): Scaffolder {
@@ -304,19 +365,20 @@ export class Orca {
       return candidate.canScaffold(framework);
     });
     if (!scaffolder) {
-      throw new ZitadelError("E_VALIDATION", `No scaffolder supports "${framework}"`, {
-        hint: `Available frameworks: ${this.availableFrameworks()
+      throw new OrcaScaffolderMissingError(
+        `No scaffolder supports "${framework}"`,
+        this.availableFrameworks()
           .map((f) => {
             return f.id;
           })
-          .join(", ")}.`,
-      });
+          .join(", "),
+      );
     }
     return scaffolder;
   }
 
   /**
-   * Resolves the patcher for a framework, throwing `E_VALIDATION` when none
+   * Resolves the patcher for a framework, throwing OrcaInternalError when none
    * matches (e.g. a framework that can be scaffolded but not yet integrated).
    */
   patcherFor(framework: string): Patcher {
@@ -324,9 +386,7 @@ export class Orca {
       return candidate.canPatch(framework);
     });
     if (!patcher) {
-      throw new ZitadelError("E_VALIDATION", `No patcher supports "${framework}"`, {
-        hint: "Zitadel integration currently supports Next.js.",
-      });
+      throw new OrcaPatcherMissingError(`No patcher supports "${framework}"`);
     }
     return patcher;
   }
@@ -353,24 +413,6 @@ export class Orca {
       this.availableFrameworks().find((framework) => {
         return framework.id === id;
       })?.displayName ?? id
-    );
-  }
-
-  /** `cwd` holds a `detected` app, and setup was asked to set up a `requested` one. */
-  private frameworkMismatch(requested: string, detected: string): ZitadelError {
-    const name = (id: string) => {
-      return this.displayName(id);
-    };
-    return new ZitadelError(
-      "E_CONFLICT",
-      `Setup detects ${name(detected)} here, not ${name(requested)}`,
-      {
-        hint:
-          `Rerun setup without --framework, or with --framework ${detected}, to set up this ` +
-          `app, or point --cwd at the ${name(requested)} app you meant. Setup never scaffolds ` +
-          "a new app over one it detects, --force or not.",
-        details: { requested, detected },
-      },
     );
   }
 }
@@ -426,20 +468,17 @@ export async function inspectScaffoldTarget(
  * scaffold creates. One that is a file, or lies under one, is not.
  */
 export async function isDirectoryOrMissing(cwd: string): Promise<boolean> {
-  return stat(cwd).then(
-    (stats) => {
-      return stats.isDirectory();
-    },
-    (error: unknown) => {
-      if (isErrno(error, "ENOENT")) {
-        return true;
-      }
-      if (isErrno(error, "ENOTDIR")) {
-        return false;
-      }
-      throw error;
-    },
-  );
+  try {
+    return (await stat(cwd)).isDirectory();
+  } catch (error) {
+    if (error instanceof FsNotFoundError) {
+      return true;
+    }
+    if (error instanceof FsNotDirectoryError) {
+      return false;
+    }
+    throw error;
+  }
 }
 
 /**
@@ -466,8 +505,12 @@ async function isLocalRuntimeEntry(
         return ["", `${localDirectory}/`].includes(line.trim());
       });
     }
-  } catch {
+  } catch (error) {
     // Not a directory, or not a readable file: not what `start` wrote.
+    if (error instanceof FsError) {
+      return false;
+    }
+    throw error;
   }
   return false;
 }

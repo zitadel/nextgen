@@ -32,13 +32,6 @@ import { reclaimableOps, withoutExistingTargets } from "./reclaim";
 import { Project } from "@/lib/project";
 
 /**
- * Closes every {@link AbstractRulePatcher.preflight} refusal. `--force` is the
- * obvious next try after an `E_CONFLICT`, and it changes nothing there.
- */
-export const PREFLIGHT_FORCE_NOTE =
-  "--force can't fix this: it only replaces files at the paths setup writes.";
-
-/**
  * Base for rule-based (deterministic, template-driven) patchers, as opposed to
  * a future LLM-driven family. It applies the integration by building a
  * file-operation plan and running the file-writer — that strategy stays
@@ -77,7 +70,7 @@ export abstract class AbstractRulePatcher implements Patcher {
    * @param ctx - What the integration is applied with.
    * @param opts - Where, and whether to write or only report.
    * @returns Every file the run touched or skipped, and every dependency it added.
-   * @throws `E_CONFLICT` when {@link preflight} refuses the project, or a
+   * @throws OrcaConflictError when {@link preflight} refuses the project, or when a
    *   planned file holds something else and `force` is not set.
    */
   async patch(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult> {
@@ -112,7 +105,7 @@ export abstract class AbstractRulePatcher implements Patcher {
   }
 
   /**
-   * Refuses, with `E_CONFLICT`, a project the plan would leave broken without
+   * Refuses, with OrcaConflictError, a project the plan would leave broken without
    * conflicting on any path it writes: the file-writer only stops on a file
    * at exactly a path in the plan, and some of the app's own files break the
    * integration from another path. Setup's dry-run patch runs this before it

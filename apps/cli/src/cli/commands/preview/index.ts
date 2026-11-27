@@ -1,7 +1,7 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { ForbiddenError, OriginService, type ZitadelClient } from "@/lib/backend";
+import { BackendForbiddenError, OriginService, type ZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { CommandGroups } from "@/cli/commands/groups";
 import { type Admitted, type CommandResult, CREDENTIALS, PREVIEW_CREDENTIAL } from "@/cli/core";
@@ -186,18 +186,18 @@ export async function refusePrimaryOrigins(
   projectId: string,
 ): Promise<void> {
   const originService = new OriginService(client, projectId);
-  const production = await originService
-    .primaryAmong(urls)
-    .catch((error: unknown): readonly string[] => {
-      if (error instanceof ForbiddenError) {
-        return [];
-      }
-      throw error;
-    });
-  if (production.length > 0) {
-    throw refusalError(PRIMARY_ORIGIN_REFUSAL, {
-      origins: production.join(", "),
-    });
+  try {
+    const production = await originService.primaryAmong(urls);
+    if (production.length > 0) {
+      throw refusalError(PRIMARY_ORIGIN_REFUSAL, {
+        origins: production.join(", "),
+      });
+    }
+  } catch (error) {
+    if (error instanceof BackendForbiddenError) {
+      return;
+    }
+    throw error;
   }
 }
 

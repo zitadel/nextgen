@@ -1,3 +1,6 @@
+import { rm } from "node:fs/promises";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
@@ -122,6 +125,19 @@ describe("preview", () => {
     });
 
     describe("--json", () => {
+      it("refuses a release that would carry two brandings", async () => {
+        const app = await aSetUpApp();
+        await app.holdsTwoBrandings();
+
+        const result = await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
+
+        expect(app.envelopeOf(result)).toMatchObject({
+          status: "error",
+          code: "E_VALIDATION",
+          hint: "A project has a single branding; keep one descriptor under .zitadel/branding/.",
+        });
+      });
+
       it("deploys to the preview URL it is given", async () => {
         const app = await anAppAdmittingPreviews();
 
@@ -600,17 +616,8 @@ describe("preview", () => {
           message:
             'Configuration validation failed (1 issue):\n  - .zitadel/idps/google.json: client_secret must reference a variable, not hold a value. Use "client_secret": "${{ NAME }}" and publish the value as that variable.',
           hint: 'Publish a secret with the command below and reference it as "${{ NAME }}".',
+          details: { issues: expect.any(Array) },
           next_commands: [expectedPublicCliCommand(app.againAsRun("variable set NAME --secret"))],
-          details: {
-            issues: [
-              {
-                message:
-                  'client_secret must reference a variable, not hold a value. Use "client_secret": "${{ NAME }}" and publish the value as that variable.',
-                path: ".zitadel/idps/google.json",
-                rule: "connection/literal-secret",
-              },
-            ],
-          },
         });
       });
 
@@ -973,6 +980,21 @@ describe("preview", () => {
         const result = await app.run(["preview", "--origin", PREVIEW_URL], { CI: "true" });
 
         expect(result).toSay("Set ZITADEL_ENV=preview in the pull-request build");
+      });
+    });
+  });
+
+  describe("with nothing in .zitadel/ to deploy", () => {
+    it("says to add a resource under .zitadel/ or set the project up", async () => {
+      const app = await anAppAdmittingPreviews();
+      await rm(join(app.path, ".zitadel"), { recursive: true, force: true });
+
+      const result = await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
+
+      expect(app.envelopeOf(result)).toMatchObject({
+        code: "E_VALIDATION",
+        message: "There is nothing in .zitadel/ to deploy",
+        hint: `Add a schema, flow, policy, branding, application or OAuth settings under .zitadel/, or run ${expectedPublicCliCommand("setup")} to scaffold one.`,
       });
     });
   });
