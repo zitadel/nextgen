@@ -14,6 +14,10 @@ import { clearSessionCaches } from "@/lib/session-cache";
 import {
   analyticsRole,
   describeExpiry,
+  describeHeldAccess,
+  type HeldAccess,
+  heldAccess,
+  heldAccessOf,
   type InvitationLookup,
   type InvitationPageState,
   inviterLabel,
@@ -38,6 +42,14 @@ import { clearInvitationToken } from "../token";
  * server no longer knows all clear it from storage. A failure of any other
  * kind keeps it, so reloading the page or reopening the link picks up where
  * it stopped.
+ *
+ * **Someone with access is not asked.** An invitation brings a new person into
+ * a project; it never changes a role (#3330). When the lookup says the
+ * signed-in person already has access (`membership`), the page says so with
+ * their role and offers neither button, and it says the same when an accept
+ * or a decline is refused with `inv.already_member`, for access given after
+ * the page loaded. The token is kept: the link is still good for the person
+ * it was meant for, who may be one **Use another account** away.
  *
  * **The account is named.** The page has no app shell, so under every state it
  * says who is signed in, which is who would join, and offers another account:
@@ -84,6 +96,8 @@ function InvitationCard({
   onAnswering: (answering: boolean) => void;
 }) {
   const [outcome, setOutcome] = useState<"declined" | "gone" | undefined>(undefined);
+  /** Access an accept or a decline was refused for, which the lookup had not seen. */
+  const [refusedFor, setRefusedFor] = useState<HeldAccess | undefined>(undefined);
 
   if (state.kind === "error") {
     return (
@@ -116,12 +130,27 @@ function InvitationCard({
     );
   }
 
+  const access = refusedFor ?? heldAccess(invitation);
+  if (access) {
+    return (
+      <StatusCard title="You already have access">
+        <p className={`${BODY} wrap-anywhere`}>
+          {describeHeldAccess(access, invitation.project_name)}
+        </p>
+        <Button asChild className="w-full px-2.5">
+          <Link to="/projects">Go to projects</Link>
+        </Button>
+      </StatusCard>
+    );
+  }
+
   return (
     <OpenInvitation
       token={token}
       invitation={invitation}
       locked={locked}
       onAnswering={onAnswering}
+      onMember={setRefusedFor}
       onDeclined={() => setOutcome("declined")}
       onGone={() => setOutcome("gone")}
     />
@@ -180,6 +209,7 @@ function OpenInvitation({
   invitation,
   locked,
   onAnswering,
+  onMember,
   onDeclined,
   onGone,
 }: {
@@ -187,13 +217,24 @@ function OpenInvitation({
   invitation: InvitationLookup;
   locked: boolean;
   onAnswering: (answering: boolean) => void;
+  /** The answer was refused because the person already has access. */
+  onMember: (access: HeldAccess) => void;
   onDeclined: () => void;
   onGone: () => void;
 }) {
   const navigate = useNavigate();
 
-  /** Clears the token for a link the server says is finished; rethrows the rest. */
+  /**
+   * Settles an answer the server refused for good: someone who already has
+   * access keeps the link for the person it was meant for, and a finished link
+   * loses its token. Rethrows the rest.
+   */
   function finishedOr(cause: unknown): never | undefined {
+    const access = heldAccessOf(cause);
+    if (access) {
+      onMember(access);
+      return undefined;
+    }
     if (!isInvitationGone(cause)) throw cause;
     clearInvitationToken();
     onGone();

@@ -60,15 +60,31 @@ function errorBody(cause: ApiError): Record<string, unknown> | undefined {
 
 /** The fields an error payload names, from its producer's `details`. */
 function namedFields(body: Record<string, unknown>): string[] {
-  const details = body.details;
-  if (!details || typeof details !== "object") return [];
-  const producer = (details as Record<string, unknown>).details;
-  if (!producer || typeof producer !== "object") return [];
-  const fields = (producer as Record<string, unknown>).fields;
+  const fields = producerDetails(body)?.fields;
   if (!Array.isArray(fields)) return [];
   return fields
     .filter((field): field is string => typeof field === "string" && field !== "")
     .map((field) => field.replace(/^attributes\./, ""));
+}
+
+/** What the error's producer attached to an error payload (`details.details`). */
+function producerDetails(body: Record<string, unknown>): Record<string, unknown> | undefined {
+  const details = body.details;
+  if (!details || typeof details !== "object") return undefined;
+  const producer = (details as Record<string, unknown>).details;
+  return producer && typeof producer === "object"
+    ? (producer as Record<string, unknown>)
+    : undefined;
+}
+
+/**
+ * What the server attached to a failed request beside its code and message
+ * (`details.details`), or nothing when it attached none. For a screen that
+ * answers a code with what the error names, such as the role already held.
+ */
+export function errorDetails(cause: unknown): Record<string, unknown> | undefined {
+  const body = cause instanceof ApiError ? errorBody(cause) : undefined;
+  return body ? producerDetails(body) : undefined;
 }
 
 /**

@@ -401,6 +401,60 @@ describe("invitation page", () => {
     expect(trackEvent).not.toHaveBeenCalled();
   });
 
+  it("tells someone who already has access so, and offers neither answer", async () => {
+    // MSW fails the test if an accept or a decline goes out: none is stubbed.
+    stubLookup(() => HttpResponse.json(lookup({ membership: { relation: "admin" } })));
+    await openLink();
+
+    expect(
+      await screen.findByRole("heading", { name: "You already have access" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "You already have admin access to acme-app. To change your role, ask a project admin.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Join project" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Decline invitation" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Go to projects" })).toBeInTheDocument();
+    // The link is still good for the person it was meant for.
+    expect(screen.getByRole("button", { name: "Use another account" })).toBeEnabled();
+    expect(readInvitationToken()).toBe(TOKEN);
+  });
+
+  it.each([
+    ["accept", "Join project"],
+    ["reject", "Decline invitation"],
+  ] as const)(
+    "says the same when the %s is refused for access given since",
+    async (verb, button) => {
+      stubLookup(() => HttpResponse.json(lookup({ membership: null })));
+      stubVerb(verb, () =>
+        HttpResponse.json(
+          {
+            code: "inv.already_member",
+            message: "you already have access to this project",
+            details: { details: { relation: "viewer" } },
+          },
+          { status: 409 },
+        ),
+      );
+      await openLink();
+
+      await userEvent.click(await screen.findByRole("button", { name: button }));
+
+      expect(
+        await screen.findByText(
+          "You already have viewer access to acme-app. To change your role, ask a project admin.",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Join project" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Decline invitation" })).not.toBeInTheDocument();
+      expect(readInvitationToken()).toBe(TOKEN);
+      expect(trackEvent).not.toHaveBeenCalled();
+    },
+  );
+
   it("turns unavailable when the inviter no longer administers the project", async () => {
     stubLookup();
     stubVerb("accept", () =>

@@ -1,5 +1,5 @@
 import type { api } from "@/api/zitadel";
-import { errorCode } from "@/lib/api-error";
+import { errorCode, errorDetails } from "@/lib/api-error";
 
 /** An invitation as the project's list returns it: never its token or link. */
 export type Invitation = Awaited<ReturnType<typeof api.listInvitations>>["invitations"][number];
@@ -149,6 +149,42 @@ const DEAD_LINK = new Set(["inv.not_found", "inv.inviter_not_admin"]);
 export function isInvitationGone(cause: unknown): boolean {
   const code = errorCode(cause);
   return code !== undefined && DEAD_LINK.has(code);
+}
+
+/**
+ * The access the signed-in person already has to an invitation's project
+ * (#3330). Someone with access can neither accept nor decline: the link stays
+ * pending for the person it was meant for. `relation` is their strongest role,
+ * and is missing only when the server refused without naming it.
+ */
+export interface HeldAccess {
+  relation?: ProjectRelation;
+}
+
+/** The access the lookup says the signed-in person already has, if any. */
+export function heldAccess(invitation: InvitationLookup): HeldAccess | undefined {
+  const membership = invitation.type === "project_member" ? invitation.membership : undefined;
+  return membership ? { relation: membership.relation } : undefined;
+}
+
+/**
+ * The access a refused accept or decline names (`409 inv.already_member`):
+ * the person was given access after the page was loaded.
+ */
+export function heldAccessOf(cause: unknown): HeldAccess | undefined {
+  if (errorCode(cause) !== "inv.already_member") return undefined;
+  const relation = errorDetails(cause)?.relation;
+  return { relation: isProjectRelation(relation) ? relation : undefined };
+}
+
+function isProjectRelation(value: unknown): value is ProjectRelation {
+  return typeof value === "string" && value in ROLE_LABEL;
+}
+
+/** What the page tells someone who already has access to the project. */
+export function describeHeldAccess(access: HeldAccess, projectName: string): string {
+  const role = access.relation ? `${ROLE_LABEL[access.relation].toLowerCase()} ` : "";
+  return `You already have ${role}access to ${projectName}. To change your role, ask a project admin.`;
 }
 
 /** Whether a looked-up invitation can still be acted on. */

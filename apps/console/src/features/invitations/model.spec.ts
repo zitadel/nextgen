@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   analyticsRole,
   describeExpiry,
+  describeHeldAccess,
   effectiveStatus,
   invitationMessage,
   inviterLabel,
@@ -98,5 +99,19 @@ describe("inviterLabel", () => {
   it("has none without an inviter", () => {
     expect(inviterLabel({ inviter: null })).toBeUndefined();
     expect(inviterLabel({})).toBeUndefined();
+  });
+});
+
+describe("describeHeldAccess", () => {
+  it("names the role held", () => {
+    expect(describeHeldAccess({ relation: "editor" }, "acme-app")).toBe(
+      "You already have editor access to acme-app. To change your role, ask a project admin.",
+    );
+  });
+
+  it("leaves the role out when the server did not name one", () => {
+    expect(describeHeldAccess({}, "acme-app")).toBe(
+      "You already have access to acme-app. To change your role, ask a project admin.",
+    );
   });
 });
