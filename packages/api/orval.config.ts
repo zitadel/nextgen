@@ -1,5 +1,6 @@
 import { defineConfig } from "orval";
 
+import { zitadelClient } from "./scripts/client-builder.ts";
 import { absoluteDocsLinks } from "./scripts/docs-links.ts";
 import { markFakerUnchecked } from "./scripts/faker-nocheck.ts";
 import { writeOperations } from "./scripts/operations.ts";
@@ -21,29 +22,26 @@ export default defineConfig({
     output: {
       target: "./src/generated/endpoints",
       schemas: "./src/generated/model",
-      client: "fetch",
+      // orval's fetch client, every operation taking its ZitadelClient first
+      // (scripts/client-builder.ts).
+      client: zitadelClient,
       mode: "split",
       mock: true,
       // A path parameter is any string the API accepts, and schema ids are
       // routinely `$id` URIs (`https://…/default-human-user.json`). Without
       // this, orval interpolates them raw and `/schemas/{schema_id}` collapses the
-      // `//` on a redirect and 404s. orval only encodes the parameters —
-      // not the `baseUrl` below — from 8.37.0 (orval-labs/orval#4179).
+      // `//` on a redirect and 404s. The server and the API prefix (ADR 077) are
+      // the client's, which the transport puts in front of the path.
       urlEncodeParameters: true,
-      // The proxy path or server URL, then the API prefix (ADR 077).
-      baseUrl: {
-        runtime: "getApiBaseUrl()",
-        imports: [{ name: "getApiBaseUrl", importPath: "../../runtime/base-url" }],
-      },
       override: {
         fetch: {
           includeHttpResponseReturnType: false,
         },
         mutator: {
-          // Every generated operation routes through `customFetch` so
-          // bearer auth, non-2xx → throw, and JSON body parsing happen
-          // in one place. Callers consume the orval functions directly
-          // — no hand-written HTTP wrapper.
+          // Every generated operation routes through `customFetch`, with
+          // its client and its name, so the URL, bearer auth, the
+          // destructive guard, non-2xx → throw and JSON body parsing
+          // happen in one place.
           path: "./src/runtime/fetch.ts",
           name: "customFetch",
         },

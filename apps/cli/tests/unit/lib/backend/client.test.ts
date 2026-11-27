@@ -1,5 +1,5 @@
 import { destructiveOperations, operations } from "@zitadel/api/generated/operations";
-import { NetworkError } from "@zitadel/api/runtime/fetch";
+import { DestructiveOperationError, NetworkError } from "@zitadel/api/runtime/fetch";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -79,22 +79,24 @@ describe("a client's destructive operations", () => {
   const client = () =>
     createZitadelClient({ signal, baseUrl: "http://localhost:8080", token: "t" });
 
-  it("are refused on the client, cast or not", () => {
-    expect(() => (client() as unknown as Record<string, unknown>).deleteVariable).toThrow(
-      "deleteVariable is destructive: reach it through allowDestructive",
+  it("are refused before anything is sent", async () => {
+    const sent = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", sent);
+
+    await expect(client().deleteVariable("NAME", { project_id: "proj_1" })).rejects.toBeInstanceOf(
+      DestructiveOperationError,
     );
+    expect(sent).not.toHaveBeenCalled();
   });
 
-  it("are refused when reached around the type", () => {
-    expect(() => Reflect.get(client(), "revokeRelease")).toThrow(
-      "revokeRelease is destructive: reach it through allowDestructive",
-    );
-  });
+  it("are refused when reached around the type", async () => {
+    const revoke = Reflect.get(client(), "revokeRelease") as (
+      ...args: unknown[]
+    ) => Promise<unknown>;
 
-  it("are refused when reached through the property descriptor", () => {
-    expect(() => Object.getOwnPropertyDescriptor(client(), "deleteVariable")).toThrow(
-      "deleteVariable is destructive: reach it through allowDestructive",
-    );
+    await expect(revoke("rel_1", { project_id: "proj_1" })).rejects.toMatchObject({
+      operation: "revokeRelease",
+    });
   });
 
   it("leave every other operation reachable, updates included", () => {
@@ -102,8 +104,11 @@ describe("a client's destructive operations", () => {
     expect(typeof client().setVariables).toBe("function");
   });
 
-  it("are handed back by allowDestructive", () => {
-    expect(typeof allowDestructive(client()).deleteVariable).toBe("function");
+  it("are handed back by allowDestructive, on the same connection", () => {
+    const allowed = allowDestructive(client());
+
+    expect(allowed.client.allowDestructive).toBe(true);
+    expect(connectionOf(allowed)).toMatchObject({ baseUrl: "http://localhost:8080", token: "t" });
   });
 
   it("are not handed back for a client createZitadelClient did not make", () => {
@@ -259,40 +264,23 @@ describe("connectionOf", () => {
 
   /**
    * What the generated client was built with, which is what bounds the
-   * requests it makes. `connectionOf` only says what the backend recorded, so
-   * a test that read it alone would pass while the client itself went
-   * unbounded.
+   * requests it makes, beside what `connectionOf` reports: a test that read
+   * the connection alone would pass while the client itself went unbounded.
    *
    * @param opts - The options to build a client with.
-   * @returns The `timeoutMs` the generated client received.
+   * @returns The `timeoutMs` the generated client received, and the connection's.
    */
-  async function rawTimeoutOf(opts: { timeoutMs?: number | undefined }): Promise<{
+  function rawTimeoutOf(opts: { timeoutMs?: number | undefined }): {
     raw: number | undefined;
     recorded: number;
-  }> {
-    vi.resetModules();
-    const raw = vi.fn((_built: { timeoutMs?: number | undefined }) => {
-      return {} as never;
-    });
-    vi.doMock("@zitadel/api/client", async (importOriginal) => {
-      const real = await importOriginal<typeof import("@zitadel/api/client")>();
-      return {
-        ...real,
-        createZitadelClient: raw,
-      };
-    });
-    const built = await import("@/lib/backend/client");
-    const client = built.createZitadelClient({
+  } {
+    const client = createZitadelClient({
       signal,
       baseUrl: "http://localhost:8080",
       token: "t",
       ...opts,
     });
-    vi.doUnmock("@zitadel/api/client");
-    return {
-      raw: raw.mock.calls[0]?.[0].timeoutMs,
-      recorded: built.connectionOf(client).timeoutMs,
-    };
+    return { raw: client.client.timeoutMs, recorded: connectionOf(client).timeoutMs };
   }
 
   it.each([
@@ -301,8 +289,8 @@ describe("connectionOf", () => {
     ["given a deadline", { timeoutMs: 1500 }, 1500],
   ])(
     "bounds the generated client and the connection alike, with the deadline %s",
-    async (_case, opts, expected) => {
-      const { raw, recorded } = await rawTimeoutOf(opts);
+    (_case, opts, expected) => {
+      const { raw, recorded } = rawTimeoutOf(opts);
 
       expect(raw).toBe(expected);
       expect(recorded).toBe(expected);

@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { getProxyPath } from "./base-url";
 import { configureZitadel, getApi, getZitadelConfig, _resetConfigForTesting } from "./config";
 
 afterEach(() => {
@@ -9,12 +8,12 @@ afterEach(() => {
 });
 
 describe("configureZitadel", () => {
-  test("sets config and syncs proxyPath", () => {
+  test("sets config, and the project's client points at its proxy path", () => {
     const project = configureZitadel({ proxyPath: "/__nextgen", projectId: "proj_1" });
 
     expect(project.proxyPath).toBe("/__nextgen");
     expect(project.projectId).toBe("proj_1");
-    expect(getProxyPath()).toBe("/__nextgen");
+    expect(getApi(project).client.baseUrl).toBe("/__nextgen");
   });
 
   test("returns null before configuration", () => {
@@ -101,6 +100,13 @@ describe("getApi", () => {
     expect(typeof api.createFlow).toBe("function");
     expect(typeof api.revokeMySession).toBe("function");
     expect(typeof api.getMySession).toBe("function");
+  });
+
+  // Signing out of the app is `DELETE /sessions/me`.
+  test("lets the app's own client run destructive operations", () => {
+    const project = configureZitadel({ proxyPath: "/__nextgen", projectId: "proj_1" });
+
+    expect(getApi(project).client.allowDestructive).toBe(true);
   });
 
   test("returns the same instance for the same project handle", () => {

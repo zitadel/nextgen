@@ -1,4 +1,4 @@
-import type { ZitadelClient } from "@zitadel/api/client";
+import type { ZitadelApi } from "@zitadel/api/client";
 
 /**
  * Credentials of the reserved platform project, captured by the kit at
@@ -132,7 +132,7 @@ export interface SeedUsersTemplate {
 export interface ConnectedZitadel {
   handle: InstanceHandle;
   /** Authenticated platform API client (bearer = project secret). */
-  api: ZitadelClient;
+  api: ZitadelApi;
   /** Env vars an SDK-based app needs to talk to this instance/project. */
   appEnv: Record<string, string>;
   seedUser(input?: SeedUserInput): Promise<SeededUser>;

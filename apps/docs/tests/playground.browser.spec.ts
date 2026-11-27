@@ -262,14 +262,14 @@ for (const operation of [
     await expect(sample).not.toContainText("ZITADEL_PROJECT_SECRET");
     // A session-authenticated write must show how to obtain and send CSRF.
     if (operation.id === "createTeam") {
-      await expect(sample).toContainText("setApiCsrfToken");
-      await expect(sample).toContainText("client.getMySessionCsrfToken()");
+      await expect(sample).toContainText("token: () => csrf_token");
+      await expect(sample).toContainText("session.getMySessionCsrfToken()");
       // Required project parameters still start with their documented example.
       await expect(
         playground.getByRole("textbox", { name: "project_id", exact: true }),
       ).toHaveValue("proj_01KWH1P4MYS7F0N9WD3P2E4YM5");
     } else {
-      await expect(sample).not.toContainText("setApiCsrfToken");
+      await expect(sample).not.toContainText("csrf_token");
     }
 
     await playground
@@ -278,7 +278,7 @@ for (const operation of [
       .click();
     await page.getByRole("option", { name: "oauth2", exact: true }).click();
     await expect(sample).toContainText("token: process.env.ZITADEL_PROJECT_SECRET!");
-    await expect(sample).not.toContainText("setApiCsrfToken");
+    await expect(sample).not.toContainText("csrf_token");
     const authorization = playground.getByRole("textbox", { name: "Authorization", exact: true });
     await authorization.fill("Bearer docs-test-secret");
     await expect(sample).not.toContainText("docs-test-secret");

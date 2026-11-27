@@ -129,31 +129,44 @@ export function authentication(operation: OperationObject, request?: RequestData
 
 function setup(auth: Authentication, csrf: boolean): string[] {
   if (auth === "session") {
+    const project = `configureZitadel({ projectId: ${JSON.stringify(exampleProjectId)} })`;
+    if (!csrf) {
+      return [
+        'import { configureZitadel, getApi } from "@zitadel/api/config";',
+        "",
+        "// In the browser, through the SDK proxy: the session cookie authenticates the call.",
+        `const client = getApi(${project});`,
+      ];
+    }
     return [
+      'import { createZitadelApi } from "@zitadel/api/client";',
       'import { configureZitadel, getApi } from "@zitadel/api/config";',
-      ...(csrf ? ['import { setApiCsrfToken } from "@zitadel/api/runtime/auth";'] : []),
       "",
       "// In the browser, through the SDK proxy: the session cookie authenticates the call.",
-      `const client = getApi(configureZitadel({ projectId: ${JSON.stringify(exampleProjectId)} }));`,
-      ...(csrf
-        ? [
-            "",
-            "// A write the session cookie authenticates carries the session's CSRF token.",
-            "setApiCsrfToken((await client.getMySessionCsrfToken()).csrf_token);",
-          ]
-        : []),
+      `const session = getApi(${project});`,
+      "",
+      "// A write the session cookie authenticates carries the session's CSRF token.",
+      "const { csrf_token } = await session.getMySessionCsrfToken();",
+      "const client = createZitadelApi(",
+      "  session.client.with({",
+      "    csrf: { origin: location.origin, token: () => csrf_token, refresh: async () => undefined },",
+      "  }),",
+      ");",
     ];
   }
 
   return [
-    'import { createZitadelClient } from "@zitadel/api/client";',
+    'import { createZitadelApi, ZitadelClient } from "@zitadel/api/client";',
     "",
-    "const client = createZitadelClient({",
-    `  baseUrl: ${baseUrl},`,
+    "const client = createZitadelApi(",
+    "  new ZitadelClient({",
+    `    baseUrl: ${baseUrl},`,
     ...(auth === "secret"
-      ? ["  token: process.env.ZITADEL_PROJECT_SECRET!, // server-side only"]
+      ? ["    token: process.env.ZITADEL_PROJECT_SECRET!, // server-side only"]
       : []),
-    "});",
+    "    allowDestructive: true,",
+    "  }),",
+    ");",
   ];
 }
 

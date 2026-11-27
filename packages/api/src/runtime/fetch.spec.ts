@@ -1,24 +1,22 @@
-import { createServer as createHttpServer } from "node:http";
+import { createServer as createHttpServer, type IncomingHttpHeaders } from "node:http";
 import { createServer, type AddressInfo, type Server, type Socket } from "node:net";
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
-import { getApiCsrfToken, setApiCsrfRejectionHandler, setApiCsrfToken } from "./auth";
+import { type CsrfProvider, ZitadelClient, type ZitadelClientSettings } from "./client";
 import {
   ApiError,
   CSRF_HEADER,
+  DestructiveOperationError,
   NetworkError,
   apiErrorCode,
   customFetch,
-  request,
-  setRequestPolicy,
 } from "./fetch";
 
 const servers: Server[] = [];
 const sockets: Socket[] = [];
 
 afterEach(async () => {
-  setRequestPolicy({});
   for (const socket of sockets.splice(0)) socket.destroy();
   await Promise.all(servers.splice(0).map((s) => new Promise((done) => s.close(done))));
 });
@@ -43,22 +41,35 @@ function silent(): Promise<string> {
   return listening(createServer((socket) => sockets.push(socket)));
 }
 
+/** A client on `baseUrl` that may not run destructive operations, with `settings`. */
+function clientOf(baseUrl: string, settings: Partial<ZitadelClientSettings> = {}): ZitadelClient {
+  return new ZitadelClient({ baseUrl, allowDestructive: false, ...settings });
+}
+
+/** `path` sent by `client` as the generated `createTeam` sends it. */
+function send(client: ZitadelClient, path: string, init: RequestInit = {}): Promise<unknown> {
+  return customFetch(client, "createTeam")(path, init);
+}
+
 describe("customFetch", () => {
   it("rejects a refused connection with an unreachable NetworkError", async () => {
     const base = await closedPort();
 
-    const error = await customFetch(`${base}/health`, { method: "GET" }).catch((e: unknown) => e);
+    const error = await send(clientOf(base), "/health", { method: "GET" }).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(NetworkError);
-    expect(error).toMatchObject({ reason: "unreachable", url: `${base}/health` });
-    expect((error as Error).message).toBe(`GET ${base}/health got no response (ECONNREFUSED)`);
+    expect(error).toMatchObject({ reason: "unreachable", url: `${base}/api/v1/health` });
+    expect((error as Error).message).toBe(
+      `GET ${base}/api/v1/health got no response (ECONNREFUSED)`,
+    );
   });
 
   it("rejects a server that never answers with a timeout NetworkError", async () => {
     const base = await silent();
-    setRequestPolicy({ timeoutMs: 50 });
 
-    const error = await customFetch(`${base}/health`, { method: "GET" }).catch((e: unknown) => e);
+    const error = await send(clientOf(base, { timeoutMs: 50 }), "/health", { method: "GET" }).catch(
+      (e: unknown) => e,
+    );
 
     expect(error).toBeInstanceOf(NetworkError);
     expect(error).toMatchObject({ reason: "timeout" });
@@ -68,9 +79,10 @@ describe("customFetch", () => {
     const base = await silent();
     const controller = new AbortController();
     const cancelled = new Error("cancelled by the user");
-    setRequestPolicy({ signal: controller.signal });
 
-    const pending = customFetch(`${base}/health`, { method: "GET" }).catch((e: unknown) => e);
+    const pending = send(clientOf(base, { signal: controller.signal }), "/health", {
+      method: "GET",
+    }).catch((e: unknown) => e);
     controller.abort(cancelled);
 
     expect(await pending).toBe(cancelled);
@@ -79,7 +91,7 @@ describe("customFetch", () => {
   it("treats a per-call timeout signal as a timeout", async () => {
     const base = await silent();
 
-    const error = await customFetch(`${base}/health`, {
+    const error = await send(clientOf(base), "/health", {
       method: "GET",
       signal: AbortSignal.timeout(50),
     }).catch((e: unknown) => e);
@@ -94,7 +106,7 @@ describe("customFetch", () => {
     });
     const base = await listening(http as unknown as Server);
 
-    const error = await customFetch(`${base}/health`, { method: "GET" }).catch((e: unknown) => e);
+    const error = await send(clientOf(base), "/health", { method: "GET" }).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(ApiError);
     expect(error).toMatchObject({ status: 503, requestId: undefined });
@@ -107,7 +119,7 @@ describe("customFetch", () => {
     });
     const base = await listening(http as unknown as Server);
 
-    const error = await customFetch(`${base}/api/v1/users/me`, { method: "GET" }).catch(
+    const error = await send(clientOf(base), "/users/me", { method: "GET" }).catch(
       (e: unknown) => e,
     );
 
@@ -124,7 +136,7 @@ describe("customFetch", () => {
     });
     const base = await listening(http as unknown as Server);
 
-    const error = await customFetch(`${base}/api/v1/users/usr_1`, { method: "GET" }).catch(
+    const error = await send(clientOf(base), "/users/usr_1", { method: "GET" }).catch(
       (e: unknown) => e,
     );
 
@@ -140,14 +152,16 @@ describe("customFetch", () => {
     });
     const base = await listening(http as unknown as Server);
 
-    const error = await customFetch(`${base}/sessions/exchange`, { method: "POST" }).catch(
+    const error = await send(clientOf(base), "/sessions/exchange", { method: "POST" }).catch(
       (e: unknown) => e,
     );
 
     expect(error).toBeInstanceOf(NetworkError);
-    expect(error).toMatchObject({ reason: "unreadable", url: `${base}/sessions/exchange` });
+    expect(error).toMatchObject({ reason: "unreadable", url: `${base}/api/v1/sessions/exchange` });
     expect((error as Error).message).toMatch(
-      new RegExp(`^POST ${base}/sessions/exchange answered 200, but its body could not be read`),
+      new RegExp(
+        `^POST ${base}/api/v1/sessions/exchange answered 200, but its body could not be read`,
+      ),
     );
   });
 
@@ -158,241 +172,309 @@ describe("customFetch", () => {
     });
     const base = await listening(http as unknown as Server);
 
-    const error = await customFetch(`${base}/users`, { method: "GET" }).catch((e: unknown) => e);
+    const error = await send(clientOf(base), "/users", { method: "GET" }).catch((e: unknown) => e);
 
     expect(error).toMatchObject({ status: 400, requestId: "req_01TEST" });
   });
 });
 
-describe("request", () => {
-  it("is bound only by the policy it is given, not by a client's", async () => {
+/** One request a {@link recording} server received. */
+type Seen = Readonly<{ method: string; path: string; headers: IncomingHttpHeaders }>;
+
+/** An answer a {@link recording} server gives: a status and a JSON body. */
+type Answer = readonly [status: number, body?: unknown];
+
+/**
+ * A server that records every request and answers each with the next of
+ * `answers`, then `204` once they run out.
+ */
+async function recording(answers: Answer[] = []): Promise<{ base: string; seen: Seen[] }> {
+  const seen: Seen[] = [];
+  const http = createHttpServer((req, res) => {
+    req.resume();
+    req.on("end", () => {
+      seen.push({ method: req.method ?? "", path: req.url ?? "", headers: req.headers });
+      const [status, body] = answers.shift() ?? [204];
+      res.writeHead(status, { "content-type": "application/json" });
+      res.end(body === undefined ? undefined : JSON.stringify(body));
+    });
+  });
+  return { base: await listening(http as unknown as Server), seen };
+}
+
+const CSRF_REFUSED: Answer = [403, { code: "auth.csrf_invalid", message: "refused" }];
+const CREATED: Answer = [201, { id: "team_1" }];
+
+/** A CSRF provider for `origin` that holds `token` and refreshes to `fresh`, counting refreshes. */
+function csrfFor(origin: string, token: string | undefined, fresh?: string) {
+  const counted = { refreshes: 0 };
+  const provider: CsrfProvider = {
+    origin,
+    token: () => token,
+    refresh: async () => {
+      counted.refreshes += 1;
+      return fresh;
+    },
+  };
+  return { provider, counted };
+}
+
+describe("customFetch with two clients", () => {
+  it("never lets one client's settings reach the other's requests", async () => {
+    const one = await recording();
+    const two = await recording();
+    const first = clientOf(one.base, { token: "one", userAgent: "agent/one" });
+    const second = clientOf(two.base, { token: "two", userAgent: "agent/two" });
+
+    await Promise.all([
+      send(first, "/a", { method: "GET" }),
+      send(second, "/b", { method: "GET" }),
+      send(first, "/c", { method: "GET" }),
+    ]);
+
+    expect(
+      one.seen.map(({ path, headers }) => [path, headers.authorization, headers["user-agent"]]),
+    ).toEqual([
+      ["/api/v1/a", "Bearer one", "agent/one"],
+      ["/api/v1/c", "Bearer one", "agent/one"],
+    ]);
+    expect(
+      two.seen.map(({ path, headers }) => [path, headers.authorization, headers["user-agent"]]),
+    ).toEqual([["/api/v1/b", "Bearer two", "agent/two"]]);
+  });
+
+  it("never puts one client's deadline on the other's requests", async () => {
     const base = await silent();
-    setRequestPolicy({ timeoutMs: 10 });
+    const bounded = clientOf(base, { timeoutMs: 20 });
+    const unbounded = clientOf(base);
 
     const outcome = await Promise.race([
-      request(`${base}/x`, { method: "GET" }).then(
-        () => "settled",
-        () => "settled",
-      ),
-      new Promise((done) => setTimeout(() => done("still waiting"), 100)),
+      Promise.all([
+        send(bounded, "/x").catch(() => "timed out"),
+        send(unbounded, "/x").then(
+          () => "settled",
+          () => "settled",
+        ),
+      ]),
+      new Promise((done) => setTimeout(() => done("still waiting"), 150)),
     ]);
 
     expect(outcome).toBe("still waiting");
   });
+
+  it("never lets one client's signal abort the other's requests", async () => {
+    const base = await recording([[200, { ok: true }]]);
+    const cancelled = clientOf(base.base, { signal: AbortSignal.abort(new Error("cancelled")) });
+
+    await expect(send(cancelled, "/x")).rejects.toThrow("cancelled");
+    await expect(send(clientOf(base.base), "/x")).resolves.toEqual({ ok: true });
+  });
+
+  it("keeps a header the caller set over the client's bearer", async () => {
+    const { base, seen } = await recording();
+
+    await send(clientOf(base, { token: "client" }), "/x", {
+      headers: { authorization: "Bearer own" },
+    });
+
+    expect(seen[0]?.headers.authorization).toBe("Bearer own");
+  });
 });
 
-function captureFetch() {
-  const seen: Headers[] = [];
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (_url: string, init: RequestInit) => {
-      seen.push(new Headers(init.headers));
-      return new Response(null, { status: 204 });
-    }),
-  );
-  return seen;
-}
+describe("customFetch destructive guard", () => {
+  it("refuses a destructive operation before anything is sent", async () => {
+    const { base, seen } = await recording();
 
-// The CSRF tests run as a page served from the API's origin, the way the
-// console is: the token and the rejection handler default to that origin.
-beforeEach(() => {
-  vi.stubGlobal("location", new URL("http://api.test/console/"));
+    const error = await customFetch(clientOf(base), "deleteUser")("/users/usr_1", {
+      method: "DELETE",
+    }).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(DestructiveOperationError);
+    expect(error).toMatchObject({ operation: "deleteUser" });
+    expect(seen).toEqual([]);
+  });
+
+  it("runs a destructive operation for a client that allows it", async () => {
+    const { base, seen } = await recording();
+
+    await customFetch(clientOf(base, { allowDestructive: true }), "deleteUser")("/users/usr_1", {
+      method: "DELETE",
+    });
+
+    expect(seen.map(({ method, path }) => [method, path])).toEqual([
+      ["DELETE", "/api/v1/users/usr_1"],
+    ]);
+  });
+
+  it("runs any other operation for a client that does not allow destructive ones", async () => {
+    const { base, seen } = await recording();
+
+    await send(clientOf(base), "/teams", { method: "POST" });
+
+    expect(seen).toHaveLength(1);
+  });
 });
-
-afterEach(() => {
-  setApiCsrfToken(undefined);
-  setApiCsrfRejectionHandler(undefined);
-  vi.unstubAllGlobals();
-});
-
-/** Answers each request with the next response; records the CSRF header sent. */
-function scriptedFetch(responses: Array<() => Response>) {
-  const sent: Array<string | null> = [];
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (_url: string, init: RequestInit) => {
-      sent.push(new Headers(init.headers).get(CSRF_HEADER));
-      const next = responses.shift();
-      if (!next) throw new Error("unexpected request");
-      return next();
-    }),
-  );
-  return sent;
-}
-
-const csrfRefused = () =>
-  new Response(JSON.stringify({ code: "auth.csrf_invalid", message: "refused" }), { status: 403 });
 
 describe("customFetch CSRF header", () => {
   it("sends the token on unsafe methods", async () => {
-    const seen = captureFetch();
-    setApiCsrfToken("tok");
+    const { base, seen } = await recording();
+    const client = clientOf(base, { csrf: csrfFor(base, "tok").provider });
+
     for (const method of ["POST", "PATCH", "DELETE", "put"]) {
-      await customFetch("http://api.test/x", { method });
+      await send(client, "/x", { method });
     }
-    expect(seen.map((headers) => headers.get(CSRF_HEADER))).toEqual(["tok", "tok", "tok", "tok"]);
+
+    expect(seen.map(({ headers }) => headers["x-zitadel-csrf"])).toEqual([
+      "tok",
+      "tok",
+      "tok",
+      "tok",
+    ]);
   });
 
   it("leaves safe methods alone", async () => {
-    const seen = captureFetch();
-    setApiCsrfToken("tok");
-    await customFetch("http://api.test/x", {});
-    await customFetch("http://api.test/x", { method: "GET" });
-    expect(seen.map((headers) => headers.has(CSRF_HEADER))).toEqual([false, false]);
+    const { base, seen } = await recording();
+    const client = clientOf(base, { csrf: csrfFor(base, "tok").provider });
+
+    await send(client, "/x");
+    await send(client, "/x", { method: "GET" });
+
+    expect(seen.map(({ headers }) => "x-zitadel-csrf" in headers)).toEqual([false, false]);
   });
 
-  it("adds nothing when no token is set", async () => {
-    const seen = captureFetch();
-    await customFetch("http://api.test/x", { method: "POST" });
-    expect(seen[0]?.has(CSRF_HEADER)).toBe(false);
+  it("adds nothing when the provider has no token yet", async () => {
+    const { base, seen } = await recording();
+
+    await send(clientOf(base, { csrf: csrfFor(base, undefined).provider }), "/x", {
+      method: "POST",
+    });
+
+    expect("x-zitadel-csrf" in (seen[0]?.headers ?? {})).toBe(false);
   });
 
-  // Another client on the page, with another base URL, must not carry this
-  // session's token to a different host.
+  it("adds nothing for a client without a provider", async () => {
+    const { base, seen } = await recording();
+
+    await send(clientOf(base), "/x", { method: "POST" });
+
+    expect("x-zitadel-csrf" in (seen[0]?.headers ?? {})).toBe(false);
+  });
+
   it("sends the token only to the origin it was issued for", async () => {
-    const seen = captureFetch();
-    setApiCsrfToken("tok");
-    await customFetch("http://other.test/x", { method: "POST" });
-    await customFetch("/api/x", { method: "POST" });
-    expect(seen.map((headers) => headers.get(CSRF_HEADER))).toEqual([null, "tok"]);
+    const issuer = await recording();
+    const other = await recording();
+    const csrf = csrfFor(issuer.base, "tok").provider;
+
+    await send(clientOf(other.base, { csrf }), "/x", { method: "POST" });
+    await send(clientOf(issuer.base, { csrf }), "/x", { method: "POST" });
+
+    expect("x-zitadel-csrf" in (other.seen[0]?.headers ?? {})).toBe(false);
+    expect(issuer.seen[0]?.headers["x-zitadel-csrf"]).toBe("tok");
   });
 
-  it("takes an explicit origin", async () => {
-    const seen = captureFetch();
-    setApiCsrfToken("tok", "http://other.test");
-    await customFetch("http://other.test/x", { method: "POST" });
-    await customFetch("http://api.test/x", { method: "POST" });
-    expect(seen.map((headers) => headers.get(CSRF_HEADER))).toEqual(["tok", null]);
-  });
+  it("reads the token again on every request", async () => {
+    const { base, seen } = await recording();
+    let token = "first";
+    const client = clientOf(base, {
+      csrf: { origin: base, token: () => token, refresh: async () => undefined },
+    });
 
-  it("sends nothing when there is no origin to go by", async () => {
-    vi.stubGlobal("location", undefined);
-    const seen = captureFetch();
-    setApiCsrfToken("tok");
-    await customFetch("http://api.test/x", { method: "POST" });
-    expect(seen[0]?.has(CSRF_HEADER)).toBe(false);
+    await send(client, "/x", { method: "POST" });
+    token = "second";
+    await send(client, "/x", { method: "POST" });
+
+    expect(seen.map(({ headers }) => headers["x-zitadel-csrf"])).toEqual(["first", "second"]);
   });
 
   it("keeps a header the caller set itself", async () => {
-    const seen = captureFetch();
-    setApiCsrfToken("tok");
-    await customFetch("http://api.test/x", { method: "POST", headers: { [CSRF_HEADER]: "own" } });
-    expect(seen[0]?.get(CSRF_HEADER)).toBe("own");
+    const { base, seen } = await recording();
+
+    await send(clientOf(base, { csrf: csrfFor(base, "tok").provider }), "/x", {
+      method: "POST",
+      headers: { [CSRF_HEADER]: "own" },
+    });
+
+    expect(seen[0]?.headers["x-zitadel-csrf"]).toBe("own");
   });
 });
 
-const created = () => new Response(JSON.stringify({ id: "team_1" }), { status: 201 });
-
 describe("customFetch CSRF refusal", () => {
-  it("retries once with the token the handler hands back", async () => {
-    const sent = scriptedFetch([csrfRefused, created]);
-    setApiCsrfToken("stale");
-    setApiCsrfRejectionHandler(async () => "fresh");
-    await expect(
-      customFetch("http://api.test/teams", { method: "POST", body: "{}" }),
-    ).resolves.toEqual({
-      id: "team_1",
-    });
-    expect(sent).toEqual(["stale", "fresh"]);
-  });
+  it("retries once with the token the provider hands back", async () => {
+    const { base, seen } = await recording([CSRF_REFUSED, CREATED]);
+    const client = clientOf(base, { csrf: csrfFor(base, "stale", "fresh").provider });
 
-  // The client sets the request policy per call. Another call made while the
-  // session is re-checked must not put its signal or deadline on this retry.
-  it("retries under the policy the request started with", async () => {
-    const responses = [csrfRefused, created];
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (_url: string, init: RequestInit) => {
-        if (init.signal?.aborted) throw init.signal.reason;
-        const next = responses.shift();
-        if (!next) throw new Error("unexpected request");
-        return next();
-      }),
-    );
-    setApiCsrfToken("stale");
-    setApiCsrfRejectionHandler(async () => {
-      setRequestPolicy({ signal: AbortSignal.abort(new Error("another call's signal")) });
-      return "fresh";
-    });
-    await expect(customFetch("http://api.test/teams", { method: "POST" })).resolves.toEqual({
+    await expect(send(client, "/teams", { method: "POST", body: "{}" })).resolves.toEqual({
       id: "team_1",
     });
+    expect(seen.map(({ headers }) => headers["x-zitadel-csrf"])).toEqual(["stale", "fresh"]);
   });
 
   it("recovers a write that went out without a token", async () => {
-    const sent = scriptedFetch([csrfRefused, created]);
-    setApiCsrfRejectionHandler(async () => "fresh");
-    await expect(customFetch("http://api.test/teams", { method: "POST" })).resolves.toEqual({
-      id: "team_1",
-    });
-    expect(sent).toEqual([null, "fresh"]);
+    const { base, seen } = await recording([CSRF_REFUSED, CREATED]);
+    const client = clientOf(base, { csrf: csrfFor(base, undefined, "fresh").provider });
+
+    await expect(send(client, "/teams", { method: "POST" })).resolves.toEqual({ id: "team_1" });
+    expect(seen.map(({ headers }) => headers["x-zitadel-csrf"])).toEqual([undefined, "fresh"]);
   });
 
-  // The handler hands back nothing when someone else, or nobody, is signed in
+  // The provider hands back nothing when someone else, or nobody, is signed in
   // now: the write is not replayed under a session it was not prepared for.
-  it("does not retry when the handler hands back no token", async () => {
-    const sent = scriptedFetch([csrfRefused]);
-    setApiCsrfToken("stale");
-    setApiCsrfRejectionHandler(async () => undefined);
-    await expect(customFetch("http://api.test/teams", { method: "POST" })).rejects.toBeInstanceOf(
-      ApiError,
-    );
-    expect(sent).toEqual(["stale"]);
+  it("does not retry when the provider hands back no token", async () => {
+    const { base, seen } = await recording([CSRF_REFUSED]);
+    const client = clientOf(base, { csrf: csrfFor(base, "stale").provider });
+
+    await expect(send(client, "/teams", { method: "POST" })).rejects.toBeInstanceOf(ApiError);
+    expect(seen).toHaveLength(1);
   });
 
   it("retries at most once", async () => {
-    const sent = scriptedFetch([csrfRefused, csrfRefused]);
-    setApiCsrfToken("stale");
-    const onRejected = vi.fn(async () => "fresh");
-    setApiCsrfRejectionHandler(onRejected);
-    await expect(customFetch("http://api.test/teams", { method: "POST" })).rejects.toBeInstanceOf(
-      ApiError,
-    );
-    expect(sent).toEqual(["stale", "fresh"]);
-    expect(onRejected).toHaveBeenCalledOnce();
+    const { base, seen } = await recording([CSRF_REFUSED, CSRF_REFUSED]);
+    const { provider, counted } = csrfFor(base, "stale", "fresh");
+
+    await expect(
+      send(clientOf(base, { csrf: provider }), "/teams", { method: "POST" }),
+    ).rejects.toBeInstanceOf(ApiError);
+    expect(seen.map(({ headers }) => headers["x-zitadel-csrf"])).toEqual(["stale", "fresh"]);
+    expect(counted.refreshes).toBe(1);
   });
 
   it("does not retry a body that can be read only once", async () => {
-    const sent = scriptedFetch([csrfRefused]);
-    setApiCsrfToken("stale");
-    const onRejected = vi.fn(async () => "fresh");
-    setApiCsrfRejectionHandler(onRejected);
+    const { base, seen } = await recording([CSRF_REFUSED]);
+    const { provider, counted } = csrfFor(base, "stale", "fresh");
+
     await expect(
-      customFetch("http://api.test/teams", { method: "POST", body: new ReadableStream() }),
+      send(clientOf(base, { csrf: provider }), "/teams", {
+        method: "POST",
+        body: new ReadableStream({ start: (controller) => controller.close() }),
+        duplex: "half",
+      } as RequestInit),
     ).rejects.toBeInstanceOf(ApiError);
-    expect(onRejected).not.toHaveBeenCalled();
-    expect(sent).toEqual(["stale"]);
+    expect(counted.refreshes).toBe(0);
+    expect(seen).toHaveLength(1);
   });
 
   it("leaves a refusal from another origin alone", async () => {
-    scriptedFetch([csrfRefused]);
-    setApiCsrfToken("tok");
-    const onRejected = vi.fn(async () => "fresh");
-    setApiCsrfRejectionHandler(onRejected);
-    await expect(customFetch("http://other.test/teams", { method: "POST" })).rejects.toBeInstanceOf(
-      ApiError,
-    );
-    expect(onRejected).not.toHaveBeenCalled();
+    const issuer = await recording();
+    const other = await recording([CSRF_REFUSED]);
+    const { provider, counted } = csrfFor(issuer.base, "tok", "fresh");
+
+    await expect(
+      send(clientOf(other.base, { csrf: provider }), "/teams", { method: "POST" }),
+    ).rejects.toBeInstanceOf(ApiError);
+    expect(counted.refreshes).toBe(0);
   });
 
   it("leaves other 403 answers and safe methods alone", async () => {
-    scriptedFetch([
-      () =>
-        new Response(JSON.stringify({ code: "team.permission_denied", message: "no" }), {
-          status: 403,
-        }),
-      csrfRefused,
+    const { base } = await recording([
+      [403, { code: "team.permission_denied", message: "no" }],
+      CSRF_REFUSED,
     ]);
-    setApiCsrfToken("tok");
-    const onRejected = vi.fn(async () => "fresh");
-    setApiCsrfRejectionHandler(onRejected);
-    await expect(customFetch("http://api.test/teams", { method: "POST" })).rejects.toBeInstanceOf(
-      ApiError,
-    );
-    await expect(customFetch("http://api.test/teams", { method: "GET" })).rejects.toBeInstanceOf(
-      ApiError,
-    );
-    expect(onRejected).not.toHaveBeenCalled();
+    const { provider, counted } = csrfFor(base, "tok", "fresh");
+    const client = clientOf(base, { csrf: provider });
+
+    await expect(send(client, "/teams", { method: "POST" })).rejects.toBeInstanceOf(ApiError);
+    await expect(send(client, "/teams", { method: "GET" })).rejects.toBeInstanceOf(ApiError);
+    expect(counted.refreshes).toBe(0);
   });
 });
 
@@ -404,18 +486,5 @@ describe("apiErrorCode", () => {
     expect(apiErrorCode({ code: "user.not_found" })).toBe("user.not_found");
     expect(apiErrorCode({ raw: "<html>" })).toBeUndefined();
     expect(apiErrorCode(new Error("x"))).toBeUndefined();
-  });
-});
-
-describe("CSRF token slot", () => {
-  it("is shared through globalThis, so another copy of the module sees it", () => {
-    setApiCsrfToken("tok");
-    const slot = (globalThis as Record<symbol, { token?: string } | undefined>)[
-      Symbol.for("@zitadel/api/auth:csrf")
-    ];
-    expect(slot?.token).toBe("tok");
-    if (!slot) throw new Error("the slot must exist once a token was set");
-    slot.token = "from-another-copy";
-    expect(getApiCsrfToken()).toBe("from-another-copy");
   });
 });

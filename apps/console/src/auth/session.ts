@@ -1,12 +1,9 @@
 import type { GetMySession200 } from "@zitadel/api/generated/model";
-import {
-  getApiCsrfToken,
-  setApiCsrfRejectionHandler,
-  setApiCsrfToken,
-} from "@zitadel/api/runtime/auth";
 import { ApiError, apiErrorCode } from "@zitadel/api/runtime/fetch";
 
-import { api, apiBase } from "@/api/zitadel";
+import { getCsrfToken, setCsrfRefresh, setCsrfToken } from "./csrf";
+
+import { api } from "@/api/zitadel";
 import { clearSessionCaches } from "@/lib/session-cache";
 import { stringParam } from "@/lib/search-params";
 import { getConsoleProjectId } from "@/runtime/runtime";
@@ -26,13 +23,6 @@ import { getConsoleProjectId } from "@/runtime/runtime";
 export type ConsoleSession = GetMySession200;
 
 const withCredentials: RequestInit = { credentials: "include" };
-
-/**
- * The origin the console's API lives on, which issues the CSRF token: the
- * shared fetch sends the token there and nowhere else (ADR 053 §5). Usually the
- * page's own; `VITE_CONSOLE_API_BASE` may point elsewhere.
- */
-const apiOrigin = new URL(apiBase || "/", window.location.href).origin;
 
 /**
  * Short-lived cache of the last confirmed session. The `_authed` guard runs
@@ -77,7 +67,7 @@ export function refreshSession(): void {
  */
 export function invalidateSessionCache(): void {
   cachedSession = null;
-  setApiCsrfToken(undefined);
+  setCsrfToken(undefined);
   clearSessionCaches();
 }
 
@@ -179,7 +169,7 @@ export async function fetchSession(): Promise<ConsoleSession | null> {
   // session is known to be active: a signed-out check never asks for one. Only
   // the session decides whether someone is signed in, and a failed token read
   // never replaces a token that works.
-  if (!getApiCsrfToken()) await loadCsrfToken();
+  if (!getCsrfToken()) await loadCsrfToken();
   return session;
 }
 
@@ -198,8 +188,8 @@ function readCsrfToken(): Promise<string | undefined> {
 async function loadCsrfToken(pending?: Promise<string | undefined>): Promise<string | undefined> {
   const token = await (pending ?? readCsrfToken());
   if (!token) return undefined;
-  // The shared fetch adds it to every unsafe request to the API from here on.
-  setApiCsrfToken(token, apiOrigin);
+  // The console's client adds it to every unsafe request to the API from here on.
+  setCsrfToken(token);
   return token;
 }
 
@@ -214,7 +204,7 @@ let recheck: Promise<string | undefined> | undefined;
  * again, with the token alongside it:
  *
  * - still this page's person: their token is stored and returned, and the
- *   shared fetch retries the write once with it;
+ *   console's client retries the write once with it;
  * - someone else, or nobody (401): nothing is returned, so the write stays
  *   refused and is never replayed as another person, and the page starts over;
  * - the session read failed for another reason, or this page has no person
@@ -241,12 +231,12 @@ async function recheckAfterRejection(): Promise<string | undefined> {
 }
 
 // Concurrent refusals share one re-check.
-setApiCsrfRejectionHandler(() => {
+setCsrfRefresh(() => {
   recheck ??= recheckAfterRejection().finally(() => {
     recheck = undefined;
   });
   return recheck;
-}, apiOrigin);
+});
 
 /**
  * Revokes the current session (`DELETE /sessions/me`). The server deletes the

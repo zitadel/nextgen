@@ -1,9 +1,9 @@
 import {
-  createZitadelClient as createRawClient,
-  type ZitadelClient as FullClient,
-  type ZitadelClientOptions,
+  createZitadelApi,
+  type ZitadelApi,
+  ZitadelClient as Client,
+  type ZitadelClientSettings,
 } from "@zitadel/api/client";
-import { destructiveOperations } from "@zitadel/api/generated/operations";
 import { ApiError, apiErrorCode, apiErrorMessage, NetworkError } from "@zitadel/api/runtime/fetch";
 
 import {
@@ -103,62 +103,63 @@ export function responseFailure(
   return refusalOf(new ApiError(status, url, body, message));
 }
 
-/** The client functions a client without permission refuses. */
-const WITHHELD: ReadonlySet<string> = new Set(destructiveOperations);
+/** Every client {@link createZitadelClient} made, so only those are trusted. */
+const made = new WeakSet<object>();
 
-/** Each narrowed client's full client, which only {@link allowDestructive} reads. */
-const fullClients = new WeakMap<object, ZitadelClient>();
+/** Each client's counterpart that may run destructive operations, made once. */
+const destructive = new WeakMap<object, ZitadelClient>();
 
-/**
- * The client without its destructive operations, at run time: reaching one
- * throws, however it is reached (a cast, `Reflect.get`, a property descriptor,
- * an `any`). Only {@link allowDestructive} hands back the full client.
- * `createZitadelClient` narrows every client it makes.
- *
- * Updates are not withheld: a merge-patch `null` (`setVariables`, the user and
- * project patches) still removes what it names.
- */
-function withholdDestructive(client: ZitadelClient): ZitadelClient {
-  const refuse = (what: string): never => {
-    throw new Error(`${what} is destructive: reach it through allowDestructive`);
-  };
-  const narrowed = new Proxy(client, {
-    get(target, property, receiver) {
-      if (typeof property === "string" && WITHHELD.has(property)) {
-        refuse(property);
-      }
-      return Reflect.get(target, property, receiver);
-    },
-    getOwnPropertyDescriptor(target, property) {
-      if (typeof property === "string" && WITHHELD.has(property)) {
-        refuse(property);
-      }
-      return Reflect.getOwnPropertyDescriptor(target, property);
+/** The client functions for one {@link Client}, failing as the backend fails. */
+function bind(client: Client): ZitadelClient {
+  // The hook applies to every call, each page of a paged one included.
+  const api = createZitadelApi(client, {
+    onError: (error: unknown): never => {
+      throw translateFailure(error);
     },
   });
-  fullClients.set(narrowed, client);
-  return narrowed;
+  made.add(api);
+  return api;
 }
 
 /**
  * The client with its destructive operations: every `DELETE`, and what the spec
  * marks `x-zitadel-destructive`. A client made by `createZitadelClient` refuses
- * them, so nothing deletes, revokes or rolls back until a caller asks for them
- * here.
+ * them in the transport, before anything is sent and however the operation is
+ * reached, so nothing deletes, revokes or rolls back until a caller asks for
+ * them here.
+ *
+ * Updates are not withheld: a merge-patch `null` (`setVariables`, the user and
+ * project patches) still removes what it names.
  *
  * @param client - A client `createZitadelClient` made.
- * @returns The same client, with its destructive operations.
+ * @returns A client on the same connection that may run destructive operations.
  */
 export function allowDestructive(client: ZitadelClient): ZitadelClient {
-  const full = fullClients.get(client);
-  if (full === undefined) {
+  if (!made.has(client)) {
     throw new Error("Only a client createZitadelClient made can allow its destructive operations");
   }
+  if (client.client.allowDestructive) {
+    return client;
+  }
+  const known = destructive.get(client);
+  if (known !== undefined) {
+    return known;
+  }
+  const full = bind(client.client.with({ allowDestructive: true }));
+  destructive.set(client, full);
   return full;
 }
 
 /** The typed Zitadel client: every operation of the API. */
-export type ZitadelClient = FullClient;
+export type ZitadelClient = ZitadelApi;
+
+/** What the CLI makes a client from: the run's signal is required, the rest optional. */
+export type ZitadelClientOptions = Omit<
+  ZitadelClientSettings,
+  "allowDestructive" | "csrf" | "signal"
+> & {
+  signal: AbortSignal;
+};
 
 /**
  * Build the typed Zitadel client the CLI talks to the server through.
@@ -178,41 +179,12 @@ export type ZitadelClient = FullClient;
  * @param opts - Where to point the client, what to authenticate with, and the run's signal.
  * @returns The client, without its destructive operations until {@link allowDestructive}.
  */
-export function createZitadelClient(
-  // The backend sets the error hook itself, so a caller's would be silently replaced.
-  opts: Omit<ZitadelClientOptions, "onResponse" | "onError" | "signal"> & {
-    signal: AbortSignal;
-  },
-): ZitadelClient {
+export function createZitadelClient(opts: ZitadelClientOptions): ZitadelClient {
   // Settled once, so the client and the connection a service reads cannot
   // disagree: spreading `opts` over a default lets an explicit `undefined`
   // wipe it, which would leave the client unbounded while this still said 30s.
   const timeoutMs = opts.timeoutMs ?? REQUEST_TIMEOUT_MS;
-  // The client applies the hook to every call, each page of a paged one included.
-  const full = createRawClient({
-    ...opts,
-    timeoutMs,
-    onError: (error: unknown): never => {
-      throw translateFailure(error);
-    },
-  });
-  const narrowed = withholdDestructive(full);
-  const connection = {
-    baseUrl: opts.baseUrl,
-    token: opts.token,
-    signal: opts.signal,
-    timeoutMs,
-    userAgent: opts.userAgent,
-  };
-  connections.set(narrowed, {
-    ...connection,
-    destructive: false,
-  });
-  connections.set(full, {
-    ...connection,
-    destructive: true,
-  });
-  return narrowed;
+  return bind(new Client({ ...opts, timeoutMs, allowDestructive: false }));
 }
 
 /** Where a client was pointed, and whether it may reach destructive operations. */
@@ -225,9 +197,6 @@ export type Connection = Readonly<{
   destructive: boolean;
 }>;
 
-/** Each client `createZitadelClient` made, with the connection it was made for. */
-const connections = new WeakMap<object, Connection>();
-
 /**
  * Where a client was pointed. For a service that sends a request the generated
  * client has no function for, and so must send it the way the client does.
@@ -236,11 +205,22 @@ const connections = new WeakMap<object, Connection>();
  * @returns The server, the credential, the signal and whether destructive operations are allowed.
  */
 export function connectionOf(client: ZitadelClient): Connection {
-  const connection = connections.get(client);
-  if (connection === undefined) {
+  if (!made.has(client)) {
     throw new Error("Only a client createZitadelClient made has a connection");
   }
-  return connection;
+  const { signal, timeoutMs } = client.client;
+  // createZitadelClient always sets both.
+  if (signal === undefined || timeoutMs === undefined) {
+    throw new Error("Only a client createZitadelClient made has a connection");
+  }
+  return {
+    baseUrl: client.client.baseUrl,
+    token: client.client.token,
+    signal,
+    timeoutMs,
+    userAgent: client.client.userAgent,
+    destructive: client.client.allowDestructive,
+  };
 }
 
 /**
@@ -262,8 +242,8 @@ export function connectionOf(client: ZitadelClient): Connection {
  * @returns True when the run was cancelled.
  */
 export function isCancelled(client: ZitadelClient): boolean {
-  return connections.get(client)?.signal.aborted === true;
+  return made.has(client) && client.client.signal?.aborted === true;
 }
 
 export { pagedFunctions } from "@zitadel/api/client";
-export type { ZitadelClientOptions };
+export type { OperationName } from "@zitadel/api/client";

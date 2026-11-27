@@ -1,8 +1,3 @@
-import {
-  getApiCsrfRejectionHandler,
-  getApiCsrfToken,
-  setApiCsrfToken,
-} from "@zitadel/api/runtime/auth";
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -14,6 +9,8 @@ import {
   sessionPage,
   signOut,
 } from "./session";
+import { getCsrfToken, setCsrfToken } from "./csrf";
+import { api } from "@/api/zitadel";
 import { _resetRuntimeForTesting, _setRuntimeForTesting } from "@/runtime/runtime";
 import { makeTestSession } from "@/test/session.fixture";
 import { server } from "@/test/msw";
@@ -23,7 +20,7 @@ beforeEach(() => {
   vi.spyOn(sessionPage, "reload").mockImplementation(() => undefined);
 });
 afterEach(() => {
-  setApiCsrfToken(undefined);
+  setCsrfToken(undefined);
   _resetRuntimeForTesting();
   vi.useRealTimers();
   vi.restoreAllMocks();
@@ -64,11 +61,11 @@ function stubCsrf(respond: () => Response) {
 const token = (value: string) => () => HttpResponse.json({ csrf_token: value });
 const failing = () => HttpResponse.json({ code: "internal", message: "no" }, { status: 500 });
 
-/** What customFetch does on a 403 auth.csrf_invalid: ask for a token to retry with. */
+/** What the console's client does on a 403 auth.csrf_invalid: ask for a token to retry with. */
 function rejectWrite(): Promise<string | undefined> {
-  const onRejected = getApiCsrfRejectionHandler();
-  if (!onRejected) throw new Error("session.ts registers the rejection handler");
-  return onRejected();
+  const csrf = api.client.csrf;
+  if (!csrf) throw new Error("the console's client carries the session's CSRF token");
+  return csrf.refresh();
 }
 
 describe("fetchSession", () => {
@@ -77,7 +74,7 @@ describe("fetchSession", () => {
     stubCsrf(token("tok"));
 
     expect(await fetchSession()).toMatchObject({ state: "active" });
-    expect(getApiCsrfToken()).toBe("tok");
+    expect(getCsrfToken()).toBe("tok");
   });
 
   // Only the session decides whether someone is signed in: an old server
@@ -88,7 +85,7 @@ describe("fetchSession", () => {
     stubCsrf(failing);
 
     expect(await fetchSession()).toMatchObject({ state: "active" });
-    expect(getApiCsrfToken()).toBeUndefined();
+    expect(getCsrfToken()).toBeUndefined();
   });
 
   // A signed-out check (/login, the claim page, the 401 boundary) never asks
@@ -115,7 +112,7 @@ describe("fetchSession", () => {
     await fetchSession();
 
     expect(calls()).toBe(1);
-    expect(getApiCsrfToken()).toBe("tok");
+    expect(getCsrfToken()).toBe("tok");
   });
 
   // Another tab signed in as someone else. Loading their token here would arm
@@ -139,7 +136,7 @@ describe("fetchSession", () => {
     await vi.waitFor(() => expect(sessionPage.reload).toHaveBeenCalledOnce());
     expect(settled).toBe(false);
     expect(calls()).toBe(0);
-    expect(getApiCsrfToken()).toBeUndefined();
+    expect(getCsrfToken()).toBeUndefined();
   });
 
   // The person belongs to the document, so losing the session does not clear
@@ -160,7 +157,7 @@ describe("fetchSession", () => {
       loseSession();
       expect(await fetchSession()).toBeNull();
       // The token belonged to the lost session.
-      expect(getApiCsrfToken()).toBeUndefined();
+      expect(getCsrfToken()).toBeUndefined();
     }
 
     it("carries on when the same person signs in again", async () => {
@@ -169,7 +166,7 @@ describe("fetchSession", () => {
       stubCsrf(token("tok_a2"));
 
       expect(await fetchSession()).toMatchObject({ user_id: "user_a" });
-      expect(getApiCsrfToken()).toBe("tok_a2");
+      expect(getCsrfToken()).toBe("tok_a2");
       expect(sessionPage.reload).not.toHaveBeenCalled();
     });
 
@@ -181,7 +178,7 @@ describe("fetchSession", () => {
       void fetchSession();
       await vi.waitFor(() => expect(sessionPage.reload).toHaveBeenCalledOnce());
       expect(calls()).toBe(0);
-      expect(getApiCsrfToken()).toBeUndefined();
+      expect(getCsrfToken()).toBeUndefined();
     });
   });
 
@@ -197,7 +194,7 @@ describe("fetchSession", () => {
     void fetchSession();
 
     await vi.waitFor(() => expect(sessionPage.reload).toHaveBeenCalledOnce());
-    expect(getApiCsrfToken()).toBeUndefined();
+    expect(getCsrfToken()).toBeUndefined();
   });
 
   it("keeps the person when the session cannot be read", async () => {
@@ -209,7 +206,7 @@ describe("fetchSession", () => {
     vi.setSystemTime(Date.now() + 60_000);
     stubSession("unreachable");
     expect(await fetchSession()).toBeNull();
-    expect(getApiCsrfToken()).toBe("tok_a");
+    expect(getCsrfToken()).toBe("tok_a");
 
     stubSession("user_b");
     void fetchSession();
@@ -271,7 +268,7 @@ describe("fetchSession, held to the console's project", () => {
 
     await fetchSession();
     expect(new URL(urls[0] ?? "").searchParams.get("project_id")).toBe("proj_platform");
-    expect(getApiCsrfToken()).toBe("tok");
+    expect(getCsrfToken()).toBe("tok");
   });
 
   // The server refuses to revoke an app's session the cookie holds, so signing
@@ -298,13 +295,13 @@ describe("CSRF rejection", () => {
     stubSession("user_a");
     stubCsrf(failing);
     await fetchSession();
-    expect(getApiCsrfToken()).toBeUndefined();
+    expect(getCsrfToken()).toBeUndefined();
 
     stubCsrf(token("tok"));
     // The token comes back, so customFetch retries the write once with it.
     expect(await rejectWrite()).toBe("tok");
 
-    expect(getApiCsrfToken()).toBe("tok");
+    expect(getCsrfToken()).toBe("tok");
     expect(sessionPage.reload).not.toHaveBeenCalled();
   });
 
@@ -322,7 +319,7 @@ describe("CSRF rejection", () => {
     expect(await rejectWrite()).toBeUndefined();
 
     expect(sessionPage.reload).toHaveBeenCalledOnce();
-    expect(getApiCsrfToken()).toBeUndefined();
+    expect(getCsrfToken()).toBeUndefined();
   });
 
   it("starts over when nobody is signed in any more", async () => {
@@ -334,7 +331,7 @@ describe("CSRF rejection", () => {
     expect(await rejectWrite()).toBeUndefined();
 
     expect(sessionPage.reload).toHaveBeenCalledOnce();
-    expect(getApiCsrfToken()).toBeUndefined();
+    expect(getCsrfToken()).toBeUndefined();
   });
 
   // A network blip on the re-check must not cost the person their page: the
@@ -348,7 +345,7 @@ describe("CSRF rejection", () => {
     expect(await rejectWrite()).toBeUndefined();
 
     expect(sessionPage.reload).not.toHaveBeenCalled();
-    expect(getApiCsrfToken()).toBe("tok_a");
+    expect(getCsrfToken()).toBe("tok_a");
   });
 
   // Only the server's project-mismatch answer means another project's session.
@@ -366,7 +363,7 @@ describe("CSRF rejection", () => {
     expect(await rejectWrite()).toBeUndefined();
 
     expect(sessionPage.reload).not.toHaveBeenCalled();
-    expect(getApiCsrfToken()).toBe("tok_a");
+    expect(getCsrfToken()).toBe("tok_a");
   });
 
   // Without a recorded person there is nothing to compare the session to, so
@@ -376,7 +373,7 @@ describe("CSRF rejection", () => {
     stubCsrf(token("tok_b"));
 
     expect(await rejectWrite()).toBeUndefined();
-    expect(getApiCsrfToken()).toBeUndefined();
+    expect(getCsrfToken()).toBeUndefined();
     expect(sessionPage.reload).not.toHaveBeenCalled();
   });
 
@@ -408,7 +405,7 @@ describe("CSRF rejection", () => {
 
     expect(await rejected).toBeUndefined();
     expect(sessionPage.reload).toHaveBeenCalledOnce();
-    expect(getApiCsrfToken()).toBeUndefined();
+    expect(getCsrfToken()).toBeUndefined();
   });
 });
 
@@ -437,7 +434,7 @@ describe("signOut", () => {
     await signOut();
 
     expect(sent).toEqual(["tok"]);
-    expect(getApiCsrfToken()).toBeUndefined();
+    expect(getCsrfToken()).toBeUndefined();
     stubSession(null);
     expect(await fetchSession()).toBeNull();
   });
@@ -450,7 +447,7 @@ describe("signOut", () => {
     stubSession("user_a");
     stubCsrf(failing);
     await fetchSession();
-    expect(getApiCsrfToken()).toBeUndefined();
+    expect(getCsrfToken()).toBeUndefined();
     stubCsrf(token("tok"));
     const sent = stubRevoke("tok");
 

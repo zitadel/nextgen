@@ -1,5 +1,6 @@
-import { apiCsrfRejectionHandlerFor, apiCsrfTokenFor, getApiAuthToken } from "./auth";
-import { API_PREFIX } from "./base-url";
+import { destructiveOperations } from "../generated/operations";
+import { API_PREFIX, apiBaseUrl } from "./base-url";
+import type { ZitadelClient } from "./client";
 
 /** The header the session-bound CSRF token travels in (ADR 053 §5). */
 export const CSRF_HEADER = "X-Zitadel-CSRF";
@@ -78,123 +79,135 @@ export class NetworkError extends Error {
 export type NetworkErrorReason = "unreachable" | "unreadable" | "timeout";
 
 /**
- * What every request a client makes is bound by. Set per call by
- * `createZitadelClient`, the same way as the base URL and token, and read at
- * the top of {@link customFetch} before its first `await`.
+ * What one {@link request} is bound by: a signal that aborts it and a deadline.
+ * {@link customFetch} takes both from the client the call was made with.
  */
-export type RequestPolicy = {
-  /** Aborts every request made while it is set; its reason is rethrown as is. */
+export type RequestPolicy = Readonly<{
+  /** Aborts the request; its reason is rethrown as is. */
   signal?: AbortSignal;
-  /** Per-request deadline, covering the response body as well as the headers. */
+  /** The deadline, covering the response body as well as the headers. */
   timeoutMs?: number;
-  /**
-   * Sent as the `User-Agent` of every request made while it is set.
-   *
-   * @remarks
-   * This is one slot for the whole process, and a client identifies itself
-   * through it, so two clients that identify differently share it. What keeps
-   * them apart is that the slot is written immediately before a call and read
-   * synchronously at the top of {@link customFetch}, before its first `await`:
-   * no other client can run in between, and the retry below holds the copy it
-   * read. Anything that writes the policy and then awaits before dispatching
-   * would send one client's agent on another client's request.
-   */
-  userAgent?: string;
-};
-
-let requestPolicy: RequestPolicy = {};
-
-export function setRequestPolicy(policy: RequestPolicy): void {
-  requestPolicy = policy;
-}
+}>;
 
 /**
- * The orval `mutator` for the fetch client. Every generated operation
- * routes its request through this function instead of the global
- * `fetch`. We pin three concerns here so generated call sites stay
- * focused on the shape of one HTTP call:
+ * Thrown, before anything is sent, when a client that does not allow
+ * destructive operations ({@link ZitadelClient.allowDestructive}) runs one:
+ * every `DELETE`, and any operation the spec marks `x-zitadel-destructive`.
+ */
+export class DestructiveOperationError extends Error {
+  /** The generated function that was called, such as `deleteProject`. */
+  readonly operation: string;
+
+  /**
+   * @param operation - The generated function that was called.
+   */
+  constructor(operation: string) {
+    super(`${operation} is destructive, and this client does not allow destructive operations`);
+    this.name = "DestructiveOperationError";
+    this.operation = operation;
+  }
+}
+
+/** The generated functions that run a destructive operation. */
+const DESTRUCTIVE: ReadonlySet<string> = new Set(destructiveOperations);
+
+/**
+ * The orval `mutator` for the fetch client: every generated operation sends
+ * its request through the function this returns, with the client it was
+ * called with and its own name. Everything about the request comes from that
+ * client and nowhere else, so two clients never share a setting:
  *
- * - bearer auth — read from `runtime/auth.ts` and attached automatically;
- * - the CSRF header — the session-bound token from `runtime/auth.ts`, on
- *   unsafe methods to the origin it was issued for, when a first-party surface
- *   has set one; an unsafe request to that origin refused with
- *   `403 auth.csrf_invalid` asks the registered rejection handler for a fresh
- *   token and is retried once with it, only if the handler returns one (the
- *   session still belongs to the same person);
- * - non-2xx → throw — orval's stock client parses the body regardless
- *   of status, so callers would have to inspect every response. Throw
- *   `ApiError` on `!res.ok` so failures interrupt control flow;
- * - body parsing — return the parsed JSON typed as `T` (the operation's
- *   return type, threaded through by orval), or `undefined` for the
+ * - the destructive guard — a destructive operation is refused with a
+ *   {@link DestructiveOperationError} unless the client allows it, before
+ *   anything is sent;
+ * - the URL — the client's base URL, then the API prefix (ADR 077), then the
+ *   operation's path;
+ * - bearer auth and the `User-Agent`, from the client;
+ * - the CSRF header — the client's session-bound token, on unsafe methods to
+ *   the origin it was issued for; an unsafe request to that origin refused
+ *   with `403 auth.csrf_invalid` asks the client's provider for a fresh token
+ *   and is retried once with it, only if the provider returns one (the session
+ *   still belongs to the same person);
+ * - the client's signal and deadline, combined with any signal on the call;
+ * - non-2xx → throw {@link ApiError}, so failures interrupt control flow;
+ * - body parsing — the parsed JSON typed as `T`, or `undefined` for the
  *   spec's `204`/`205`/`304` no-body responses;
  * - no response → throw {@link NetworkError}, or the abort reason when the
  *   caller cancelled (see {@link request}).
+ *
+ * @param client - The client the operation was called with.
+ * @param operation - The generated function's name, such as `getProject`.
+ * @returns The fetch the generated function calls with its path and request.
  */
-export async function customFetch<T>(url: string, options: RequestInit): Promise<T> {
-  // The client sets the policy per call, so it is read before the first await;
-  // the retry below runs under the same policy as the first attempt.
-  const policy = requestPolicy;
-  const token = getApiAuthToken();
-  const headers = new Headers(options.headers);
-  if (policy.userAgent !== undefined) {
-    headers.set("user-agent", policy.userAgent);
-  }
-  if (token && !headers.has("authorization")) {
-    headers.set("authorization", `Bearer ${token}`);
-  }
-  const method = (options.method ?? "GET").toUpperCase();
-  const unsafe = !SAFE_METHODS.has(method) && !headers.has(CSRF_HEADER);
-  // The token and the rejection handler belong to one server: a request to
-  // any other origin gets neither.
-  const target = originOf(url);
-  const csrfToken = apiCsrfTokenFor(target);
-  if (unsafe && csrfToken) {
-    headers.set(CSRF_HEADER, csrfToken);
-  }
-
-  let { res, rawBody: parsed } = await request(url, { ...options, headers }, policy, readBody);
-
-  // The token was stale (the session cookie changed under this page) or never
-  // loaded. The app re-checks the session and hands back a fresh token only if
-  // it still belongs to the same person; then the request is retried once. A
-  // body that can be read only once cannot be sent again, so it is not retried.
-  const onRejected = apiCsrfRejectionHandlerFor(target);
-  if (
-    unsafe &&
-    onRejected &&
-    res.status === 403 &&
-    apiErrorCode(parsed) === CSRF_INVALID &&
-    !isStream(options.body)
-  ) {
-    const fresh = await onRejected().catch(() => undefined);
-    if (fresh && fresh !== csrfToken) {
-      headers.set(CSRF_HEADER, fresh);
-      ({ res, rawBody: parsed } = await request(url, { ...options, headers }, policy, readBody));
+export function customFetch(client: ZitadelClient, operation: string) {
+  return async <T>(path: string, options: RequestInit): Promise<T> => {
+    if (DESTRUCTIVE.has(operation) && !client.allowDestructive) {
+      throw new DestructiveOperationError(operation);
     }
-  }
+    const url = `${apiBaseUrl(client.baseUrl)}${path}`;
+    const policy = { signal: client.signal, timeoutMs: client.timeoutMs };
+    const headers = new Headers(options.headers);
+    if (client.userAgent !== undefined) {
+      headers.set("user-agent", client.userAgent);
+    }
+    if (client.token && !headers.has("authorization")) {
+      headers.set("authorization", `Bearer ${client.token}`);
+    }
+    const method = (options.method ?? "GET").toUpperCase();
+    const unsafe = !SAFE_METHODS.has(method) && !headers.has(CSRF_HEADER);
+    // The token and its refresh belong to one server: a request to any other
+    // origin gets neither.
+    const csrf =
+      client.csrf !== undefined && originOf(url) === client.csrf.origin ? client.csrf : undefined;
+    const csrfToken = unsafe ? csrf?.token() : undefined;
+    if (csrfToken) {
+      headers.set(CSRF_HEADER, csrfToken);
+    }
 
-  if (!res.ok) {
-    // Every operation this client calls is one the spec has, so a server that
-    // knows no such path is another version, most likely one from before the
-    // API moved under its prefix.
-    const message =
-      res.status === 404 && apiErrorCode(parsed) === ROUTE_NOT_FOUND
-        ? `${options.method ?? "GET"} ${url} returned 404 (${ROUTE_NOT_FOUND}): the server has no such operation; a server older than this client does not serve the API under ${API_PREFIX}`
-        : `${options.method ?? "GET"} ${url} returned ${res.status}`;
-    throw new ApiError(
-      res.status,
-      url,
-      parsed,
-      message,
-      res.headers.get("x-request-id") || undefined,
-    );
-  }
+    let { res, rawBody: parsed } = await request(url, { ...options, headers }, policy, readBody);
 
-  // The body is trusted to have the shape the generated types promise; no
-  // response is checked here or by the paged functions. Should that change,
-  // check it here, against the generated Zod response schemas, so every call
-  // is covered.
-  return parsed as T;
+    // The token was stale (the session cookie changed under this page) or never
+    // loaded. The provider re-checks the session and hands back a fresh token
+    // only if it still belongs to the same person; then the request is retried
+    // once. A body that can be read only once cannot be sent again, so it is not
+    // retried.
+    if (
+      unsafe &&
+      csrf !== undefined &&
+      res.status === 403 &&
+      apiErrorCode(parsed) === CSRF_INVALID &&
+      !isStream(options.body)
+    ) {
+      const fresh = await csrf.refresh().catch(() => undefined);
+      if (fresh && fresh !== csrfToken) {
+        headers.set(CSRF_HEADER, fresh);
+        ({ res, rawBody: parsed } = await request(url, { ...options, headers }, policy, readBody));
+      }
+    }
+
+    if (!res.ok) {
+      // Every operation this client calls is one the spec has, so a server that
+      // knows no such path is another version, most likely one from before the
+      // API moved under its prefix.
+      const message =
+        res.status === 404 && apiErrorCode(parsed) === ROUTE_NOT_FOUND
+          ? `${options.method ?? "GET"} ${url} returned 404 (${ROUTE_NOT_FOUND}): the server has no such operation; a server older than this client does not serve the API under ${API_PREFIX}`
+          : `${options.method ?? "GET"} ${url} returned ${res.status}`;
+      throw new ApiError(
+        res.status,
+        url,
+        parsed,
+        message,
+        res.headers.get("x-request-id") || undefined,
+      );
+    }
+
+    // The body is trusted to have the shape the generated types promise; no
+    // response is checked here or by the paged functions. Should that change,
+    // check it here, against the generated Zod response schemas, so every call
+    // is covered.
+    return parsed as T;
+  };
 }
 
 /** The parsed body, or `undefined` for the spec's no-body responses. */

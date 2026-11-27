@@ -1,4 +1,4 @@
-import type { ZitadelClient } from "@zitadel/api/client";
+import type { ZitadelApi } from "@zitadel/api/client";
 import type { CreateFlow201, CreateFlow201StepFieldsItem } from "@zitadel/api/generated/model";
 
 import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
@@ -94,7 +94,7 @@ export interface MintSessionOptions {
  * without it. Browsers round-trip it implicitly; here a one-cookie jar does.
  */
 export async function mintSession(
-  client: ZitadelClient,
+  client: ZitadelApi,
   handle: Pick<InstanceHandle, "baseUrl" | "projectSecret">,
   context: SeedContext,
   user: SeededUser,

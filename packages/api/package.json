@@ -52,10 +52,10 @@
       "types": "./dist/runtime/base-url.d.mts",
       "import": "./dist/runtime/base-url.mjs"
     },
-    "./runtime/auth": {
-      "@zitadel/source": "./src/runtime/auth.ts",
-      "types": "./dist/runtime/auth.d.mts",
-      "import": "./dist/runtime/auth.mjs"
+    "./runtime/client": {
+      "@zitadel/source": "./src/runtime/client.ts",
+      "types": "./dist/runtime/client.d.mts",
+      "import": "./dist/runtime/client.mjs"
     },
     "./runtime/paging": {
       "@zitadel/source": "./src/runtime/paging.ts",
