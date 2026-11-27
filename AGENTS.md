@@ -36,6 +36,7 @@ conflict.
 | `packages/testing/` | `@zitadel/testing`, the published test kit | [testing](packages/testing/AGENTS.md) |
 | `turbo.json` files, `scripts/` | task graph; scripts behind the root `package.json` | [turbo](docs/design/build/turborepo.md) |
 | `docs/` | ADRs, design notes, runbooks | [ADR index](docs/adrs/README.md) |
+| `media/login-video/` | the "sign-in by your agent" video, rendered from real agent and CLI runs | [README](media/login-video/README.md) |
 
 ## Workflow Front Doors
 
