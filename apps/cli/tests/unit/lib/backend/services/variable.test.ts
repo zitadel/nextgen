@@ -262,7 +262,14 @@ function readsHeldUntilBoth(server: SetupServer) {
 }
 
 describe("VariableService.set", () => {
-  /** A write of a plain preview value through `client`, whose primary read answers `primary`. */
+  /**
+   * A write of a plain preview value through `client`, whose primary read answers `primary`.
+   *
+   * @param server - The MSW server that answers the write's requests.
+   * @param client - The client the service sends through.
+   * @param primary - What the primary value's read answers.
+   * @returns The write's result.
+   */
   function setPreviewOver(
     server: SetupServer,
     client: ZitadelClient,

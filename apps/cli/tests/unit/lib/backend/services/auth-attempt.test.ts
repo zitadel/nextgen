@@ -31,12 +31,19 @@ describe("AuthAttemptService.open", () => {
 });
 
 describe("AuthAttemptService.prove", () => {
-  /** An attempt whose challenge is issued, and whose proof is answered by `verify`. */
+  /**
+   * An attempt whose challenge is issued, and whose proof is answered by `verify`.
+   *
+   * @param server - The MSW server that answers the attempt's requests.
+   * @param client - The client the service sends through.
+   * @param verify - What the server answers the proof with.
+   * @returns The service, ready to prove the attempt.
+   */
   function proving(
     server: SetupServer,
     client: ZitadelClient,
     verify: Reply<"verifyAuthAttemptChallenge">,
-  ) {
+  ): AuthAttemptService {
     answering(server, "createAuthAttemptChallenge", { challenge_id: "chl_1" });
     answering(server, "verifyAuthAttemptChallenge", verify);
     return new AuthAttemptService(client, ORIGIN);
