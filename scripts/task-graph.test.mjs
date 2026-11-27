@@ -143,8 +143,8 @@ beforeAll(() => {
   write("apps/api/internal/build/testdata/fixture.txt", "test fixture\n");
   for (const file of ["vitest.shared.mjs", "vitest.shared.d.mts"]) {
     write(
-      `packages/vitest-config/${file}`,
-      readFileSync(join(repo, "packages/vitest-config", file)),
+      `packages/vitest-config/src/${file}`,
+      readFileSync(join(repo, "packages/vitest-config/src", file)),
     );
   }
   run("git", ["init", "-q", "-b", "main"]);
@@ -277,7 +277,7 @@ describe.sequential("task graph cache and ordering contracts", () => {
   });
 
   test("shared Vitest changes invalidate its readers without invalidating builds", () => {
-    changed("packages/vitest-config/vitest.shared.mjs", "export const baseTest = {};\n", () => {
+    changed("packages/vitest-config/src/vitest.shared.mjs", "export const baseTest = {};\n", () => {
       const next = dry();
       for (const [id, task] of baseline) {
         if (task.task === "build" && task.command !== "<NONEXISTENT>")

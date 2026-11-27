@@ -5,12 +5,12 @@
   "description": "The Vitest defaults every workspace project spreads into its own config, and the edge-runtime project. Workspace tooling only; nothing is published.",
   "license": "AGPL-3.0-only",
   "type": "module",
-  "main": "./vitest.shared.mjs",
-  "types": "./vitest.shared.d.mts",
+  "main": "./src/vitest.shared.mjs",
+  "types": "./src/vitest.shared.d.mts",
   "exports": {
     ".": {
-      "types": "./vitest.shared.d.mts",
-      "default": "./vitest.shared.mjs"
+      "types": "./src/vitest.shared.d.mts",
+      "default": "./src/vitest.shared.mjs"
     }
   },
   "scripts": {
