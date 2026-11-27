@@ -40,6 +40,21 @@ Authority (do not duplicate payload rules or the catalog table here):
   — live catalog types must have a producer; do not list deferred types as
   live.
 
+## A carrier hands on its chain
+
+An event's `correlation_id` and `flow_id` come from the request's
+`middleware.Correlation`, never from an emitter
+([ADR 048](../../../../docs/adrs/048-wide-events-internal-audit-primitive.md#amendment-2026-11-26-a-correlation-id-that-requests-inherit)).
+
+- A mutate that loads a carrier it acts on (an authorization request, a flow
+  state, an auth attempt, an invitation, a claim challenge) calls
+  `audit.JoinCorrelation` with the carrier's chain before its first emit.
+- A mutate that creates a carrier stores `audit.EnsureCorrelation(ctx)` on it.
+- Never join from a list, and never store a chain on a session or a token:
+  a chain ends with the events that create those.
+- A feature that takes several requests names its carrier in the ADR's table
+  and the catalog's, and stores the chain in a column of its own.
+
 ## The events list reads no further than a page or a budget
 
 - Put a new `GET /events` filter into `planEventRead` (`event.go`): as part of

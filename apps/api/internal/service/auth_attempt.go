@@ -402,6 +402,11 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 	attempt.DeploymentID = input.DeploymentID
 	attempt.ReleaseID = input.ReleaseID
 	attempt.FlowID = input.FlowID
+	// The attempt is a carrier: the provider's callback and the handoff
+	// exchange reach their chain through it.
+	if attempt.CorrelationID, err = audit.EnsureCorrelation(ctx); err != nil {
+		return nil, err
+	}
 	if resolution := RuntimeResolutionFromContext(ctx); resolution != nil {
 		if attempt.DeploymentID == "" && resolution.Deployment != nil {
 			attempt.DeploymentID = resolution.Deployment.ID
@@ -439,7 +444,7 @@ func (s *authAttemptService) GetByID(ctx context.Context, projectID, attemptID s
 	ctx, end := startSpan(ctx, "AuthAttemptService.GetByID")
 	defer end(&err)
 
-	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, projectID, attemptID)
+	attempt, err := loadAuthAttempt(ctx, s.stmts.Statements(), projectID, attemptID)
 	if err != nil {
 		if errors.Is(err, domain.ErrAuthAttemptNotFound()) {
 			return nil, err
@@ -449,13 +454,24 @@ func (s *authAttemptService) GetByID(ctx context.Context, projectID, attemptID s
 	return attempt, nil
 }
 
+// loadAuthAttempt reads the attempt a request acts on and puts the request
+// into the attempt's chain, before the request writes anything.
+func loadAuthAttempt(ctx context.Context, stmts AuthAttemptStatements, projectID, attemptID string) (*domain.AuthAttempt, error) {
+	attempt, err := stmts.GetAuthAttemptByID(ctx, projectID, attemptID)
+	if err != nil {
+		return nil, err
+	}
+	audit.JoinCorrelation(ctx, attempt.CorrelationID)
+	return attempt, nil
+}
+
 // IssueChallenge issues a challenge for the given check type on an existing attempt.
 // For passkey, the user check must already be verified so the user ID is known.
 func (s *authAttemptService) IssueChallenge(ctx context.Context, input IssueChallengeInput) (_ *domain.AuthAttempt, err error) {
 	ctx, end := startSpan(ctx, "AuthAttemptService.IssueChallenge")
 	defer end(&err)
 
-	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.AttemptID)
+	attempt, err := loadAuthAttempt(ctx, s.stmts.Statements(), input.ProjectID, input.AttemptID)
 	if err != nil {
 		return nil, err
 	}
@@ -479,7 +495,7 @@ func (s *authAttemptService) IssueSSOState(ctx context.Context, input IssueSSOSt
 	ctx, end := startSpan(ctx, "AuthAttemptService.IssueSSOState")
 	defer end(&err)
 
-	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.AttemptID)
+	attempt, err := loadAuthAttempt(ctx, s.stmts.Statements(), input.ProjectID, input.AttemptID)
 	if err != nil {
 		return nil, err
 	}
@@ -511,17 +527,20 @@ func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID
 	ctx, end := startSpan(ctx, "AuthAttemptService.SetSSOCallbackResult")
 	defer end(&err)
 
-	var flowID string
-	err = s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+	return s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if err := tx.Statements().SetSSOCallbackResult(ctx, projectID, check.StateHash, result); err != nil {
 			return err
 		}
 		// The session and the login flow the event carries live on the attempt.
-		attempt, err := tx.Statements().GetAuthAttemptByID(ctx, projectID, check.AuthAttemptID)
+		attempt, err := loadAuthAttempt(ctx, tx.Statements(), projectID, check.AuthAttemptID)
 		if err != nil {
 			return err
 		}
-		flowID = attempt.FlowID
+		// The provider's redirect reaches the callback without the flow's
+		// cookie, so the request joins the flow and its chain only through
+		// the attempt. Bound before the emit, so the event and the
+		// callback's request event carry them alike.
+		audit.BindFlow(ctx, attempt.FlowID)
 		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
 			Type:       eventType,
 			Category:   domain.EventCategoryAuth,
@@ -530,7 +549,6 @@ func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID
 			EntityID:   check.ID,
 			UserID:     attempt.ResolvedUserID(),
 			SessionID:  attempt.SessionID,
-			FlowID:     &attempt.FlowID,
 			Payload: domain.AuthCheckPayload{
 				CheckID:       check.ID,
 				CheckType:     check.Type().String(),
@@ -538,13 +556,6 @@ func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID
 			},
 		})
 	})
-	if err != nil {
-		return err
-	}
-	// The provider's redirect reaches the callback without the flow's cookie,
-	// so its request event joins the flow only through the attempt.
-	audit.BindFlow(ctx, flowID)
-	return nil
 }
 
 // VerifyProof verifies the submitted proof against the challenge identified by ChallengeID.
@@ -561,7 +572,7 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 		}
 	}
 
-	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.AttemptID)
+	attempt, err := loadAuthAttempt(ctx, s.stmts.Statements(), input.ProjectID, input.AttemptID)
 	if err != nil {
 		return nil, err
 	}
@@ -611,7 +622,7 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (_
 	ctx, end := startSpan(ctx, "AuthAttemptService.Handoff")
 	defer end(&err)
 
-	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.AttemptID)
+	attempt, err := loadAuthAttempt(ctx, s.stmts.Statements(), input.ProjectID, input.AttemptID)
 	if err != nil {
 		return nil, err
 	}
@@ -1147,7 +1158,7 @@ func (s *authAttemptService) FinishPasskeyEnrollment(ctx context.Context, input 
 	ctx, end := startSpan(ctx, "AuthAttemptService.FinishPasskeyEnrollment")
 	defer end(&err)
 
-	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.RegistrationID)
+	attempt, err := loadAuthAttempt(ctx, s.stmts.Statements(), input.ProjectID, input.RegistrationID)
 	if err != nil {
 		return nil, err
 	}

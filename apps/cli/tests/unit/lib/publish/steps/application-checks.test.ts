@@ -1,11 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
 import { ForbiddenError } from "@/lib/backend/errors";
 import { ZitadelError } from "@/lib/errors";
 import { validateApplications } from "@/lib/publish/steps/application-checks";
+import { it } from "@tests/fixtures";
+import { answering, answeringVariables, refusal } from "@tests/helpers/api-answers";
 import { aConfig, anApplication, aUserSchema } from "@tests/helpers/config";
-import type { ClientStubs } from "@tests/helpers/fake-client";
-import { holdingVariables, SECRET_VARIABLE } from "@tests/helpers/records";
+import { SECRET_VARIABLE } from "@tests/helpers/records";
 import { aStepContext } from "@tests/helpers/step-context";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
@@ -15,20 +16,11 @@ import { rejectionOf } from "@tests/helpers/thrown-value";
  */
 const SHOP = aConfig({ applications: { "shop.json": anApplication() } });
 
-/**
- * The project's variables, which this run's token may not read.
- */
-const FORBIDDEN: ClientStubs = {
-  listVariables: async () => {
-    throw new ForbiddenError("Forbidden", { status: 403, url: "https://api.example/variables" });
-  },
-};
-
 describe("validateApplications", () => {
-  it("accepts a client whose secret is a secret variable the project holds", async () => {
+  it("accepts a client whose secret is a secret variable the project holds", async ({ server }) => {
+    answeringVariables(server, { SHOP_WEB_CLIENT_SECRET: SECRET_VARIABLE });
     const context = aStepContext({
       config: SHOP,
-      client: holdingVariables({ SHOP_WEB_CLIENT_SECRET: SECRET_VARIABLE }),
     });
 
     const error = await rejectionOf(() => {
@@ -38,9 +30,10 @@ describe("validateApplications", () => {
     expect(error).toBeUndefined();
   });
 
-  it("reads no variables without an application", async () => {
+  it("reads no variables without an application", async ({ server }) => {
+    answering(server, "listVariables", refusal(403, "var.permission_denied"));
     const config = aConfig({ schemas: { "human-user.json": aUserSchema() } });
-    const context = aStepContext({ config, client: FORBIDDEN });
+    const context = aStepContext({ config });
 
     const error = await rejectionOf(() => {
       return validateApplications(context);
@@ -49,8 +42,11 @@ describe("validateApplications", () => {
     expect(error).toBeUndefined();
   });
 
-  it("refuses a secret variable the project lacks, naming the file and client", async () => {
-    const context = aStepContext({ config: SHOP, client: holdingVariables({}) });
+  it("refuses a secret variable the project lacks, naming the file and client", async ({
+    server,
+  }) => {
+    answeringVariables(server, {});
+    const context = aStepContext({ config: SHOP });
 
     const error = await rejectionOf(() => {
       return validateApplications(context);
@@ -71,10 +67,10 @@ describe("validateApplications", () => {
     });
   });
 
-  it("refuses a secret held in a plain variable", async () => {
+  it("refuses a secret held in a plain variable", async ({ server }) => {
+    answeringVariables(server, { SHOP_WEB_CLIENT_SECRET: "plain" });
     const context = aStepContext({
       config: SHOP,
-      client: holdingVariables({ SHOP_WEB_CLIENT_SECRET: "plain" }),
     });
 
     const error = await rejectionOf(() => {
@@ -88,8 +84,9 @@ describe("validateApplications", () => {
     });
   });
 
-  it("refuses a deploy whose token may not read the variables", async () => {
-    const context = aStepContext({ config: SHOP, client: FORBIDDEN });
+  it("refuses a deploy whose token may not read the variables", async ({ server }) => {
+    answering(server, "listVariables", refusal(403, "var.permission_denied"));
+    const context = aStepContext({ config: SHOP });
 
     const error = await rejectionOf(() => {
       return validateApplications(context);
@@ -99,11 +96,11 @@ describe("validateApplications", () => {
   });
 
   describe("with a preview", () => {
-    it("checks the preview kind's variables", async () => {
+    it("checks the preview kind's variables", async ({ server }) => {
+      answeringVariables(server, { SHOP_WEB_CLIENT_SECRET: SECRET_VARIABLE }, "preview");
       const context = aStepContext({
         config: SHOP,
         mode: "preview",
-        client: holdingVariables({ SHOP_WEB_CLIENT_SECRET: SECRET_VARIABLE }, "preview"),
       });
 
       const error = await rejectionOf(() => {
@@ -113,8 +110,11 @@ describe("validateApplications", () => {
       expect(error).toBeUndefined();
     });
 
-    it("leaves the check to the deploy when its token may not read the variables", async () => {
-      const context = aStepContext({ config: SHOP, mode: "preview", client: FORBIDDEN });
+    it("leaves the check to the deploy when its token may not read the variables", async ({
+      server,
+    }) => {
+      answering(server, "listVariables", refusal(403, "var.permission_denied"));
+      const context = aStepContext({ config: SHOP, mode: "preview" });
 
       const error = await rejectionOf(() => {
         return validateApplications(context);

@@ -58,6 +58,10 @@ func sharedSchemaColumns(t *testing.T) []schematest.ColumnNullability {
 	cols = append(cols, schematest.ColumnNullability{Table: "auth_requests", Column: "user_id", Nullable: true})
 	cols = append(cols, schematest.ColumnNullability{Table: "auth_requests", Column: "session_id", Nullable: true})
 	cols = append(cols, schematest.ColumnNullability{Table: "auth_requests", Column: "code_expires_at", Nullable: true})
+	// The chain a carrier holds; NULL on a row stored before chains.
+	cols = append(cols, schematest.ColumnNullability{Table: "auth_requests", Column: "correlation_id", Nullable: true})
+	cols = append(cols, schematest.ColumnNullability{Table: "auth_attempts", Column: "correlation_id", Nullable: true})
+	cols = append(cols, schematest.ColumnNullability{Table: "claim_challenges", Column: "correlation_id", Nullable: true})
 	cols = append(cols, schematest.ColumnNullability{Table: "signup_limits", Column: "project_id"})
 	cols = append(cols, schematest.ColumnNullability{Table: "signup_limits", Column: "flow_id"})
 	cols = append(cols, schematest.ColumnNullability{Table: "signup_limits", Column: "window_start"})
