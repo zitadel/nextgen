@@ -7066,6 +7066,32 @@
                       ]
                     }
                   }
+                },
+                "boards": {
+                  "summary": "A browser-only app with one public client",
+                  "description": "Public clients hold no secret and authenticate with PKCE. The\nserver generates a `client_id` and returns no `client_secrets`.\n",
+                  "value": {
+                    "application": {
+                      "slug": "boards",
+                      "name": "Boards",
+                      "clients": [
+                        {
+                          "slug": "spa",
+                          "type": "public",
+                          "grant_types": [
+                            "authorization_code",
+                            "refresh_token"
+                          ],
+                          "redirect_uris": [
+                            "http://localhost:5173/callback"
+                          ],
+                          "allowed_origins": [
+                            "http://localhost:5173"
+                          ]
+                        }
+                      ]
+                    }
+                  }
                 }
               }
             }
@@ -20465,9 +20491,10 @@
           "type": {
             "type": "string",
             "enum": [
-              "confidential"
+              "confidential",
+              "public"
             ],
-            "description": "A `confidential` client runs where a secret can be kept, such as a web\napp's backend, and authenticates with one at the token endpoint. Public\nclients, which hold no secret, are not available yet.\n"
+            "description": "A `confidential` client runs where a secret can be kept, such as a web\napp's backend, and authenticates with one at the token endpoint. A\n`public` client holds no secret: a browser-only or installed app that\nsigns in with authorization code and PKCE (`S256`) only.\n"
           },
           "grant_types": {
             "type": "array",
@@ -20492,10 +20519,26 @@
               "minLength": 1,
               "maxLength": 2048
             },
-            "description": "Where the authorization endpoint may send the user back. Required with\n`authorization_code`; omit it otherwise, an empty list is refused. Each\nis an `https` URL, or an `http` URL on a loopback host for local\ndevelopment: `localhost`, a name under `.localhost`, or a loopback IP\nsuch as `127.0.0.1` or `[::1]`. A URI is written as the client will\nsend it, with a lowercase host and no fragment, since it is matched\nexactly; a loopback URI matches on any port (RFC 8252 §7.3).\n",
+            "description": "Where the authorization endpoint may send the user back. Required with\n`authorization_code`; omit it otherwise, an empty list is refused. Each\nis an `https` URL, an `http` URL on a loopback host for local\ndevelopment (`localhost`, a name under `.localhost`, or a loopback IP\nsuch as `127.0.0.1` or `[::1]`), or a private-use URI scheme for an\ninstalled app (`com.example.app:/callback`, RFC 8252 §7.1). A URI is\nwritten as the client will send it, with a lowercase host where it has\none and no fragment, since it is matched exactly; a loopback URI\nmatches on any port (RFC 8252 §7.3).\n",
             "examples": [
               [
                 "https://shop.example.com/callback"
+              ]
+            ]
+          },
+          "allowed_origins": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 50,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "description": "Browser origins that may call the authorization server's CORS-protected\nendpoints for this client. Scheme and host only (optional port), no\npath, query, fragment or credentials. Used by public browser clients\n(SPAs); omit it for confidential clients and for installed apps that\ndo not call from a browser origin. An empty list is the same as omit.\n",
+            "examples": [
+              [
+                "http://localhost:5173"
               ]
             ]
           },
@@ -20824,7 +20867,7 @@
                 "items": {
                   "$ref": "#/components/schemas/application-client-secret"
                 },
-                "description": "The secrets this write generated, one for each client it created,\neach with the client's `client_id`. Absent when the write created\nno client. Each secret is shown only once.\n"
+                "description": "The secrets this write generated, one for each confidential client\nit created, each with the client's `client_id`. A public client has\nnone. Absent or empty when the write created no confidential\nclient. Each secret is shown only once.\n"
               }
             }
           }

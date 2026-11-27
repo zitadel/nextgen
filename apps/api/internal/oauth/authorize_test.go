@@ -63,8 +63,10 @@ func (a *authRequests) Create(_ context.Context, request *domain.AuthRequest) (s
 var (
 	deployed = settings{settings: Settings{Enabled: true, DeploymentID: "dep_1", ReleaseID: "rel_1"}}
 	shop     = clients{
-		"shop":     {GrantTypes: []string{"authorization_code"}, RedirectURIs: []string{callback, "http://127.0.0.1:3000/callback"}},
-		"no-codes": {GrantTypes: []string{"client_credentials"}, RedirectURIs: []string{callback}},
+		"shop":     {Type: "confidential", GrantTypes: []string{"authorization_code"}, RedirectURIs: []string{callback, "http://127.0.0.1:3000/callback"}},
+		"spa":      {Type: "public", GrantTypes: []string{"authorization_code"}, RedirectURIs: []string{callback}, AllowedOrigins: []string{"https://app.example.com"}},
+		"native":   {Type: "public", GrantTypes: []string{"authorization_code"}, RedirectURIs: []string{"com.acme.tunes:/callback", "http://127.0.0.1/callback"}},
+		"no-codes": {Type: "confidential", GrantTypes: []string{"client_credentials"}, RedirectURIs: []string{callback}},
 	}
 	browser = map[string]string{"X-Forwarded-Proto": "https", "Accept": "text/html"}
 )
@@ -97,6 +99,7 @@ func TestAuthorizeReachesTheLoginPage(t *testing.T) {
 		name          string
 		method        string
 		set           map[string]string
+		wantClientID  string
 		wantChallenge string
 		wantState     string
 		cookies       string
@@ -104,6 +107,7 @@ func TestAuthorizeReachesTheLoginPage(t *testing.T) {
 	}{
 		{name: "without_pkce"},
 		{name: "with_pkce", set: map[string]string{"code_challenge": challenge, "code_challenge_method": "S256"}, wantChallenge: challenge},
+		{name: "public_with_pkce", set: map[string]string{"client_id": "spa", "code_challenge": challenge, "code_challenge_method": "S256"}, wantClientID: "spa", wantChallenge: challenge},
 		{name: "state_at_limit", set: map[string]string{"state": strings.Repeat("s", 2048)}, wantState: strings.Repeat("s", 2048)},
 		{name: "under_cookie_limit", cookies: "session=1; " + bindingCookieNames(9)},
 		// Another cookie and a loopback binding cookie do not count.
@@ -135,7 +139,7 @@ func TestAuthorizeReachesTheLoginPage(t *testing.T) {
 			assert.Equal(t, &domain.AuthRequest{
 				ProjectID:     "proj_123",
 				ID:            "authreq_1",
-				ClientID:      "shop",
+				ClientID:      cmp.Or(tt.wantClientID, "shop"),
 				RedirectURI:   callback,
 				State:         cmp.Or(tt.wantState, "xyz"),
 				Scopes:        []string{},
@@ -430,6 +434,7 @@ func TestAuthorizeRedirectsRefusalsToTheClient(t *testing.T) {
 		{name: "fragment_mode", set: map[string]string{"response_mode": "fragment"}, wantError: "invalid_request"},
 		{name: "request_object", set: map[string]string{"request": "eyJhbGciOiJub25lIn0.e30."}, wantError: "request_not_supported"},
 		{name: "request_uri", set: map[string]string{"request_uri": "https://app.example.com/request.jwt"}, wantError: "request_uri_not_supported"},
+		{name: "public_without_pkce", set: map[string]string{"client_id": "spa"}, wantError: "invalid_request"},
 		{name: "store_unavailable", storeErr: domain.ErrUnavailable().WithParent(errors.New("contention")), wantError: "temporarily_unavailable"},
 		{name: "store_fails", storeErr: domain.ErrInternal(errors.New("boom")), wantError: "server_error"},
 	}

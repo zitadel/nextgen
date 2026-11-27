@@ -2,7 +2,7 @@ import Ajv2020 from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 
 import applicationMetaSchema from "../meta-schemas/application.json" with { type: "json" };
-import { webApplication } from "./application-presets.js";
+import { nativeApplication, spaApplication, webApplication } from "./application-presets.js";
 
 const validate = new Ajv2020({ strict: false }).compile(applicationMetaSchema);
 
@@ -44,5 +44,55 @@ describe("web application preset", () => {
       redirectUris: [first, second, first],
     });
     expect(deduped.clients[0]?.redirect_uris).toEqual([first, second]);
+  });
+});
+
+describe("spa application preset", () => {
+  const redirectUris: [string, ...string[]] = ["http://localhost:5173/callback"];
+  const allowedOrigins: [string, ...string[]] = ["http://localhost:5173"];
+  const app = spaApplication({ slug: "boards", name: "Boards", redirectUris, allowedOrigins });
+
+  it("builds a document the application schema accepts", () => {
+    expect(validate(app), JSON.stringify(validate.errors)).toBe(true);
+  });
+
+  it("has one public client with PKCE grants and allowed origins", () => {
+    expect(app.clients).toHaveLength(1);
+    expect(app.clients[0]?.slug).toBe("spa");
+    expect(app.clients[0]?.type).toBe("public");
+    expect(app.clients[0]?.grant_types).toEqual(["authorization_code", "refresh_token"]);
+    expect(app.clients[0]?.allowed_origins).toEqual(allowedOrigins);
+  });
+
+  it("drops duplicate origins and redirect URIs", () => {
+    const deduped = spaApplication({
+      slug: "boards",
+      name: "Boards",
+      redirectUris: ["http://localhost:5173/callback", "http://localhost:5173/callback"],
+      allowedOrigins: ["http://localhost:5173", "http://localhost:5173"],
+    });
+    expect(deduped.clients[0]?.redirect_uris).toEqual(["http://localhost:5173/callback"]);
+    expect(deduped.clients[0]?.allowed_origins).toEqual(["http://localhost:5173"]);
+  });
+});
+
+describe("native application preset", () => {
+  const redirectUris: [string, ...string[]] = [
+    "com.acme.tunes:/callback",
+    "http://127.0.0.1/callback",
+  ];
+  const app = nativeApplication({ slug: "tunes", name: "Acme Tunes", redirectUris });
+
+  it("builds a document the application schema accepts", () => {
+    expect(validate(app), JSON.stringify(validate.errors)).toBe(true);
+  });
+
+  it("has one public client without allowed origins", () => {
+    expect(app.clients).toHaveLength(1);
+    expect(app.clients[0]?.slug).toBe("native");
+    expect(app.clients[0]?.type).toBe("public");
+    expect(app.clients[0]?.grant_types).toEqual(["authorization_code", "refresh_token"]);
+    expect(app.clients[0]?.allowed_origins).toBeUndefined();
+    expect(app.clients[0]?.redirect_uris).toEqual(redirectUris);
   });
 });

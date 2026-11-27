@@ -56,7 +56,7 @@ func (s opServer) VerifyClient(ctx context.Context, r *op.Request[op.ClientCrede
 	if err != nil {
 		return nil, refused(err)
 	}
-	if r.Data.ClientAssertion != "" || r.Data.ClientAssertionType != "" || r.Data.ClientSecret == "" {
+	if r.Data.ClientAssertion != "" || r.Data.ClientAssertionType != "" {
 		return nil, op.NewStatusError(oidc.ErrInvalidClient().WithDescription("the client must authenticate with its client secret"), http.StatusUnauthorized)
 	}
 	// A lookup with text a dialect cannot hold fails as a 500, and the code's
@@ -75,6 +75,28 @@ func (s opServer) VerifyClient(ctx context.Context, r *op.Request[op.ClientCrede
 	if r.Form.Get("grant_type") != string(oidc.GrantTypeCode) ||
 		!storable(deploymentID) || len(deploymentID) > maxDeploymentIDLength {
 		deploymentID = ""
+	}
+	// A public client authenticates with client_id only (AuthMethodNone) and
+	// PKCE on the code. A confidential client must send its secret.
+	if r.Data.ClientSecret == "" {
+		doc, err := s.clients.Client(ctx, projectID, deploymentID, r.Data.ClientID)
+		switch {
+		case errors.Is(err, domain.ErrApplicationClientNotFound()), errors.Is(err, domain.ErrApplicationNotFound()):
+			return nil, refused(err)
+		case errors.Is(err, domain.ErrReleaseNotDeployed(nil)), errors.Is(err, domain.ErrDeploymentNotFound()),
+			errors.Is(err, domain.ErrReleaseRevoked()):
+			return nil, refused(err)
+		case errors.Is(err, domain.ErrUnavailable()):
+			return nil, op.NewStatusError((&oidc.Error{ErrorType: temporarilyUnavailable}).WithParent(err), http.StatusServiceUnavailable)
+		case err != nil:
+			return nil, op.NewStatusError(oidc.ErrServerError().WithParent(err), http.StatusInternalServerError)
+		}
+		if !doc.IsPublic() {
+			return nil, op.NewStatusError(oidc.ErrInvalidClient().WithDescription("the client must authenticate with its client secret"), http.StatusUnauthorized)
+		}
+		c := newClient(r.Data.ClientID, doc)
+		c.projectID = projectID
+		return c, nil
 	}
 	served, err := s.clients.AuthenticateClient(ctx, projectID, deploymentID, r.Data.ClientID, r.Data.ClientSecret)
 	switch {

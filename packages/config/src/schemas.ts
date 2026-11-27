@@ -124,7 +124,7 @@ export type DeclaredApplicationIssue = { path: string; message: string };
  * a confidential client that does not name its `secret`. Read from the body as
  * written, so each is reported beside whatever the schema refuses of the same
  * client, rather than only once the client's shape is sound. A client with no
- * `type` is held as confidential, the only type there is.
+ * `type` is held as confidential. A public client must not name a secret.
  */
 export function declaredApplicationIssues(document: unknown): DeclaredApplicationIssue[] {
   const clients = (document as { clients?: unknown } | null)?.clients;
@@ -142,6 +142,15 @@ export function declaredApplicationIssues(document: unknown): DeclaredApplicatio
         path: `clients.${index}.client_id`,
         message: "is required: a client declared in a release sets its client_id",
       });
+    }
+    if (type === "public") {
+      if (secret !== undefined) {
+        issues.push({
+          path: `clients.${index}.secret`,
+          message: "must not be set: a public client holds no secret",
+        });
+      }
+      return issues;
     }
     if ((type === undefined || type === "confidential") && secret === undefined) {
       issues.push({

@@ -51,10 +51,12 @@ properties:
     type: string
     enum:
       - confidential
+      - public
     description: |
       A `confidential` client runs where a secret can be kept, such as a web
-      app's backend, and authenticates with one at the token endpoint. Public
-      clients, which hold no secret, are not available yet.
+      app's backend, and authenticates with one at the token endpoint. A
+      `public` client holds no secret: a browser-only or installed app that
+      signs in with authorization code and PKCE (`S256`) only.
   grant_types:
     type: array
     minItems: 1
@@ -82,13 +84,31 @@ properties:
     description: |
       Where the authorization endpoint may send the user back. Required with
       `authorization_code`; omit it otherwise, an empty list is refused. Each
-      is an `https` URL, or an `http` URL on a loopback host for local
-      development: `localhost`, a name under `.localhost`, or a loopback IP
-      such as `127.0.0.1` or `[::1]`. A URI is written as the client will
-      send it, with a lowercase host and no fragment, since it is matched
-      exactly; a loopback URI matches on any port (RFC 8252 §7.3).
+      is an `https` URL, an `http` URL on a loopback host for local
+      development (`localhost`, a name under `.localhost`, or a loopback IP
+      such as `127.0.0.1` or `[::1]`), or a private-use URI scheme for an
+      installed app (`com.example.app:/callback`, RFC 8252 §7.1). A URI is
+      written as the client will send it, with a lowercase host where it has
+      one and no fragment, since it is matched exactly; a loopback URI
+      matches on any port (RFC 8252 §7.3).
     examples:
       - - https://shop.example.com/callback
+  allowed_origins:
+    type: array
+    uniqueItems: true
+    maxItems: 50
+    items:
+      type: string
+      minLength: 1
+      maxLength: 2048
+    description: |
+      Browser origins that may call the authorization server's CORS-protected
+      endpoints for this client. Scheme and host only (optional port), no
+      path, query, fragment or credentials. Used by public browser clients
+      (SPAs); omit it for confidential clients and for installed apps that
+      do not call from a browser origin. An empty list is the same as omit.
+    examples:
+      - - http://localhost:5173
   secret:
     type: string
     pattern: '^\$\{\{ *[A-Za-z0-9_]{1,255} *\}\}$'

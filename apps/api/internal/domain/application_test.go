@@ -3,6 +3,7 @@ package domain_test
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,7 +16,27 @@ import (
 func webClient(redirectURIs ...string) domain.ApplicationClientDocument {
 	return domain.ApplicationClientDocument{
 		Slug:         "web",
+		Type:         "confidential",
 		GrantTypes:   []string{"authorization_code"},
+		RedirectURIs: redirectURIs,
+	}
+}
+
+func spaClient(redirectURIs []string, origins ...string) domain.ApplicationClientDocument {
+	return domain.ApplicationClientDocument{
+		Slug:           "spa",
+		Type:           "public",
+		GrantTypes:     []string{"authorization_code", "refresh_token"},
+		RedirectURIs:   redirectURIs,
+		AllowedOrigins: origins,
+	}
+}
+
+func nativeClient(redirectURIs ...string) domain.ApplicationClientDocument {
+	return domain.ApplicationClientDocument{
+		Slug:         "native",
+		Type:         "public",
+		GrantTypes:   []string{"authorization_code", "refresh_token"},
 		RedirectURIs: redirectURIs,
 	}
 }
@@ -98,14 +119,51 @@ func TestValidateRegisteredApplication(t *testing.T) {
 		{
 			name: "a client_id supplied twice and a bad redirect URI",
 			clients: []domain.ApplicationClientDocument{
-				{Slug: "web", GrantTypes: []string{"authorization_code"}, RedirectURIs: []string{"http://shop.example.com/cb"}, ClientID: new("shared")},
-				{Slug: "api", GrantTypes: []string{"authorization_code"}, RedirectURIs: []string{"https://shop.example.com/cb"}, ClientID: new("shared")},
+				{Slug: "web", Type: "confidential", GrantTypes: []string{"authorization_code"}, RedirectURIs: []string{"http://shop.example.com/cb"}, ClientID: new("shared")},
+				{Slug: "api", Type: "confidential", GrantTypes: []string{"authorization_code"}, RedirectURIs: []string{"https://shop.example.com/cb"}, ClientID: new("shared")},
 			},
 			wantErr: domain.ErrApplicationInvalid(nil, nil),
 			want: map[string]string{
 				"/clients/0/redirect_uris/0": "an http redirect URI must be on a loopback host",
 				"/clients/1/client_id":       "another client of the application has this client_id",
 			},
+		},
+		{
+			name:    "a public spa client with origins passes",
+			clients: []domain.ApplicationClientDocument{spaClient([]string{"http://localhost:5173/callback"}, "http://localhost:5173")},
+		},
+		{
+			name:    "a native private-use redirect passes",
+			clients: []domain.ApplicationClientDocument{nativeClient("com.acme.tunes:/callback", "http://127.0.0.1/callback")},
+		},
+		{
+			name:    "a confidential client with a private-use redirect",
+			clients: []domain.ApplicationClientDocument{webClient("com.acme.app:/callback")},
+			wantErr: domain.ErrApplicationInvalid(nil, nil),
+			want:    map[string]string{"/clients/0/redirect_uris/0": "a confidential client may not use a private-use redirect URI"},
+		},
+		{
+			name: "a confidential client with allowed origins",
+			clients: []domain.ApplicationClientDocument{
+				{
+					Slug: "web", Type: "confidential", GrantTypes: []string{"authorization_code"},
+					RedirectURIs: []string{"https://shop.example.com/cb"}, AllowedOrigins: []string{"https://shop.example.com"},
+				},
+			},
+			wantErr: domain.ErrApplicationInvalid(nil, nil),
+			want:    map[string]string{"/clients/0/allowed_origins": "only a public client lists allowed origins"},
+		},
+		{
+			name:    "an allowed origin with a path",
+			clients: []domain.ApplicationClientDocument{spaClient([]string{"http://localhost:5173/callback"}, "http://localhost:5173/app")},
+			wantErr: domain.ErrApplicationInvalid(nil, nil),
+			want:    map[string]string{"/clients/0/allowed_origins/0": "an allowed origin must be scheme://host[:port] with no path"},
+		},
+		{
+			name:    "an invalid redirect scheme",
+			clients: []domain.ApplicationClientDocument{nativeClient("1bad:/callback")},
+			wantErr: domain.ErrApplicationInvalid(nil, nil),
+			want:    map[string]string{"/clients/0/redirect_uris/0": "a redirect URI scheme must be http, https, or a private-use scheme"},
 		},
 	}
 	for _, tt := range tests {
@@ -296,6 +354,13 @@ func TestReviseDeclaredApplication(t *testing.T) {
 		{Slug: "web", ClientID: "shop-web"},
 		{Slug: "api", ClientID: "shop-api"},
 	}
+	declaredClient := func(slug, clientID string) domain.ApplicationClientDocument {
+		return domain.ApplicationClientDocument{
+			Slug: slug, ClientID: new(clientID), Type: "confidential",
+			GrantTypes: []string{"authorization_code"}, RedirectURIs: []string{"https://shop.example.com/cb"},
+			Secret: new("${{ " + strings.ToUpper(strings.ReplaceAll(slug, "-", "_")) + "_SECRET }}"),
+		}
+	}
 
 	tests := []struct {
 		name        string
@@ -308,33 +373,33 @@ func TestReviseDeclaredApplication(t *testing.T) {
 		{
 			name:     "a dropped client is not an error",
 			old:      declared,
-			document: []domain.ApplicationClientDocument{{Slug: "web", ClientID: new("shop-web")}},
+			document: []domain.ApplicationClientDocument{declaredClient("web", "shop-web")},
 			want:     []*domain.ApplicationClient{},
 		},
 		{
 			name:     "a client declared again under its client_id is not created again",
 			old:      declared,
-			document: []domain.ApplicationClientDocument{{Slug: "api", ClientID: new("shop-api")}, {Slug: "cli", ClientID: new("shop-cli")}},
+			document: []domain.ApplicationClientDocument{declaredClient("api", "shop-api"), declaredClient("cli", "shop-cli")},
 			want:     []*domain.ApplicationClient{{ProjectID: "prj", Slug: "cli", ClientID: "shop-cli"}},
 		},
 		{
 			name:        "a client declared again under another client_id",
 			old:         declared,
-			document:    []domain.ApplicationClientDocument{{Slug: "api", ClientID: new("shop-api-2")}},
+			document:    []domain.ApplicationClientDocument{declaredClient("api", "shop-api-2")},
 			wantErr:     domain.ErrApplicationFieldImmutable(nil),
 			wantDetails: map[string][]string{"fields": {"/clients/0/client_id"}},
 		},
 		{
 			name:        "the location is the client's index in the new document",
 			old:         declared,
-			document:    []domain.ApplicationClientDocument{{Slug: "web", ClientID: new("shop-web")}, {Slug: "api", ClientID: new("shop-api-2")}},
+			document:    []domain.ApplicationClientDocument{declaredClient("web", "shop-web"), declaredClient("api", "shop-api-2")},
 			wantErr:     domain.ErrApplicationFieldImmutable(nil),
 			wantDetails: map[string][]string{"fields": {"/clients/1/client_id"}},
 		},
 		{
 			name:     "a new client with a reserved prefix",
 			old:      declared,
-			document: []domain.ApplicationClientDocument{{Slug: "cli", ClientID: new("client_mine")}},
+			document: []domain.ApplicationClientDocument{declaredClient("cli", "client_mine")},
 			wantErr:  domain.ErrApplicationInvalid(nil, nil),
 			wantDetails: map[string]string{
 				"/clients/0/client_id": "a supplied client_id may not start with client_ or dcr_",
@@ -343,7 +408,7 @@ func TestReviseDeclaredApplication(t *testing.T) {
 		{
 			name:     "a registered application",
 			old:      &domain.Application{ProjectID: "prj", ID: "app", Slug: "shop"},
-			document: []domain.ApplicationClientDocument{{Slug: "web", ClientID: new("shop-web")}},
+			document: []domain.ApplicationClientDocument{declaredClient("web", "shop-web")},
 			wantErr:  domain.ErrApplicationRegistered(),
 		},
 	}

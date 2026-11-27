@@ -32,6 +32,7 @@ const (
 	grantTypeRefreshToken      = "refresh_token"
 
 	clientTypeConfidential = "confidential"
+	clientTypePublic       = "public"
 )
 
 type ApplicationField uint8
@@ -70,14 +71,24 @@ type ApplicationClientDocument struct {
 	Type         string   `json:"type"`
 	GrantTypes   []string `json:"grant_types"`
 	RedirectURIs []string `json:"redirect_uris"`
+	// AllowedOrigins are browser origins that may call CORS-protected OAuth
+	// endpoints for this client. Empty for confidential and native clients.
+	AllowedOrigins []string `json:"allowed_origins"`
 	// Secret is the `${{ NAME }}` reference to the variable holding a
 	// declared client's secret; a registered client has none.
 	Secret       *string `json:"secret"`
 	IsFirstParty bool    `json:"first_party"`
 }
 
+// IsConfidential reports whether the client authenticates with a secret.
+// An omitted type is confidential: that was the only type before public
+// clients shipped, and declared documents may still leave it out.
 func (c ApplicationClientDocument) IsConfidential() bool {
-	return c.Type == clientTypeConfidential
+	return c.Type == clientTypeConfidential || c.Type == ""
+}
+
+func (c ApplicationClientDocument) IsPublic() bool {
+	return c.Type == clientTypePublic
 }
 
 func (c ApplicationClientDocument) SecretVariable() (string, bool) {
@@ -169,8 +180,8 @@ func NewRegisteredApplication(projectID string, doc ApplicationDocument, docbs [
 
 	clients = make([]*ApplicationClient, len(doc.Clients))
 	plainSecrets = make([]string, len(doc.Clients))
-	for i, client := range doc.Clients {
-		client, secret, err := NewApplicationClient(projectID, client.ClientID, client.Slug, secretGen)
+	for i, clientDoc := range doc.Clients {
+		client, secret, err := NewApplicationClient(projectID, clientDoc.ClientID, clientDoc.Slug, !clientDoc.IsPublic(), secretGen)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -188,16 +199,20 @@ func NewRegisteredApplication(projectID string, doc ApplicationDocument, docbs [
 	return app, clients, plainSecrets, nil
 }
 
-func NewApplicationClient(projectID string, clientID *string, slug string, secretGen secrets.Generator) (client *ApplicationClient, plainSecret string, err error) {
+func NewApplicationClient(projectID string, clientID *string, slug string, confidential bool, secretGen secrets.Generator) (client *ApplicationClient, plainSecret string, err error) {
+	client = &ApplicationClient{
+		ProjectID: projectID,
+		Slug:      slug,
+		ClientID:  gu.Value(clientID),
+	}
+	if !confidential {
+		return client, "", nil
+	}
 	secret, err := NewApplicationClientSecret(secretGen)
 	if err != nil {
 		return nil, "", err
 	}
-	return &ApplicationClient{
-		ProjectID: projectID,
-		Slug:      slug,
-		ClientID:  gu.Value(clientID),
-	}, secret, nil
+	return client, secret, nil
 }
 
 // NewApplicationClientSecret generates a registered client's secret, sk_client_….
@@ -242,11 +257,11 @@ func ReviseRegisteredApplication(oldApp *Application, newDoc ApplicationDocument
 	clientsToAdd = make([]*ApplicationClient, len(toAdd))
 	plainSecrets = make([]string, len(toAdd))
 	for i, client := range toAdd {
-		client, secret, err := NewApplicationClient(oldApp.ProjectID, client.ClientID, client.Slug, secretGen)
+		row, secret, err := NewApplicationClient(oldApp.ProjectID, client.ClientID, client.Slug, !client.IsPublic(), secretGen)
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		clientsToAdd[i] = client
+		clientsToAdd[i] = row
 		plainSecrets[i] = secret
 	}
 
@@ -452,6 +467,9 @@ func ValidateDeclaredApplication(doc ApplicationDocument) error {
 		if client.IsConfidential() && client.Secret == nil {
 			failures[at+"/secret"] = "a confidential client declared in a release names the variable holding its secret"
 		}
+		if client.IsPublic() && client.Secret != nil {
+			failures[at+"/secret"] = "a public client holds no secret"
+		}
 	}
 	if len(failures) > 0 {
 		return ErrApplicationInvalid(failures, nil)
@@ -484,6 +502,23 @@ func validateApplicationDocument(doc ApplicationDocument) map[string]string {
 		for j, uri := range client.RedirectURIs {
 			if err := validateRedirectURI(uri); err != nil {
 				failures[fmt.Sprintf("%s/redirect_uris/%d", at, j)] = err.Error()
+				continue
+			}
+			if !client.IsPublic() && isPrivateUseRedirectURI(uri) {
+				failures[fmt.Sprintf("%s/redirect_uris/%d", at, j)] = "a confidential client may not use a private-use redirect URI"
+			}
+		}
+		if !client.IsPublic() && len(client.AllowedOrigins) > 0 {
+			failures[at+"/allowed_origins"] = "only a public client lists allowed origins"
+		}
+		for j, origin := range client.AllowedOrigins {
+			normalized, err := NormalizeOrigin(origin)
+			if err != nil {
+				failures[fmt.Sprintf("%s/allowed_origins/%d", at, j)] = "an allowed origin must be scheme://host[:port] with no path"
+				continue
+			}
+			if normalized != origin {
+				failures[fmt.Sprintf("%s/allowed_origins/%d", at, j)] = "the allowed origin is not in its canonical form"
 			}
 		}
 	}
@@ -543,20 +578,61 @@ func isRefreshTokenIssuingGrant(grant string) bool {
 // validateRedirectURI returns why uri is not a redirect URI the authorization
 // server accepts. Matching is exact, so only the canonical form passes: a URI
 // that re-serializes differently, or has an uppercase host, would never match
-// the one the client sends.
+// the one the client sends. https and loopback http use the browser redirect
+// parser; a private-use scheme (RFC 8252 §7.1) is accepted for installed apps.
 func validateRedirectURI(uri string) error {
 	if strings.Contains(uri, "#") {
 		return errors.New("a redirect URI may not have a fragment")
 	}
-	u, err := httputil.ParseRedirectTarget(uri)
-	if err != nil {
-		return err
+	scheme, rest, ok := strings.Cut(uri, ":")
+	if !ok || scheme == "" {
+		return errors.New("a redirect URI must start with a scheme")
 	}
-	if u.Scheme == "http" && !IsLoopbackOrigin(u.Scheme+"://"+u.Host) {
-		return errors.New("an http redirect URI must be on a loopback host")
+	if scheme == "http" || scheme == "https" {
+		u, err := httputil.ParseRedirectTarget(uri)
+		if err != nil {
+			return err
+		}
+		if u.Scheme == "http" && !IsLoopbackOrigin(u.Scheme+"://"+u.Host) {
+			return errors.New("an http redirect URI must be on a loopback host")
+		}
+		if u.String() != uri || u.Host != strings.ToLower(u.Host) {
+			return errors.New("the redirect URI is not in its canonical form")
+		}
+		return nil
 	}
-	if u.String() != uri || u.Host != strings.ToLower(u.Host) {
+	if strings.EqualFold(scheme, "http") || strings.EqualFold(scheme, "https") {
 		return errors.New("the redirect URI is not in its canonical form")
 	}
+	if !isPrivateUseScheme(scheme) {
+		return errors.New("a redirect URI scheme must be http, https, or a private-use scheme")
+	}
+	if rest == "" || rest == "//" {
+		return errors.New("a private-use redirect URI needs a path")
+	}
 	return nil
+}
+
+// isPrivateUseScheme reports whether scheme is a private-use URI scheme for
+// native apps (RFC 8252 §7.1): letters, digits, '.', '+' or '-', starting with
+// a letter, and not http/https.
+func isPrivateUseScheme(scheme string) bool {
+	if scheme == "" || scheme == "http" || scheme == "https" {
+		return false
+	}
+	if scheme[0] < 'a' || scheme[0] > 'z' {
+		return false
+	}
+	for i := 1; i < len(scheme); i++ {
+		c := scheme[i]
+		if (c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '.' && c != '+' && c != '-' {
+			return false
+		}
+	}
+	return true
+}
+
+func isPrivateUseRedirectURI(uri string) bool {
+	scheme, _, ok := strings.Cut(uri, ":")
+	return ok && isPrivateUseScheme(scheme)
 }
