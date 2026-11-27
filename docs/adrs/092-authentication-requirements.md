@@ -457,8 +457,9 @@ recommends for access tokens. With `prompt=none`, insufficient proof returns
   claim counts as not satisfied. Completing a recent check does not change
   `auth_time`, so the app compares the two limits separately: a token from a
   request with `recent_check=0` in place of `max_age=0` still carries the old
-  `auth_time`, and the app rejects it. If insufficient, the API returns `insufficient_user_authentication` so the app
-  initiates a new request ([RFC 9470](https://www.rfc-editor.org/rfc/rfc9470)).
+  `auth_time`, and the app rejects it. If insufficient, the API returns
+  `insufficient_user_authentication` so the app initiates a new request
+  ([RFC 9470](https://www.rfc-editor.org/rfc/rfc9470)).
 - **Session API:** Returns `factors` (each verified check with `verified_at`,
   plus `user_verified` for passkeys) and `assurance_levels` (which `acr`
   values of [§1](#1-model) are met; the session does not report the
