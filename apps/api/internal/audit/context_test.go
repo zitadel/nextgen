@@ -88,8 +88,7 @@ func TestBindPublicRequest_StampsSlot(t *testing.T) {
 	slot, ok := ActorSlotFromContext(ctx)
 	require.True(t, ok)
 	assert.Equal(t, "proj_1", slot.ProjectID)
-	require.NotNil(t, slot.FlowID)
-	assert.Equal(t, "flow_1", *slot.FlowID)
+	assert.Equal(t, "flow_1", middleware.CorrelationFromContext(ctx).Flow())
 	require.NotNil(t, slot.SessionID)
 	assert.Equal(t, "sess_1", *slot.SessionID)
 	require.NotNil(t, slot.RequestID)
@@ -104,7 +103,7 @@ func TestBindPublicRequest_EmptyProjectIsNoop(t *testing.T) {
 	slot, ok := ActorSlotFromContext(ctx)
 	require.True(t, ok)
 	assert.Empty(t, slot.ProjectID)
-	assert.Nil(t, slot.FlowID)
+	assert.Empty(t, middleware.CorrelationFromContext(ctx).Flow())
 	assert.Nil(t, slot.SessionID)
 }
 
@@ -117,21 +116,91 @@ func TestBindFlow_StampsOnlyTheFlowOfARequestWithNone(t *testing.T) {
 	slot, ok := ActorSlotFromContext(ctx)
 	require.True(t, ok)
 	slot.ProjectID = "proj_1"
+	correlation := middleware.CorrelationFromContext(ctx)
 
 	BindFlow(ctx, "")
-	assert.Nil(t, slot.FlowID)
+	assert.Empty(t, correlation.Flow())
 
 	BindFlow(ctx, "flow_1")
-	require.NotNil(t, slot.FlowID)
-	assert.Equal(t, "flow_1", *slot.FlowID)
+	assert.Equal(t, "flow_1", correlation.Flow())
 	assert.Equal(t, "proj_1", slot.ProjectID)
 	assert.Nil(t, slot.SessionID)
 
 	// The flow a request names itself stays.
 	BindFlow(ctx, "flow_2")
-	assert.Equal(t, "flow_1", *slot.FlowID)
+	assert.Equal(t, "flow_1", correlation.Flow())
 
-	BindFlow(t.Context(), "flow_1") // no slot: a no-op
+	BindFlow(t.Context(), "flow_1") // outside a request: a no-op
+}
+
+// The security handler stamps the actor on a context of its own, a copy. A
+// flow and a chain the handler learns afterwards still reach the domain
+// events it writes, as they reach the request event: both read the request's
+// one correlation.
+func TestFromContext_AuthenticatedRequestCarriesWhatItBoundLater(t *testing.T) {
+	request := WithActorSlot(middleware.WithCorrelation(t.Context()))
+	handler := WithActorContext(request, ActorContext{ProjectID: "proj_1", Authenticated: true})
+
+	BindFlow(handler, "flow_1")
+	JoinCorrelation(handler, "chain_1")
+
+	slot, ok := ActorSlotFromContext(request)
+	require.True(t, ok)
+	for name, ev := range map[string]*domain.Event{
+		"domain event":  FromContext(handler, domain.EventTypeUserCreated, domain.EventCategoryEntity),
+		"request event": FromContext(WithActorContext(request, *slot), domain.EventTypeRequestAPI, domain.EventCategoryRequest),
+	} {
+		require.NotNil(t, ev.FlowID, name)
+		assert.Equal(t, "flow_1", *ev.FlowID, name)
+		require.NotNil(t, ev.CorrelationID, name)
+		assert.Equal(t, "chain_1", *ev.CorrelationID, name)
+	}
+}
+
+func TestJoinCorrelation_TheFirstCarrierDecides(t *testing.T) {
+	ctx := middleware.WithCorrelation(t.Context())
+	correlation := middleware.CorrelationFromContext(ctx)
+
+	JoinCorrelation(ctx, "") // a carrier of a time before chains
+	assert.Empty(t, correlation.Chain())
+
+	JoinCorrelation(ctx, "chain_1")
+	JoinCorrelation(ctx, "chain_2")
+	assert.Equal(t, "chain_1", correlation.Chain())
+
+	JoinCorrelation(t.Context(), "chain_1") // outside a request: a no-op
+	assert.Nil(t, FromContext(t.Context(), domain.EventTypeUserCreated, domain.EventCategoryEntity).CorrelationID)
+}
+
+func TestEnsureCorrelation(t *testing.T) {
+	t.Run("a request with no chain starts one and stays in it", func(t *testing.T) {
+		ctx := middleware.WithCorrelation(t.Context())
+		id, err := EnsureCorrelation(ctx)
+		require.NoError(t, err)
+		assert.Regexp(t, `^[0-9a-f]{32}$`, id)
+
+		again, err := EnsureCorrelation(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, id, again, "a second carrier of the request is in the same chain")
+		ev := FromContext(ctx, domain.EventTypeInvitationCreated, domain.EventCategoryAdmin)
+		require.NotNil(t, ev.CorrelationID)
+		assert.Equal(t, id, *ev.CorrelationID)
+	})
+	t.Run("a request in a chain hands it to the carrier it creates", func(t *testing.T) {
+		ctx := middleware.WithCorrelation(t.Context())
+		JoinCorrelation(ctx, "chain_1")
+		id, err := EnsureCorrelation(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, "chain_1", id)
+	})
+	t.Run("outside a request the carrier gets a chain of its own", func(t *testing.T) {
+		first, err := EnsureCorrelation(t.Context())
+		require.NoError(t, err)
+		second, err := EnsureCorrelation(t.Context())
+		require.NoError(t, err)
+		assert.Regexp(t, `^[0-9a-f]{32}$`, first)
+		assert.NotEqual(t, first, second)
+	})
 }
 
 func TestWithPayload(t *testing.T) {

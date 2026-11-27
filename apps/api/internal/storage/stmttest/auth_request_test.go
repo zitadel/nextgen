@@ -32,6 +32,9 @@ func TestAuthRequestStatements_CreateAndGet(t *testing.T) {
 					DeploymentID:  "dep_1",
 					ReleaseID:     "rel_1",
 					BindingHash:   domain.HashSecret("nonce"),
+					// The chain the request starts, which the redemption of
+					// its code reads back; the cases below store none.
+					CorrelationID: "chain_authorize",
 				},
 			},
 			{

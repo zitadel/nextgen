@@ -9115,7 +9115,7 @@
         "operationId": "createInvitation",
         "x-zitadel-cli": "invitation create",
         "summary": "Create an invitation",
-        "description": "Creates an invitation for a project, or replaces an existing one, and\nreturns the invitation and its one-shot link.\n\nSend `type` and the object named after it. `project_member` takes\n`relation` (`viewer`, `editor` or `admin`). `team_member` takes `team_id`\nand `role`, and answers `501` `not_implemented` until team invitations\nship. Optional `metadata.name` (1–200 characters) labels who the link is\nfor. Optional `replaces_invitation_id` replaces that invitation: the new\nrow keeps the original's `journey_id`, and the original is deleted in the\nsame transaction unless it was accepted.\n\nThe `link` appears only in this response. Share it out of band; whoever\nopens it and is signed in can redeem the role. It expires in 72 hours.\nRefused for an unclaimed project, on a server without a platform project,\nand when the project already has 100 pending unexpired invitations.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Creation needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
+        "description": "Creates an invitation for a project, or replaces an existing one, and\nreturns the invitation and its one-shot link.\n\nSend `type` and the object named after it. `project_member` takes\n`relation` (`viewer`, `editor` or `admin`). `team_member` takes `team_id`\nand `role`, and answers `501` `not_implemented` until team invitations\nship. Optional `metadata.name` (1–200 characters) labels who the link is\nfor. Optional `replaces_invitation_id` replaces that invitation: the new\nrow keeps the original's `journey_id`, and the original is deleted in the\nsame transaction. An accepted original cannot be replaced: the request\nanswers `404`.\n\nThe `link` appears only in this response. Send it to the recipient\nyourself; whoever opens it and is signed in can redeem the role. It\nexpires in 72 hours.\nRefused for an unclaimed project, on a server without a platform project,\nand when the project already has 100 pending unexpired invitations.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Creation needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
         "tags": [
           "Invitations"
         ],
@@ -9460,7 +9460,7 @@
       "post": {
         "operationId": "acceptInvitation",
         "summary": "Accept an invitation",
-        "description": "Accepts a pending invitation for the signed-in user and returns the updated\ninvitation.\n\nSend the plaintext token from the invitation link fragment. Acceptance\ngrants the invitation's role (a project grant for `project_member`) when\nthe invitation is pending and unexpired, the project is active and claimed,\nand the creator still holds `admin` unless `created_by` is null. The\ninviter cannot accept their own invitation. Every unknown or finished token\nanswers the same opaque `404`.\n\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules.\n",
+        "description": "Accepts a pending invitation for the signed-in user and returns the updated\ninvitation.\n\nSend the plaintext token from the invitation link fragment. Acceptance\ngrants the invitation's role (a project grant for `project_member`) when\nthe invitation is pending and unexpired, the project is claimed, and the\ncreator still holds `admin` unless `created_by` is null. The\ninviter cannot accept their own invitation. Every unknown or finished token\nanswers the same opaque `404`.\n\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules.\n",
         "tags": [
           "Invitations"
         ],
@@ -9531,7 +9531,7 @@
             }
           },
           "409": {
-            "description": "The project is unclaimed or inactive, so acceptance cannot complete.",
+            "description": "The project is unclaimed, or the server has no platform project.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9770,7 +9770,7 @@
         "operationId": "listEvents",
         "x-zitadel-cli": "event list",
         "summary": "List events",
-        "description": "Lists a project's audit events, newest first. Pass `order=asc` for oldest\nfirst. Requires `events.read`.\n\nA project that is not claimed yet returns an empty list: its events are\nstored but stay invisible until the\n[claim](/docs/concepts/project-team-user#claim) succeeds. The deployment's\nplatform operators read them from the start.\n\nTeam-scoped credentials see only the events whose `team_id` matches the\ncredential's team. Team-scoped credentials are not issued today.\n\nEach item carries an `event_type` that says which type of event it is, and\nthe matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{event_id}`).\n\nFilters combine. These are answered from an index and fill their pages: no\nfilter, `category`, `event_type`, `status_class`, `operation_id` with or\nwithout `status_class`, `request_id`, `flow_id`, and `session_id`,\n`entity_id`, `user_id`, `actor_id` or `entity_type` with or without\n`category`, each with or without the time bounds. Any other filter or combination is\nmatched event by event, over at most a few thousand events per request.\nSuch a page can hold fewer events than `limit`, or none, and still carry\n`next_page_token`: keep passing the token until a response has none.\n",
+        "description": "Lists a project's audit events, newest first. Pass `order=asc` for oldest\nfirst. Requires `events.read`.\n\nA project that is not claimed yet returns an empty list: its events are\nstored but stay invisible until the\n[claim](/docs/concepts/project-team-user#claim) succeeds. The deployment's\nplatform operators read them from the start.\n\nTeam-scoped credentials see only the events whose `team_id` matches the\ncredential's team. Team-scoped credentials are not issued today.\n\nEach item carries an `event_type` that says which type of event it is, and\nthe matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{event_id}`).\n\nFilters combine. These are answered from an index and fill their pages: no\nfilter, `category`, `event_type`, `status_class`, `operation_id` with or\nwithout `status_class`, `request_id`, `flow_id`, `correlation_id`, and `session_id`,\n`entity_id`, `user_id`, `actor_id` or `entity_type` with or without\n`category`, each with or without the time bounds. Any other filter or combination is\nmatched event by event, over at most a few thousand events per request.\nSuch a page can hold fewer events than `limit`, or none, and still carry\n`next_page_token`: keep passing the token until a response has none.\n",
         "tags": [
           "Events"
         ],
@@ -9858,6 +9858,14 @@
             "name": "flow_id",
             "in": "query",
             "description": "Only events of this login flow ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "correlation_id",
+            "in": "query",
+            "description": "Only events of this chain: the requests that one sign-in, invitation\nor project claim took, whoever sent them. Read the ID from the\n`correlation_id` of an event in the chain. Events recorded by a server\nversion before this filter existed are not matched; they leave the\nlist as retention removes them.\n",
             "schema": {
               "type": "string"
             }
@@ -23273,6 +23281,10 @@
               }
             }
           },
+          "trace_id": {
+            "type": "string",
+            "description": "The OpenTelemetry trace ID of the request, set only on events from an\nAPI request (`request.api`) whose trace was sampled. It leads from the\nevent to the request's trace in the operator's tracing backend. It is\nobserved context, not a filter: `correlation_id` and `request_id`\ncorrelate events.\n"
+          },
           "client": {
             "description": "The observed HTTP requestor context, set only on events from an API request (`request.api`).",
             "type": "object",
@@ -23468,6 +23480,17 @@
           },
           "flow_id": {
             "description": "An ID that correlates the events of one login flow.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "correlation_id": {
+            "description": "An ID that correlates the events of one chain: the requests that one\npiece of work took, whoever sent them. A sign-in shares it from the\nOAuth authorization request or the first step of the login flow to the\nsession and the token it ends with. An invitation shares it with its\nreplacements and its answer, and a project claim from its start to its\ncompletion. The server assigns it and never reads it from a request.\nAbsent on an event whose request is the whole of its work; `request_id`\ncorrelates those.\n",
             "oneOf": [
               {
                 "type": "string"

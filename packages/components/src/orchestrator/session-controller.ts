@@ -81,8 +81,8 @@ export class SessionController implements ReactiveController {
     this.host.requestUpdate();
 
     try {
-      const { api, project } = this.resolve();
-      await revokeSession(api, project.projectId);
+      const { client, project } = this.resolve();
+      await revokeSession(client, project.projectId);
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       this.errorMessage = message || "Sign-out failed. Please try again.";
@@ -115,9 +115,9 @@ export class SessionController implements ReactiveController {
     void this.loadIdentity(resolved);
   }
 
-  private async loadIdentity({ api, project }: Resolved): Promise<void> {
+  private async loadIdentity({ client, project }: Resolved): Promise<void> {
     try {
-      const session = await getSession(api, project.projectId);
+      const session = await getSession(client, project.projectId);
       // A live session of another project: nobody to show here.
       if (session === null) return;
       this.display = session.user?.display ?? "";

@@ -13,6 +13,7 @@ export {
   allowDestructive,
   createZitadelClient,
   isCancelled,
+  type OperationName,
   pagedFunctions,
   responseFailure,
   type ZitadelClient,
@@ -44,7 +45,7 @@ export {
   UNACCEPTED_INVITATION_STATUSES,
 } from "./services/invitation";
 export { type ApiRequest, Operation, OperationService, type Target } from "./services/operation";
-export { Origin, OriginService, Origins } from "./services/origin";
+export { OriginService, Origins } from "./services/origin";
 export { type PolicyEvaluation, PolicyService } from "./services/policy";
 export { PreviewService } from "./services/preview";
 export { type CreatedProject, ProjectService } from "./services/project";

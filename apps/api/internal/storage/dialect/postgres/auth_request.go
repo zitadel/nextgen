@@ -10,13 +10,14 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/authattempt"
 )
 
 const (
-	authRequestColumns    = `project_id, id, client_id, redirect_uri, state, scopes, code_challenge, issuer, deployment_id, release_id, binding_hash, created_at, expires_at, code_hash, user_id, session_id, code_expires_at`
+	authRequestColumns    = `project_id, id, client_id, redirect_uri, state, scopes, code_challenge, issuer, deployment_id, release_id, binding_hash, created_at, expires_at, code_hash, user_id, session_id, code_expires_at, correlation_id`
 	createAuthRequestStmt = `INSERT INTO zitadel_nextgen.auth_requests` +
-		` (project_id, id, client_id, redirect_uri, state, scopes, code_challenge, issuer, deployment_id, release_id, binding_hash, expires_at)` +
-		` VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING created_at`
+		` (project_id, id, client_id, redirect_uri, state, scopes, code_challenge, issuer, deployment_id, release_id, binding_hash, expires_at, correlation_id)` +
+		` VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING created_at`
 	getAuthRequestStmt     = `SELECT ` + authRequestColumns + ` FROM zitadel_nextgen.auth_requests WHERE project_id = $1 AND id = $2`
 	setAuthRequestCodeStmt = `UPDATE zitadel_nextgen.auth_requests SET code_hash = $3, user_id = $4, session_id = $5, code_expires_at = $6` +
 		` WHERE project_id = $1 AND id = $2 AND code_hash IS NULL AND expires_at > $7`
@@ -52,6 +53,7 @@ func (s authRequestStatements) CreateAuthRequest(ctx context.Context, request *d
 		request.ReleaseID,
 		request.BindingHash,
 		request.ExpiresAt,
+		authattempt.EmptyStringArg(request.CorrelationID),
 	).Scan(&request.CreatedAt); err != nil {
 		return wrapError(err)
 	}
@@ -108,6 +110,7 @@ func scanAuthRequest(row pgx.CollectableRow) (*domain.AuthRequest, error) {
 	var (
 		request                     domain.AuthRequest
 		codeHash, userID, sessionID *string
+		correlationID               *string
 	)
 	if err := row.Scan(
 		&request.ProjectID,
@@ -127,9 +130,11 @@ func scanAuthRequest(row pgx.CollectableRow) (*domain.AuthRequest, error) {
 		&userID,
 		&sessionID,
 		&request.CodeExpiresAt,
+		&correlationID,
 	); err != nil {
 		return nil, err
 	}
+	request.CorrelationID = gu.Value(correlationID)
 	request.CodeHash = gu.Value(codeHash)
 	request.UserID = gu.Value(userID)
 	request.SessionID = gu.Value(sessionID)

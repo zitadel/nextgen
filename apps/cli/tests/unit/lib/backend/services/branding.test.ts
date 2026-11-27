@@ -1,75 +1,69 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect } from "vitest";
 
-import { BrandingService } from "@/lib/backend";
-import { fakeClient, pagesOf } from "@tests/helpers/fake-client";
+import { it } from "@tests/fixtures";
+
+import { BrandingService } from "@/lib/backend/services/branding";
+import { answering, answeringPages, testClient } from "@tests/helpers/api-answers";
+
+/** A service on a test client, bound to `proj_1`. */
+function service(): BrandingService {
+  return new BrandingService(testClient(), "proj_1");
+}
 
 describe("BrandingService.list", () => {
-  it("lists every revision of the project it is bound to", async () => {
-    const all = vi.fn(async () => []);
-    const brandingService = new BrandingService(fakeClient({ listBranding: { all } }), "proj_1");
+  it("lists every revision of the project it is bound to", async ({ server }) => {
+    const listed = answeringPages(server, "listBranding", { branding: [] });
 
-    await brandingService.list();
+    await service().list();
 
-    expect(all).toHaveBeenCalledWith({ project_id: "proj_1" });
+    expect(listed.map(({ url }) => url.searchParams.get("project_id"))).toEqual(["proj_1"]);
   });
 
-  it("drains past the first page, in the order the server answered", async () => {
-    const brandingService = new BrandingService(
-      fakeClient({
-        listBranding: { all: async () => [{ id: "brand_2" }, { id: "brand_1" }] },
-      }),
-      "proj_1",
+  it("drains past the first page, in the order the server answered", async ({ server }) => {
+    answeringPages(
+      server,
+      "listBranding",
+      { branding: [{ id: "brand_2" }] },
+      { branding: [{ id: "brand_1" }] },
     );
 
-    await expect(brandingService.list()).resolves.toEqual([{ id: "brand_2" }, { id: "brand_1" }]);
+    await expect(service().list()).resolves.toEqual([{ id: "brand_2" }, { id: "brand_1" }]);
   });
 });
 
 describe("BrandingService.page", () => {
-  it("reads one page and the cursor to the next", async () => {
-    const pages = vi.fn(() =>
-      pagesOf(
-        { branding: [{ id: "brand_2" }], next_page_token: "t2" },
-        { branding: [{ id: "brand_1" }], next_page_token: null },
-      ),
-    );
-    const brandingService = new BrandingService(fakeClient({ listBranding: { pages } }), "proj_1");
+  it("reads one page and the cursor to the next", async ({ server }) => {
+    const listed = answering(server, "listBranding", {
+      branding: [{ id: "brand_2" }],
+      next_page_token: "t2",
+    });
 
-    const first = await brandingService.page({ limit: 1 });
+    const first = await service().page({ limit: 1 });
 
-    expect(pages).toHaveBeenCalledWith({ project_id: "proj_1", limit: 1 });
+    expect(
+      listed.map(({ url }) => [url.searchParams.get("project_id"), url.searchParams.get("limit")]),
+    ).toEqual([["proj_1", "1"]]);
     expect(first.items).toEqual([{ id: "brand_2" }]);
     expect(first.next).toBe("t2");
   });
 
-  it("answers no cursor when the server sent none", async () => {
-    const brandingService = new BrandingService(
-      fakeClient({
-        listBranding: { pages: () => pagesOf({ branding: [], next_page_token: null }) },
-      }),
-      "proj_1",
-    );
+  it("answers no cursor when the server sent none", async ({ server }) => {
+    answeringPages(server, "listBranding", { branding: [] });
 
-    const first = await brandingService.page();
+    const first = await service().page();
 
     expect(first.next).toBeNull();
   });
 
-  it("drains every page when asked for all of them", async () => {
-    const brandingService = new BrandingService(
-      fakeClient({
-        listBranding: {
-          pages: () =>
-            pagesOf(
-              { branding: [{ id: "brand_2" }], next_page_token: "t2" },
-              { branding: [{ id: "brand_1" }], next_page_token: null },
-            ),
-        },
-      }),
-      "proj_1",
+  it("drains every page when asked for all of them", async ({ server }) => {
+    answeringPages(
+      server,
+      "listBranding",
+      { branding: [{ id: "brand_2" }] },
+      { branding: [{ id: "brand_1" }] },
     );
 
-    const every = await brandingService.page({}, { all: true });
+    const every = await service().page({}, { all: true });
 
     expect(every.items).toEqual([{ id: "brand_2" }, { id: "brand_1" }]);
     expect(every.next).toBeNull();
@@ -77,12 +71,13 @@ describe("BrandingService.page", () => {
 });
 
 describe("BrandingService.get", () => {
-  it("reads one revision by its own id, which names the project already", async () => {
-    const getBranding = vi.fn(async () => ({ id: "brand_1" }));
-    const brandingService = new BrandingService(fakeClient({ getBranding }), "proj_1");
+  it("reads one revision by its own id, which names the project already", async ({ server }) => {
+    const read = answering(server, "getBranding", { id: "brand_1" });
 
-    await brandingService.get("brand_1");
+    await service().get("brand_1");
 
-    expect(getBranding).toHaveBeenCalledWith("brand_1");
+    expect(read.map(({ params, url }) => [params.branding_id, url.search])).toEqual([
+      ["brand_1", ""],
+    ]);
   });
 });

@@ -1,6 +1,11 @@
 import { destructiveOperations, operations } from "@zitadel/api/generated/operations";
-import { NetworkError } from "@zitadel/api/runtime/fetch";
-import { describe, expect, it, vi } from "vitest";
+import { DestructiveOperationError, NetworkError } from "@zitadel/api/runtime/fetch";
+import { HttpResponse, http, type JsonBodyType } from "msw";
+import type { SetupServer } from "msw/node";
+import { describe, expect } from "vitest";
+
+import { it } from "@tests/fixtures";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import {
   allowDestructive,
@@ -13,32 +18,52 @@ import { InvalidError } from "@/lib/backend";
 
 const signal = new AbortController().signal;
 
-/** Answer every request with one JSON body and status. */
-function stubFetch(status: number, body: unknown): void {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async () => new Response(JSON.stringify(body), { status })),
+/**
+ * Answers every request to the client's server with one JSON body, status and
+ * headers, and records the requests that arrived.
+ *
+ * @param server - The test's MSW server.
+ * @param status - The status to answer with.
+ * @param body - The JSON body to answer with.
+ * @param headers - Headers to add to the answer.
+ * @returns The requests that arrived, oldest first.
+ */
+function answering(
+  server: SetupServer,
+  status: number,
+  body: JsonBodyType,
+  headers: Record<string, string> = {},
+): readonly Request[] {
+  const arrived: Request[] = [];
+  server.use(
+    http.all("http://localhost:8080/*", ({ request }) => {
+      arrived.push(request);
+      return HttpResponse.json(body, { status, headers });
+    }),
   );
+  return arrived;
 }
 
 describe("createZitadelClient", () => {
   const client = () =>
     createZitadelClient({ signal, baseUrl: "http://localhost:8080", token: "t" });
 
-  it("answers a body exactly as the server sent it", async () => {
+  it("answers a body exactly as the server sent it", async ({ server }) => {
     const body = {
       liquid_template: "<p>\r\n\u200d\u001b[2J</p>",
       nested: {
         tags: ["ok", "\u001b]8;;https://evil.example\u0007click"],
       },
     };
-    stubFetch(200, body);
+    answering(server, 200, body);
 
     await expect(client().getProject("p1")).resolves.toEqual(body);
   });
 
-  it("raises a refused response as a BackendError carrying the server's text as it came", async () => {
-    stubFetch(400, {
+  it("raises a refused response as a BackendError carrying the server's text as it came", async ({
+    server,
+  }) => {
+    answering(server, 400, {
       code: "invalid_argument",
       message: "bad \u001b[31mname",
       details: { details: "\u001b]52;c;cHduZWQ=\u0007" },
@@ -59,19 +84,15 @@ describe("createZitadelClient", () => {
     });
   });
 
-  it("carries the server's request id, which finds the request in its logs", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        async () =>
-          new Response(JSON.stringify({ code: "invalid_argument" }), {
-            status: 400,
-            headers: { "x-request-id": "req_1" },
-          }),
-      ),
-    );
+  it("carries the server's request id, which finds the request in its logs", async ({ server }) => {
+    answering(server, 400, { code: "invalid_argument" }, { "x-request-id": "req_1" });
 
-    await expect(client().getProject("p1")).rejects.toMatchObject({ requestId: "req_1" });
+    const error = await rejectionOf(() => client().getProject("p1"));
+
+    expect(error).toBeInstanceOf(InvalidError);
+    expect(error).toMatchObject({
+      requestId: "req_1",
+    });
   });
 });
 
@@ -79,22 +100,21 @@ describe("a client's destructive operations", () => {
   const client = () =>
     createZitadelClient({ signal, baseUrl: "http://localhost:8080", token: "t" });
 
-  it("are refused on the client, cast or not", () => {
-    expect(() => (client() as unknown as Record<string, unknown>).deleteVariable).toThrow(
-      "deleteVariable is destructive: reach it through allowDestructive",
-    );
+  it("are refused before anything is sent", async ({ server }) => {
+    const arrived = answering(server, 204, null);
+
+    expect(
+      await rejectionOf(() => client().deleteVariable("NAME", { project_id: "proj_1" })),
+    ).toBeInstanceOf(DestructiveOperationError);
+    expect(arrived).toEqual([]);
   });
 
-  it("are refused when reached around the type", () => {
-    expect(() => Reflect.get(client(), "revokeRelease")).toThrow(
-      "revokeRelease is destructive: reach it through allowDestructive",
-    );
-  });
-
-  it("are refused when reached through the property descriptor", () => {
-    expect(() => Object.getOwnPropertyDescriptor(client(), "deleteVariable")).toThrow(
-      "deleteVariable is destructive: reach it through allowDestructive",
-    );
+  it("are refused by name, whichever one is called", async () => {
+    expect(
+      await rejectionOf(() => client().revokeRelease("rel_1", { project_id: "proj_1" })),
+    ).toMatchObject({
+      operation: "revokeRelease",
+    });
   });
 
   it("leave every other operation reachable, updates included", () => {
@@ -102,8 +122,11 @@ describe("a client's destructive operations", () => {
     expect(typeof client().setVariables).toBe("function");
   });
 
-  it("are handed back by allowDestructive", () => {
-    expect(typeof allowDestructive(client()).deleteVariable).toBe("function");
+  it("are handed back by allowDestructive, on the same connection", () => {
+    const allowed = allowDestructive(client());
+
+    expect(allowed.client.allowDestructive).toBe(true);
+    expect(connectionOf(allowed)).toMatchObject({ baseUrl: "http://localhost:8080", token: "t" });
   });
 
   it("are not handed back for a client createZitadelClient did not make", () => {
@@ -259,40 +282,23 @@ describe("connectionOf", () => {
 
   /**
    * What the generated client was built with, which is what bounds the
-   * requests it makes. `connectionOf` only says what the backend recorded, so
-   * a test that read it alone would pass while the client itself went
-   * unbounded.
+   * requests it makes, beside what `connectionOf` reports: a test that read
+   * the connection alone would pass while the client itself went unbounded.
    *
    * @param opts - The options to build a client with.
-   * @returns The `timeoutMs` the generated client received.
+   * @returns The `timeoutMs` the generated client received, and the connection's.
    */
-  async function rawTimeoutOf(opts: { timeoutMs?: number | undefined }): Promise<{
+  function rawTimeoutOf(opts: { timeoutMs?: number | undefined }): {
     raw: number | undefined;
     recorded: number;
-  }> {
-    vi.resetModules();
-    const raw = vi.fn((_built: { timeoutMs?: number | undefined }) => {
-      return {} as never;
-    });
-    vi.doMock("@zitadel/api/client", async (importOriginal) => {
-      const real = await importOriginal<typeof import("@zitadel/api/client")>();
-      return {
-        ...real,
-        createZitadelClient: raw,
-      };
-    });
-    const built = await import("@/lib/backend/client");
-    const client = built.createZitadelClient({
+  } {
+    const client = createZitadelClient({
       signal,
       baseUrl: "http://localhost:8080",
       token: "t",
       ...opts,
     });
-    vi.doUnmock("@zitadel/api/client");
-    return {
-      raw: raw.mock.calls[0]?.[0].timeoutMs,
-      recorded: built.connectionOf(client).timeoutMs,
-    };
+    return { raw: client.client.timeoutMs, recorded: connectionOf(client).timeoutMs };
   }
 
   it.each([
@@ -301,8 +307,8 @@ describe("connectionOf", () => {
     ["given a deadline", { timeoutMs: 1500 }, 1500],
   ])(
     "bounds the generated client and the connection alike, with the deadline %s",
-    async (_case, opts, expected) => {
-      const { raw, recorded } = await rawTimeoutOf(opts);
+    (_case, opts, expected) => {
+      const { raw, recorded } = rawTimeoutOf(opts);
 
       expect(raw).toBe(expected);
       expect(recorded).toBe(expected);

@@ -5830,9 +5830,9 @@
           },
           "parameters": [
             {
-              "name": "api",
+              "name": "client",
               "type": {
-                "text": "ZitadelApi"
+                "text": "ZitadelClient"
               }
             },
             {
@@ -5853,9 +5853,9 @@
           },
           "parameters": [
             {
-              "name": "api",
+              "name": "client",
               "type": {
-                "text": "ZitadelApi"
+                "text": "ZitadelClient"
               }
             },
             {
@@ -5882,9 +5882,9 @@
           },
           "parameters": [
             {
-              "name": "api",
+              "name": "client",
               "type": {
-                "text": "ZitadelApi"
+                "text": "ZitadelClient"
               }
             },
             {
@@ -5905,9 +5905,9 @@
           },
           "parameters": [
             {
-              "name": "api",
+              "name": "client",
               "type": {
-                "text": "ZitadelApi"
+                "text": "ZitadelClient"
               }
             },
             {
@@ -5923,7 +5923,7 @@
               }
             }
           ],
-          "description": "Exchange a terminal-flow `handoff_token` for an authenticated session.\nThe server sets the HttpOnly session cookie on success.\n\nUses the generated `exchangeHandoff` client which handles the\n`project_id` query parameter via ExchangeHandoffParams."
+          "description": "Exchange a terminal-flow `handoff_token` for an authenticated session.\nThe server sets the HttpOnly session cookie on success.\n\nUses the generated `exchangeHandoff`, which handles the\n`project_id` query parameter via ExchangeHandoffParams."
         },
         {
           "kind": "function",
@@ -5935,9 +5935,9 @@
           },
           "parameters": [
             {
-              "name": "api",
+              "name": "client",
               "type": {
-                "text": "ZitadelApi"
+                "text": "ZitadelClient"
               }
             },
             {
@@ -5959,9 +5959,9 @@
           },
           "parameters": [
             {
-              "name": "api",
+              "name": "client",
               "type": {
-                "text": "ZitadelApi"
+                "text": "ZitadelClient"
               }
             },
             {
@@ -7345,7 +7345,7 @@
           "name": "resolveApi",
           "return": {
             "type": {
-              "text": "{ project: ZitadelProject; api: ZitadelApi }"
+              "text": "{ project: ZitadelProject; client: ZitadelClient }"
             }
           },
           "parameters": [
@@ -7371,7 +7371,7 @@
               "description": "Tag name used in the thrown error (e.g. `<zitadel-login>`)."
             }
           ],
-          "description": "Resolves the effective SDK project handle and its typed API client for an\norchestrator element. Precedence, highest first:\n\n1. the element's `project` property (an SDK handle set from JS / a framework),\n2. the global handle from `configureZitadel()`,\n3. the `project-id` / `proxy-path` / `url` / `publishable-key` attributes set declaratively in HTML.\n\nBoth JS paths (property and global) win over the declarative attributes, so a\ndeliberate `configureZitadel()` is never silently overridden by fallback or\nstale HTML attributes; the attributes are the no-JS fallback.\n\nBoth `<zitadel-login>` and `<zitadel-logout>` need the same resolution and\nthe same \"no config\" failure, so it lives here rather than being copied\ninto each element. Callers run this inside their try/catch so a missing\nconfiguration surfaces through the element's normal error path rather than\nas an unhandled rejection."
+          "description": "Resolves the effective SDK project handle and its client for an\norchestrator element. Precedence, highest first:\n\n1. the element's `project` property (an SDK handle set from JS / a framework),\n2. the global handle from `configureZitadel()`,\n3. the `project-id` / `proxy-path` / `url` / `publishable-key` attributes set declaratively in HTML.\n\nBoth JS paths (property and global) win over the declarative attributes, so a\ndeliberate `configureZitadel()` is never silently overridden by fallback or\nstale HTML attributes; the attributes are the no-JS fallback.\n\nBoth `<zitadel-login>` and `<zitadel-logout>` need the same resolution and\nthe same \"no config\" failure, so it lives here rather than being copied\ninto each element. Callers run this inside their try/catch so a missing\nconfiguration surfaces through the element's normal error path rather than\nas an unhandled rejection."
         }
       ],
       "exports": [
@@ -7623,7 +7623,7 @@
               },
               "parameters": [
                 {
-                  "name": "{ api, project }",
+                  "name": "{ client, project }",
                   "type": {
                     "text": "Resolved"
                   }

@@ -14,7 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 
+	"context"
+
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -88,6 +91,44 @@ func TestOAuthCodeRedemption(t *testing.T) {
 			CodeVerifier: verifier,
 		}
 	}
+
+	// The authorization endpoint, the login that issues the code and the
+	// token endpoint are three requests from two parties. The authorization
+	// request holds their chain: its own event and the token the code buys
+	// carry one correlation ID.
+	t.Run("the token a code buys is in the authorization request's chain", func(t *testing.T) {
+		userID := harness.CreateUserWithTeam(t, project.ID)
+		session := harness.CreateActiveSession(t, project.ID, userID)
+		request := &domain.AuthRequest{
+			ProjectID:     project.ID,
+			ClientID:      "web",
+			RedirectURI:   redirectURI,
+			State:         "xyz",
+			CodeChallenge: oidc.NewSHACodeChallenge(verifier),
+			Issuer:        issuer,
+			DeploymentID:  deployment.ID,
+			ReleaseID:     deployment.ReleaseID,
+		}
+		// Each call is a request of its own, with a correlation of its own.
+		newRequest := func() context.Context { return middleware.WithCorrelation(t.Context()) }
+		_, err := requests.Create(newRequest(), request)
+		require.NoError(t, err)
+		require.Regexp(t, `^[0-9a-f]{32}$`, request.CorrelationID)
+		code, err := requests.IssueCode(newRequest(), project.ID, request.ID, userID, session.ID)
+		require.NoError(t, err)
+		_, _, err = requests.RedeemCode(newRequest(), input(code))
+		require.NoError(t, err)
+
+		opts := events.ListOptions(project.ID, 100)
+		opts.Filter = database.And(opts.Filter, database.Equal(database.Col(domain.EventFieldCorrelationID), request.CorrelationID))
+		page, err := stmts.ListEvents(t.Context(), opts)
+		require.NoError(t, err)
+		var types []domain.EventType
+		for _, ev := range page.Items {
+			types = append(types, ev.EventType)
+		}
+		assert.ElementsMatch(t, []domain.EventType{domain.EventTypeAuthRequestCreated, domain.EventTypeAuthTokenIssued}, types)
+	})
 
 	t.Run("a code is redeemed once for a signed access token", func(t *testing.T) {
 		userID := harness.CreateUserWithTeam(t, project.ID)
