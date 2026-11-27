@@ -6,7 +6,11 @@ const cwd = "/repo";
 
 /** knip's findings with one finding of `type`, as a reporter receives them. */
 function findingsWith(type, issue) {
-  return { cwd, issues: { [type]: { [issue.filePath]: { [issue.symbol]: issue } } } };
+  return {
+    cwd,
+    report: { [type]: true },
+    issues: { [type]: { [issue.filePath]: { [issue.symbol]: issue } } },
+  };
 }
 
 describe("annotations", () => {
@@ -77,7 +81,40 @@ describe("annotations", () => {
     ]);
   });
 
+  it("annotates nothing of a kind knip does not report", () => {
+    const options = findingsWith("cycles", { filePath: "/repo/src/a.ts", symbol: "a" });
+
+    expect(annotations({ ...options, report: { cycles: false } })).toEqual([]);
+  });
+
+  it.each([
+    ["switched off", { severity: "off" }],
+    ["already fixed", { isFixed: true }],
+  ])("annotates nothing for a finding %s", (_, state) => {
+    const options = findingsWith("types", { filePath: "/repo/src/a.ts", symbol: "T", ...state });
+
+    expect(annotations(options)).toEqual([]);
+  });
+
+  it("names every export a duplicate covers", () => {
+    const options = findingsWith("duplicates", {
+      filePath: "/repo/src/a.ts",
+      symbol: "a",
+      symbols: [{ symbol: "a" }, { symbol: "b" }],
+    });
+
+    expect(annotations(options)).toEqual([
+      "::error file=src/a.ts,title=knip%3A Duplicate export::Duplicate export: a, b",
+    ]);
+  });
+
   it("annotates nothing when knip found nothing", () => {
-    expect(annotations({ cwd, issues: { exports: {}, files: {} } })).toEqual([]);
+    expect(
+      annotations({
+        cwd,
+        report: { exports: true, files: true },
+        issues: { exports: {}, files: {} },
+      }),
+    ).toEqual([]);
   });
 });

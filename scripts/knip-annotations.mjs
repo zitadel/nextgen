@@ -43,23 +43,37 @@ function encode(value, property) {
  * @param {import("knip").ReporterOptions} options - What knip found, and where it ran.
  * @returns {string[]} One workflow command per finding.
  */
-export function annotations({ issues, cwd }) {
-  return Object.entries(issues).flatMap(([type, records]) => {
+export function annotations({ issues, report, cwd }) {
+  return Object.entries(report).flatMap(([type, reported]) => {
+    if (!reported) {
+      return [];
+    }
     const title = TITLES[type] ?? type;
-    return Object.values(records).flatMap((byFile) => {
-      return Object.values(byFile).map((issue) => {
-        const level = issue.severity === "warn" ? "warning" : "error";
-        const params = [`file=${encode(relative(cwd, issue.filePath), true)}`];
-        if (issue.line !== undefined) {
-          params.push(`line=${issue.line}`);
-        }
-        if (issue.col !== undefined) {
-          params.push(`col=${issue.col}`);
-        }
-        const symbol = issue.parentSymbol ? `${issue.parentSymbol}.${issue.symbol}` : issue.symbol;
-        params.push(`title=${encode(`knip: ${title}`, true)}`);
-        return `::${level} ${params.join(",")}::${encode(`${title}: ${symbol}`, false)}`;
-      });
+    return Object.values(issues[type] ?? {}).flatMap((byFile) => {
+      return Object.values(byFile)
+        .filter((issue) => {
+          return issue.severity !== "off" && !issue.isFixed;
+        })
+        .map((issue) => {
+          const level = issue.severity === "warn" ? "warning" : "error";
+          const params = [`file=${encode(relative(cwd, issue.filePath), true)}`];
+          if (issue.line !== undefined) {
+            params.push(`line=${issue.line}`);
+          }
+          if (issue.col !== undefined) {
+            params.push(`col=${issue.col}`);
+          }
+          const named = issue.symbols
+            ? issue.symbols
+                .map((item) => {
+                  return item.symbol;
+                })
+                .join(", ")
+            : issue.symbol;
+          const symbol = issue.parentSymbol ? `${issue.parentSymbol}.${named}` : named;
+          params.push(`title=${encode(`knip: ${title}`, true)}`);
+          return `::${level} ${params.join(",")}::${encode(`${title}: ${symbol}`, false)}`;
+        });
     });
   });
 }

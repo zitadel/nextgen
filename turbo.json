@@ -122,7 +122,7 @@
     // replaces `inputs` instead of extending them (cli#test). Every package
     // lint is `biome check .` and knip, which read no Markdown.
     "lint": {
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/biome-plugins/*.grit", "$TURBO_ROOT$/knip.config.js", "$TURBO_ROOT$/scripts/knip-annotations.mjs", "!**/*.md", "!**/*.mdx", "!**/LICENSE"]
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/biome-plugins/*.grit", "$TURBO_ROOT$/knip.config.js", "$TURBO_ROOT$/scripts/knip-annotations.mjs", "$TURBO_ROOT$/scripts/knip-workspaces.mjs", "!**/*.md", "!**/*.mdx", "!**/LICENSE"]
     },
     "typecheck": {
       "inputs": [
@@ -355,6 +355,8 @@
         "scripts/task-graph.test.mjs",
         "scripts/knip-annotations.mjs",
         "scripts/knip-annotations.test.mjs",
+        "scripts/knip-workspaces.mjs",
+        "scripts/knip-workspaces.test.mjs",
         "scripts/cloud-build.test.mjs",
         "vercel.json",
         "apps/cloud/build-launcher.sh",
