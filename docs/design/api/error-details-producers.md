@@ -47,6 +47,7 @@ Flow `Fields` value decode failures attach `{field}` only (no parser text, no pa
 | `service/auth_attempt.go` unsupported proof | was string `WithDetails` | **Fixed** — moved to `Message` |
 | `domain/deployment.go` `ErrDeploymentInvalid` | explanation | **Fixed** — callers set it with `WithMessage` |
 | `domain/project.go` `ErrProjectLastOwner` | typed `{project_ids}` | **Reference** — the projects whose owning team would be left without an active member; the message names the same ids |
+| `domain/invitation.go` `ErrInvitationAlreadyMember` | typed `{relation}` | **Reference** — the strongest role the caller already holds on the project; self-scoped |
 | `deployment.go` `deploymentConflictResponse` | typed `{deployment}` | **Reference** — hand-built typed 409, so `details.deployment` is flat and in the API's deployment shape |
 | `service/list.go`, `service/project.go`, `service/team.go` filter/sort strings | string `WithDetails` | **Deferred** — inventory only this PR |
 | crypto / token / signing / encryption `WithDetails` | strings or maps | **Deferred** — often internal; review before promoting to public details |

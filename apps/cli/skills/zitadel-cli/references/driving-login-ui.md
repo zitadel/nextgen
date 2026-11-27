@@ -48,7 +48,8 @@ supported frameworks.
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
 then re-run `deploy` (or `deploy --dry-run` to validate and preview the diff
 without publishing). Schema and flow files are synced from
-`.zitadel/schemas/*.json` and `.zitadel/flows/*.json`. Login templates
+`.zitadel/schemas/*.json` and `.zitadel/flows/*.json`, and declared
+applications from `.zitadel/applications/<slug>.json`. Login templates
 (branding) are synced from `.zitadel/branding/`: a single `branding.json`
 descriptor (layout, asset URLs) plus a sibling `login.liquid` LiquidJS
 template referenced as `"liquid_template": { "$file": "./login.liquid" }`. Scaffold them with the

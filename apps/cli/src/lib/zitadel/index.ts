@@ -1,7 +1,8 @@
 /**
  * The project's configuration under `.zitadel/`: its user schemas, login flows,
- * identity-provider connections, operation policies and branding, read, edited,
- * checked, bundled and written through one {@link ZitadelConfig}, whose
+ * identity-provider connections, operation policies, branding and declared
+ * applications, read, edited, checked, bundled and written through one
+ * {@link ZitadelConfig}, whose
  * collections hold each kind of document and every edit and question about it.
  *
  * @remarks
@@ -10,6 +11,7 @@
  * document. Nothing in this module prints or knows the command line. It fails
  * only with a {@link ConfigError}, and depends on nothing else under `lib/`.
  */
+export { Application } from "@/lib/zitadel/resources/applications";
 export {
   BRANDING_DESIGN_INFO,
   Branding,

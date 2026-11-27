@@ -56,6 +56,7 @@ export const CONFIG_KINDS = [
   "connections",
   "policies",
   "branding",
+  "applications",
   "oauth",
 ] as const;
 
@@ -73,6 +74,7 @@ export const CONFIG_DIRECTORIES = {
   connections: ".zitadel/idps",
   policies: ".zitadel/policies",
   branding: ".zitadel/branding",
+  applications: ".zitadel/applications",
   oauth: ".zitadel/oauth",
 } as const satisfies Record<ConfigKind, `.zitadel/${string}`>;
 
@@ -280,6 +282,10 @@ export type ConfigurationBundle = {
    * The branding descriptor's wire body; absent when there is none.
    */
   readonly branding?: JsonObject;
+  /**
+   * Every declared application's wire body; absent when there are none.
+   */
+  readonly applications?: readonly JsonObject[];
   /**
    * The OAuth settings' wire body; absent when there are none, which leaves
    * the project's authorization server off.

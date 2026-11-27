@@ -180,19 +180,12 @@ stateDiagram-v2
   adapter knows that service's errors and decides which of them mean
   "already done". Its outcome is success, which lets acceptance continue, or
   a failure, which aborts it.
-- **The `project_member` adapter** calls the grant service with the accepting
-  user and the relation. Grants are unique per user and relation, and roles
-  are additive, so:
-  - no grant for that relation yet: the grant service creates one;
-  - a different relation already held: a second grant is created, and the
-    strongest wins;
-  - an identical active grant: the grant service refuses a duplicate, and the
-    adapter treats that as success;
-  - an identical expired grant still holds the binding: the adapter revokes
-    it and creates a new one.
-
-  These rules follow the grant service as it is. If it starts accepting
-  duplicates, the adapter gets simpler; the invitation doesn't change.
+- **The `project_member` adapter** refuses a user who already has access to
+  the project (amendment of 2026-11-25), then calls the grant service with
+  the accepting user and the relation. Grants are unique per user and
+  relation, so an expired grant of that relation still holds the binding:
+  the grant service revokes it, without re-reading its expiry, before it
+  writes the new one.
 - **Provenance:** the grant row doesn't point back to the invitation (ADR 054
   §6 keeps provenance in events). The grant service emits `authz.granted`,
   and `authz.revoked` for a replaced expired grant. They share
@@ -429,19 +422,11 @@ This refines §3's lookup and §4's adapter and self-accept rules (#2853).
 
 - **The grant service takes the caller's transaction.** `GrantService.Create`
   opens its own transaction, and transactions don't nest, so the
-  `project_member` adapter calls `EnsureUserGrant`, which runs in the
+  `project_member` adapter calls `WriteUserGrant`, which runs in the
   invitation's transaction.
-- **The duplicate rules live in that method, not in the adapter.** On
-  Postgres a unique violation aborts the transaction, so a refused duplicate
-  can't be read as success afterwards. `EnsureUserGrant` reads the user's
-  grants on the project first, and compares them by relation:
-  - an active grant of the same relation is already done;
-  - an expired one is revoked and created again;
-  - otherwise it creates the grant.
-
-  §4 says "if it starts accepting duplicates, the adapter gets simpler":
-  `EnsureUserGrant` is that path, and the adapter only maps the invitation's
-  type to the call.
+- **§4's leftover-grant revoke lives in that method, not in the adapter,**
+  because on Postgres a unique violation aborts the transaction. The adapter
+  only maps the invitation's type to the call.
 - **Accept changes the status before it grants.** The guarded status change
   locks the row, so of two racing accepts the loser misses it and gets
   `404 inv.not_found`, before any grant is written.
@@ -545,3 +530,29 @@ amendments.
   counts as not accepted, and the 72-hour acceptance rate leaves out
   cancelled journeys. The audit event `invitation.cancelled` (§5) is still
   written for every cancel.
+
+## Amendment (2026-11-25): a user with access can't redeem an invitation
+
+This refines §4's `project_member` adapter for a user who already has access
+(#3330).
+
+- **Invitations bring people into a project; they don't change anyone's
+  access.** A user who already has access to the project can neither accept
+  nor decline its invitations: both answer `409 inv.already_member`, with
+  their strongest role as `relation` in the error's details. Changing a role
+  goes through grants.
+- **The invitation stays pending** for the person it was meant for. No grant
+  is written and no event is emitted: the refused transaction rolls back.
+- **Access is what the authorization check grants**, by any path: a grant to
+  the user or to a team they are a member of, the owning team, a grant
+  borrowed through a team (tuple-to-userset), or operating the deployment
+  (ADR 075). An expired grant gives none, so accept still renews it.
+- **The check belongs to the type's adapter**, like the grant. For
+  `project_member` it asks the resolver for the user's strongest project role,
+  the same question accept asks about the inviter (§10). `team_member` will
+  ask about team membership. Accept and decline run it after the project
+  lock, so it sees a grant that a racing accept or administrator wrote.
+- **Lookup returns the same answer** as `membership: { relation }` on the
+  `project_member` variant, or null, so the accept page can show it in place
+  of Accept and Decline. Each type's variant carries its own, so access to a
+  project never blocks a team invitation.

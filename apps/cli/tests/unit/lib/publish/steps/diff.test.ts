@@ -202,6 +202,17 @@ describe("diffStep", () => {
       expect(shown(result)).toContain("The primary origins serve 2 different releases");
     });
 
+    it("shows an added application, with its redirect URIs", async ({ dir, server }) => {
+      const sha = await aLiveCommit(dir);
+      await write(dir, {
+        ".zitadel/applications/shop.json": '{ "redirect_uris": ["https://shop.test/cb"] }\n',
+      });
+
+      const result = await diffStep.run(aRunIn(server, dir, [{ targets: [PRIMARY], sha }]));
+
+      expect(shown(result)).toContain('+{ "redirect_uris": ["https://shop.test/cb"] }');
+    });
+
     it("prints the diff against the live commit", async ({ dir, server }) => {
       const sha = await aLiveCommit(dir);
       await write(dir, { [SCHEMA]: '{ "type": "string" }\n' });
@@ -251,6 +262,19 @@ describe("diffStep", () => {
       expect(result?.learned?.changedConfiguration).toEqual(["user_schema", "branding"]);
     });
 
+    it("records a changed application, which changes no schema or flow", async ({
+      dir,
+      server,
+    }) => {
+      const sha = await aLiveCommit(dir);
+      await write(dir, { ".zitadel/applications/shop.json": "{}\n" });
+
+      const result = await diffStep.run(aRunIn(server, dir, [{ targets: [PRIMARY], sha }]));
+
+      expect(result?.learned?.changedConfiguration).toEqual(["application"]);
+      expect(result?.learned?.schemasOrFlowsChanged).toBe(false);
+    });
+
     it("counts the OAuth settings as their own kind of configuration", async ({ dir, server }) => {
       const sha = await aLiveCommit(dir);
       await write(dir, { ".zitadel/oauth/oauth.json": '{ "enabled": true }\n' });
@@ -258,6 +282,22 @@ describe("diffStep", () => {
       const result = await diffStep.run(aRunIn(server, dir, [{ targets: [PRIMARY], sha }]));
 
       expect(result?.learned?.changedConfiguration).toEqual(["oauth"]);
+    });
+
+    it("records application and OAuth changes together without triggering lockout checks", async ({
+      dir,
+      server,
+    }) => {
+      const sha = await aLiveCommit(dir);
+      await write(dir, {
+        ".zitadel/applications/shop.json": "{}\n",
+        ".zitadel/oauth/oauth.json": '{ "enabled": true }\n',
+      });
+
+      const result = await diffStep.run(aRunIn(server, dir, [{ targets: [PRIMARY], sha }]));
+
+      expect(result?.learned?.changedConfiguration).toEqual(["application", "oauth"]);
+      expect(result?.learned?.schemasOrFlowsChanged).toBe(false);
     });
 
     it("does not count a README or a policy's test file as a changed policy", async ({

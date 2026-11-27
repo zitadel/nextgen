@@ -7,6 +7,8 @@ import {
 import { providerOf } from "@zitadel/config/idp";
 
 import { Change } from "@/lib/zitadel/change";
+import { Application } from "@/lib/zitadel/resources/applications";
+import { Applications } from "@/lib/zitadel/resources/applications";
 import { BrokenFile } from "@/lib/zitadel/resources/broken";
 import { Branding } from "@/lib/zitadel/resources/branding";
 import { Brandings } from "@/lib/zitadel/resources/branding";
@@ -29,6 +31,7 @@ import type { Policy } from "@/lib/zitadel/resources/policies";
 import { SignupPolicy } from "@/lib/zitadel/resources/policies";
 import { PolicyTest } from "@/lib/zitadel/resources/policies";
 import { POLICY_TEST_SUFFIX } from "@/lib/zitadel/resources/policies";
+import { APPLICATION_RULES } from "@/lib/zitadel/rules/applications";
 import { CONTRACT_RULES } from "@/lib/zitadel/rules/contracts";
 import { ENVIRONMENT_RULES } from "@/lib/zitadel/rules/environment";
 import { FLOW_RULES } from "@/lib/zitadel/rules/flows";
@@ -62,6 +65,7 @@ export type AnyDocument =
   | Policy
   | PolicyTest
   | Branding
+  | Application
   | OAuthSettings;
 
 /**
@@ -101,6 +105,7 @@ type Parts = {
   readonly policies: readonly Policy[];
   readonly policyTests: readonly PolicyTest[];
   readonly brandings: readonly Branding[];
+  readonly applications: readonly Application[];
   readonly oauth: readonly OAuthSettings[];
   readonly broken: readonly BrokenFile[];
   readonly read: readonly (AnyDocument | BrokenFile)[];
@@ -117,8 +122,8 @@ type ListEdit = <T extends AnyDocument>(documents: readonly T[], document: T) =>
 
 /**
  * A project's whole configuration under `.zitadel/`: its user schemas, login
- * flows, identity-provider connections, operation policies and branding, read
- * and written together.
+ * flows, identity-provider connections, operation policies, branding,
+ * declared applications and OAuth settings, read and written together.
  *
  * @remarks
  * Immutable. Each kind of document is a collection, and every question and
@@ -161,6 +166,11 @@ export class ZitadelConfig {
   readonly branding: Brandings;
 
   /**
+   * The applications under `.zitadel/applications/`, which a release declares.
+   */
+  readonly applications: Applications;
+
+  /**
    * The OAuth settings under `.zitadel/oauth/`; a deploy refuses more than
    * one file.
    */
@@ -169,7 +179,8 @@ export class ZitadelConfig {
   /**
    * The files read that their kind's contract refuses, so no collection holds
    * them: schemas, flows, connections, policies, policy test files, branding
-   * and OAuth settings, in that order and each kind in the order it was read.
+   * applications and OAuth settings, in that order and each kind in the order
+   * it was read.
    */
   readonly broken: readonly BrokenFile[];
 
@@ -196,6 +207,7 @@ export class ZitadelConfig {
     this.connections = new Connections(this, parts.connections);
     this.policies = new Policies(this, parts.policies, parts.policyTests);
     this.branding = new Brandings(this, parts.brandings);
+    this.applications = new Applications(this, parts.applications);
     this.oauth = new OAuthSettingsCollection(this, parts.oauth);
     this.broken = parts.broken;
     this.options = parts.options;
@@ -256,7 +268,8 @@ export class ZitadelConfig {
    * @param options - What is known beyond the files.
    * @returns The configuration, with the kinds not named empty.
    * @throws The error the read of the first named kind in the kinds' fixed
-   *   order (schemas, flows, connections, policies, branding, oauth) failed with.
+   *   order (schemas, flows, connections, policies, branding, applications,
+   *   oauth) failed with.
    */
   static async loadKinds(
     store: ConfigStore,
@@ -269,6 +282,7 @@ export class ZitadelConfig {
       ZitadelConfig.readKind(store, kinds, "connections"),
       ZitadelConfig.readKind(store, kinds, "policies"),
       ZitadelConfig.readKind(store, kinds, "branding"),
+      ZitadelConfig.readKind(store, kinds, "applications"),
       ZitadelConfig.readKind(store, kinds, "oauth"),
     ]);
     return ZitadelConfig.of(
@@ -278,7 +292,8 @@ export class ZitadelConfig {
         connections: ZitadelConfig.unwrap(settled[2]),
         policies: ZitadelConfig.unwrap(settled[3]),
         branding: ZitadelConfig.unwrap(settled[4]),
-        oauth: ZitadelConfig.unwrap(settled[5]),
+        applications: ZitadelConfig.unwrap(settled[5]),
+        oauth: ZitadelConfig.unwrap(settled[6]),
       },
       options,
     );
@@ -310,7 +325,8 @@ export class ZitadelConfig {
    *
    * @remarks
    * The reads run together, so the kinds are unwrapped one after another in
-   * their fixed order (schemas, flows, connections, policies, branding, oauth). When
+   * their fixed order (schemas, flows, connections, policies, branding,
+   * applications, oauth). When
    * several fail, the same one is named every time, rather than whichever
    * settled first.
    *
@@ -353,6 +369,7 @@ export class ZitadelConfig {
       })
       .map(PolicyTest.read);
     const brandings = files.branding.map(Branding.read);
+    const applications = files.applications.map(Application.read);
     const oauth = files.oauth.map(OAuthSettings.read);
     const readings = [
       ...schemas,
@@ -361,6 +378,7 @@ export class ZitadelConfig {
       ...policies,
       ...policyTests,
       ...brandings,
+      ...applications,
       ...oauth,
     ];
     return new ZitadelConfig({
@@ -370,6 +388,7 @@ export class ZitadelConfig {
       policies: ZitadelConfig.documentsIn(policies),
       policyTests: ZitadelConfig.documentsIn(policyTests),
       brandings: ZitadelConfig.documentsIn(brandings),
+      applications: ZitadelConfig.documentsIn(applications),
       oauth: ZitadelConfig.documentsIn(oauth),
       broken: readings.filter((reading): reading is BrokenFile => {
         return reading instanceof BrokenFile;
@@ -398,24 +417,30 @@ export class ZitadelConfig {
       connections: [],
       policies: [],
       branding: [],
+      applications: [],
       oauth: [],
     });
   }
 
   /**
    * Check the configuration against every rule: each file's contract, the
-   * server's flow rules, the environment, and how the files agree.
+   * server's flow rules, the environment, and how the files agree, the
+   * application files among them.
    *
    * @param context - What some rules need beyond the files; a rule that needs
    *   what is not given is skipped.
    * @returns Every finding; none when it is consistent.
    */
   validate(context: ValidationContext = {}): readonly Issue[] {
-    return [...CONTRACT_RULES, ...FLOW_RULES, ...ENVIRONMENT_RULES, ...SSO_RULES].flatMap(
-      (rule) => {
-        return rule.check(this, context);
-      },
-    );
+    return [
+      ...CONTRACT_RULES,
+      ...FLOW_RULES,
+      ...ENVIRONMENT_RULES,
+      ...SSO_RULES,
+      ...APPLICATION_RULES,
+    ].flatMap((rule) => {
+      return rule.check(this, context);
+    });
   }
 
   /**
@@ -445,6 +470,10 @@ export class ZitadelConfig {
     });
     const policies = policyBodies.length === 0 ? {} : { policies: policyBodies };
     const brandingPart = branding === undefined ? {} : { branding };
+    const applicationBodies = this.applications.all.map((application) => {
+      return application.toWireBody(store);
+    });
+    const applications = applicationBodies.length === 0 ? {} : { applications: applicationBodies };
     const oauthPart = oauth === undefined ? {} : { oauth };
     const bundle: ConfigurationBundle = {
       schemas: this.schemas.all.map((schema) => {
@@ -458,6 +487,7 @@ export class ZitadelConfig {
       }),
       ...policies,
       ...brandingPart,
+      ...applications,
       ...oauthPart,
     };
     const resourceCount =
@@ -466,6 +496,7 @@ export class ZitadelConfig {
       this.connections.all.length +
       this.policies.all.length +
       this.branding.all.length +
+      this.applications.all.length +
       this.oauth.all.length;
     // A broken file is left out of the bundle, which a deploy never sends
     // while one is there, but it still counts: its validation names it.
@@ -476,7 +507,7 @@ export class ZitadelConfig {
       }).length;
     if (fileCount === 0) {
       throw new ConfigError("There is nothing in .zitadel/ to deploy", {
-        hint: "Add a schema, flow, policy or branding under .zitadel/, or run `zitadel setup` to scaffold one.",
+        hint: "Add a schema, flow, policy, branding, application or OAuth settings under .zitadel/, or run `zitadel setup` to scaffold one.",
       });
     }
     if (fileCount > ZitadelConfig.MAX_BUNDLE_RESOURCES) {
@@ -746,6 +777,7 @@ export class ZitadelConfig {
         ...this.policies.all,
         ...this.policies.tests,
         ...this.branding.all,
+        ...this.applications.all,
         ...this.oauth.all,
         ...this.broken,
       ].map((file) => {
@@ -771,6 +803,7 @@ export class ZitadelConfig {
       ...this.policies.all,
       ...this.policies.tests,
       ...this.branding.all,
+      ...this.applications.all,
       ...this.oauth.all,
     ];
     return documents.filter((document) => {
@@ -875,6 +908,7 @@ export class ZitadelConfig {
       policies: this.policies.all,
       policyTests: this.policies.tests,
       brandings: this.branding.all,
+      applications: this.applications.all,
       oauth: this.oauth.all,
       broken: this.broken,
       read: this.read,
@@ -914,6 +948,9 @@ export class ZitadelConfig {
       }
       case "branding": {
         return { ...parts, brandings: edit(parts.brandings, document) };
+      }
+      case "application": {
+        return { ...parts, applications: edit(parts.applications, document) };
       }
       case "oauth": {
         return { ...parts, oauth: edit(parts.oauth, document) };

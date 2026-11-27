@@ -424,6 +424,7 @@ export class Change {
       ...before.policies.all,
       ...before.policies.tests,
       ...before.branding.all,
+      ...before.applications.all,
       ...before.oauth.all,
     ];
     const read = documents.filter((document) => {
