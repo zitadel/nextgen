@@ -5,6 +5,7 @@ package helpers
 import (
 	"testing"
 
+	"github.com/go-jose/go-jose/v4"
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/cache"
@@ -33,6 +34,7 @@ func (h *Harness) EnsureKeyService(t testing.TB) service.KeyService {
 			*(h.EnsureMasterKey(t)),
 			crypters,
 			signingKeys,
+			cache.Disabled[service.SigningKeyCacheKey, []jose.JSONWebKey]{},
 		)
 	}
 	return h.keyService.value
