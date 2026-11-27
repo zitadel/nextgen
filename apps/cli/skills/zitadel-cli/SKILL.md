@@ -222,15 +222,17 @@ nothing; `data.skills` and `data.directories` say what it added where.
   must be present; missing ones are listed in one `E_VALIDATION`. Interactively,
   the kind menu includes Help me choose (two questions → web/spa/native); a
   `package.json` sniff may highlight a preset but never skips the question.
-  Redirect and origin prompts offer kind-based suggestions plus Custom…. Today
-  only `--preset web` succeeds: spa and native refuse with a clear message until
-  the server supports public clients. Success always prints a pasteable `.env`
-  block (`ZITADEL_ISSUER=<ZITADEL_ISSUER>/__nextgen/oauth/<project_id>`,
-  `ZITADEL_CLIENT_ID`, `ZITADEL_CLIENT_SECRET` for web, `ZITADEL_CALLBACK_URL`);
-  `--application-env-file <path>` writes those variables (distinct from the
-  global `--env-file` that reads CLI project credentials). The client secret is
-  shown only once. A slug a release already declares fails with `app.declared`.
-  The plural alias `applications create` works the same way.
+  Redirect and origin prompts offer kind-based suggestions plus Custom….
+  `--preset web` registers a confidential client with a one-shot secret;
+  `--preset spa` and `--preset native` register public clients (PKCE, no
+  secret). Success always prints a pasteable `.env` block
+  (`ZITADEL_ISSUER=<ZITADEL_ISSUER>/__nextgen/oauth/<project_id>`,
+  `ZITADEL_CLIENT_ID`, `ZITADEL_CLIENT_SECRET` for web, `ZITADEL_CALLBACK_URL`,
+  and `ZITADEL_ALLOWED_ORIGINS` for spa); `--application-env-file <path>` writes
+  those variables (distinct from the global `--env-file` that reads CLI project
+  credentials). The client secret is shown only once. A slug a release already
+  declares fails with `app.declared`. The plural alias `applications create`
+  works the same way.
 - **Invitations.** `zitadel invitation create --relation viewer|editor|admin`
   makes a link that grants that role on the project to whoever opens it and
   signs in; `--name` labels who it is for and is never matched. Non-interactive,
