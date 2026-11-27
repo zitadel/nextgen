@@ -54,6 +54,27 @@ import {
   BuildReleaseQueryParams,
   CancelInvitationParams,
   CancelInvitationQueryParams,
+  CreateGrantBody,
+  CreateGrantQueryParams,
+  CreateGrantResponse,
+  CreateTeamBody,
+  CreateTeamQueryParams,
+  CreateTeamResponse,
+  CreateUserBody,
+  CreateUserQueryParams,
+  CreateUserResponse,
+  DeactivateTeamParams,
+  DeleteGrantParams,
+  DeleteGrantQueryParams,
+  DeleteUserParams,
+  GetTeamParams,
+  GetTeamResponse,
+  GetUserParams,
+  GetUserQueryParams,
+  GetUserResponse,
+  QueryGrantsBody,
+  QueryGrantsQueryParams,
+  QueryGrantsResponse,
   CreateInvitationBody,
   CreateInvitationQueryParams,
   CreateInvitationResponse,
@@ -515,10 +536,42 @@ type InvitationRecord = {
   seq: number;
 };
 
+/** A team as `internal/service/team.go` keeps it; deactivating keeps it readable (ADR 024). */
+type TeamRecord = {
+  id: string;
+  projectId: string;
+  name: string;
+  status: "active" | "deactivated";
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** A user as the server keeps it; deleting removes it. */
+type UserRecord = {
+  id: string;
+  schema: string;
+  attributes: Record<string, unknown>;
+  createdAt: string;
+};
+
+/** A collaboration grant giving a user or a team a role on a project. */
+type GrantRecord = {
+  id: string;
+  projectId: string;
+  relation: "viewer" | "editor" | "admin";
+  createdAt: string;
+  expiresAt: string | null;
+  principal: { user_id: string } | { team_id: string };
+  seq: number;
+};
+
 /** How long an invitation's link stays redeemable (`domain.InvitationExpiration`). */
 const INVITATION_TTL_MS = 72 * 60 * 60 * 1000;
 
 const INVITATION_NOT_FOUND = errorBody("inv.not_found", "invitation not found");
+const TEAM_NOT_FOUND = errorBody("team.not_found", "team not found");
+const USER_NOT_FOUND = errorBody("user.not_found", "user not found");
+const GRANT_NOT_FOUND = errorBody("grant.not_found", "grant not found");
 
 type Store = {
   projects: Map<string, ProjectRecord>;
@@ -532,6 +585,9 @@ type Store = {
   previews: Map<string, PreviewRecord>;
   policies: Map<string, PolicyRecord>;
   invitations: Map<string, InvitationRecord>;
+  teams: Map<string, TeamRecord>;
+  users: Map<string, UserRecord>;
+  grants: Map<string, GrantRecord>;
   /**
    * Owner key -> variable name -> value. The project level and each
    * environment are separate owners: the project does not see into its
@@ -560,6 +616,9 @@ function makeStore(): Store {
     previews: new Map(),
     policies: new Map(),
     invitations: new Map(),
+    teams: new Map(),
+    users: new Map(),
+    grants: new Map(),
     variables: new Map(),
     claimChallenges: new Map(),
     claims: new Map(),
@@ -2109,6 +2168,72 @@ function invitationResponse(invitation: InvitationRecord): Record<string, unknow
 function projectInvitation(projectId: string, id: string): InvitationRecord | undefined {
   const invitation = store.invitations.get(id);
   return invitation?.projectId === projectId ? invitation : undefined;
+}
+
+/** A team as every read answers it. */
+function teamResponse(team: TeamRecord): Record<string, unknown> {
+  return {
+    id: team.id,
+    name: team.name,
+    status: team.status,
+    created_at: team.createdAt,
+    updated_at: team.updatedAt,
+  };
+}
+
+/** A user as every read answers it. */
+function userResponse(user: UserRecord): Record<string, unknown> {
+  return {
+    id: user.id,
+    schema: user.schema,
+    attributes: user.attributes,
+    metadata: {
+      created_at: user.createdAt,
+      updated_at: user.createdAt,
+      status: "active",
+      lifecycle_owner_team_id: null,
+    },
+  };
+}
+
+/** A grant as every read answers it, its principal a bare ref. */
+function grantResponse(grant: GrantRecord): Record<string, unknown> {
+  return {
+    id: grant.id,
+    project_id: grant.projectId,
+    object_type: "project",
+    relation: grant.relation,
+    created_at: grant.createdAt,
+    expires_at: grant.expiresAt,
+    ...("user_id" in grant.principal ? { user: grant.principal } : { team: grant.principal }),
+  };
+}
+
+/**
+ * The active user or team a grant request names, by id or by team name.
+ *
+ * @param projectId - The project the grant is for, which a team name is looked up in.
+ * @param body - The grant request's locators.
+ * @returns The principal ref, or undefined when the request names none that is active.
+ */
+function grantPrincipal(
+  projectId: string,
+  body: {
+    user?: { user_id?: string; identifier?: string };
+    team?: { team_id?: string; name?: string };
+  },
+): { user_id: string } | { team_id: string } | undefined {
+  if (body.user?.user_id !== undefined && store.users.has(body.user.user_id)) {
+    return { user_id: body.user.user_id };
+  }
+  const team = [...store.teams.values()].find(
+    (candidate) =>
+      candidate.status === "active" &&
+      (candidate.id === body.team?.team_id ||
+        (candidate.projectId === projectId &&
+          candidate.name.toLowerCase() === body.team?.name?.toLowerCase())),
+  );
+  return team === undefined ? undefined : { team_id: team.id };
 }
 
 export function setupPlatformHandlers() {
@@ -3905,6 +4030,189 @@ export function setupPlatformHandlers() {
         return HttpResponse.json(INVITATION_NOT_FOUND, { status: 404 });
       }
       store.invitations.delete(invitation.id);
+      return new HttpResponse(null, { status: 204 });
+    }),
+    http.post("*/teams", async ({ request }) => {
+      const query = parse(CreateTeamQueryParams, queryRecord(request));
+      if (!query.ok) {
+        return query.response;
+      }
+      const body = parse(CreateTeamBody, await readJson(request));
+      if (!body.ok) {
+        return body.response;
+      }
+      const now = nowIso();
+      const team: TeamRecord = {
+        id: `team_${shortId()}`,
+        projectId: query.data.project_id,
+        name: body.data.name,
+        status: "active",
+        createdAt: now,
+        updatedAt: now,
+      };
+      store.teams.set(team.id, team);
+      const out = parseOut(CreateTeamResponse, teamResponse(team));
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data, { status: 201 });
+    }),
+
+    http.get("*/teams/:team_id", ({ params }) => {
+      const path = parse(GetTeamParams, params);
+      if (!path.ok) {
+        return path.response;
+      }
+      const team = store.teams.get(path.data.team_id);
+      if (team === undefined) {
+        return HttpResponse.json(TEAM_NOT_FOUND, { status: 404 });
+      }
+      const out = parseOut(GetTeamResponse, teamResponse(team));
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    http.delete("*/teams/:team_id", ({ params }) => {
+      const path = parse(DeactivateTeamParams, params);
+      if (!path.ok) {
+        return path.response;
+      }
+      const team = store.teams.get(path.data.team_id);
+      if (team === undefined) {
+        return HttpResponse.json(TEAM_NOT_FOUND, { status: 404 });
+      }
+      store.teams.set(team.id, { ...team, status: "deactivated", updatedAt: nowIso() });
+      return new HttpResponse(null, { status: 204 });
+    }),
+
+    http.post("*/users", async ({ request }) => {
+      const query = parse(CreateUserQueryParams, queryRecord(request));
+      if (!query.ok) {
+        return query.response;
+      }
+      const body = parse(CreateUserBody, await readJson(request));
+      if (!body.ok) {
+        return body.response;
+      }
+      const user: UserRecord = {
+        id: `user_${shortId()}`,
+        schema: body.data.schema,
+        attributes: body.data.attributes,
+        createdAt: nowIso(),
+      };
+      store.users.set(user.id, user);
+      const out = parseOut(CreateUserResponse, userResponse(user));
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data, { status: 201 });
+    }),
+
+    http.get("*/users/:user_id", ({ params, request }) => {
+      const path = parse(GetUserParams, params);
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetUserQueryParams, queryRecord(request));
+      if (!query.ok) {
+        return query.response;
+      }
+      const user = store.users.get(path.data.user_id);
+      if (user === undefined) {
+        return HttpResponse.json(USER_NOT_FOUND, { status: 404 });
+      }
+      const out = parseOut(GetUserResponse, userResponse(user));
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    http.delete("*/users/:user_id", ({ params }) => {
+      const path = parse(DeleteUserParams, params);
+      if (!path.ok) {
+        return path.response;
+      }
+      if (!store.users.delete(path.data.user_id)) {
+        return HttpResponse.json(USER_NOT_FOUND, { status: 404 });
+      }
+      return new HttpResponse(null, { status: 204 });
+    }),
+
+    http.post("*/grants/query", async ({ request }) => {
+      const query = parse(QueryGrantsQueryParams, queryRecord(request));
+      if (!query.ok) {
+        return query.response;
+      }
+      const body = parse(QueryGrantsBody, (await readJson(request)) ?? {});
+      if (!body.ok) {
+        return body.response;
+      }
+      const grants = [...store.grants.values()]
+        .filter((grant) => grant.projectId === query.data.project_id)
+        .sort((a, b) => a.seq - b.seq);
+      const paged = pageOf(grants, body.data.limit, body.data.page_token ?? undefined);
+      if (!paged.ok) {
+        return paged.response;
+      }
+      const out = parseOut(QueryGrantsResponse, {
+        grants: paged.page.map(grantResponse),
+        next_page_token: paged.next ?? null,
+      });
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    http.post("*/grants", async ({ request }) => {
+      const query = parse(CreateGrantQueryParams, queryRecord(request));
+      if (!query.ok) {
+        return query.response;
+      }
+      const body = parse(CreateGrantBody, await readJson(request));
+      if (!body.ok) {
+        return body.response;
+      }
+      const principal = grantPrincipal(query.data.project_id, body.data);
+      if (principal === undefined) {
+        return HttpResponse.json(errorBody("grant.invalid", "grant names no active user or team"), {
+          status: 400,
+        });
+      }
+      const grant: GrantRecord = {
+        id: `asgn_${shortId()}`,
+        projectId: query.data.project_id,
+        relation: body.data.relation,
+        createdAt: nowIso(),
+        expiresAt: body.data.expires_at ?? null,
+        principal,
+        seq: ++store.lastSeq,
+      };
+      store.grants.set(grant.id, grant);
+      const out = parseOut(CreateGrantResponse, grantResponse(grant));
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data, { status: 201 });
+    }),
+
+    http.delete("*/grants/:grant_id", ({ params, request }) => {
+      const path = parse(DeleteGrantParams, params);
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(DeleteGrantQueryParams, queryRecord(request));
+      if (!query.ok) {
+        return query.response;
+      }
+      const grant = store.grants.get(path.data.grant_id);
+      if (grant === undefined || grant.projectId !== query.data.project_id) {
+        return HttpResponse.json(GRANT_NOT_FOUND, { status: 404 });
+      }
+      store.grants.delete(grant.id);
       return new HttpResponse(null, { status: 204 });
     }),
   ];

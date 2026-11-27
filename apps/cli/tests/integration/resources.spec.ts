@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
-import { anApp, aSetUpApp, MOCK_SERVER_URL, PASSWORD_POLICY } from "@tests/helpers/project";
+import {
+  anApp,
+  aSetUpApp,
+  MOCK_SERVER_URL,
+  PASSWORD_POLICY,
+  type ScaffoldedApp,
+} from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
 
 const SERVERS = [
@@ -55,6 +61,48 @@ const WRONG_KIND: readonly { args: string[]; list: string; message: string }[] =
     list: "release list",
     message: "Invalid id: must be a release ID: rel_ followed by letters, digits, _ or -",
   },
+];
+
+/** Create a resource with the CLI's own create command and return its id. */
+async function aCreated(app: ScaffoldedApp, args: readonly string[]): Promise<string> {
+  const result = await app.run([...args, "--non-interactive", "--json"]);
+  expect(result, "arranging the resource should have succeeded").toSucceed();
+  return app.envelopeOf<{ id: string }>(result).data.id;
+}
+
+/** Create a team and return its id. */
+async function aTeam(app: ScaffoldedApp): Promise<string> {
+  return aCreated(app, ["team", "create", "--name", "Support"]);
+}
+
+/** Create a user on the project's published schema and return its id. */
+async function aUser(app: ScaffoldedApp): Promise<string> {
+  const { id } = await app.publishedSchema();
+  return aCreated(app, ["user", "create", "--schema", id, "--attributes", "email=ada@example.com"]);
+}
+
+/** Grant a new team the viewer role on the project and return the grant's id. */
+async function aGrant(app: ScaffoldedApp): Promise<string> {
+  const teamId = await aTeam(app);
+  return aCreated(app, ["grant", "create", "--relation", "viewer", "--team-team-id", teamId]);
+}
+
+/** Read a resource back with its get or list command, as the envelope's data. */
+async function readBack(app: ScaffoldedApp, args: readonly string[]): Promise<unknown> {
+  const result = await app.run([...args, "--non-interactive", "--json"]);
+  expect(result, "reading the resource back should have succeeded").toSucceed();
+  return app.envelopeOf(result).data;
+}
+
+const READ_BACK: readonly [
+  string,
+  string,
+  (app: ScaffoldedApp) => Promise<string>,
+  (id: string) => string[],
+][] = [
+  ["user", "delete", aUser, (id) => ["user", "get", id]],
+  ["team", "deactivate", aTeam, (id) => ["team", "get", id]],
+  ["grant", "delete", aGrant, () => ["grant", "list"]],
 ];
 
 describe("resources", () => {
@@ -390,6 +438,63 @@ describe("resources", () => {
             expect(result).toSuggestExactly(app.againAsRun(`${topic} ${verb} ${id} --force`));
           },
         );
+      });
+
+      describe("leaving what it would change as it was", () => {
+        it.each(READ_BACK)(
+          "changes nothing on %s %s without --force",
+          async (topic, verb, arrange, read) => {
+            const app = await aSetUpApp();
+            const id = await arrange(app);
+            const before = await readBack(app, read(id));
+
+            await app.run([topic, verb, id, "--json"]);
+
+            expect(await readBack(app, read(id))).toEqual(before);
+          },
+        );
+      });
+
+      describe("with --force", () => {
+        it("leaves a deleted user unreadable", async () => {
+          const app = await aSetUpApp();
+          const id = await aUser(app);
+
+          await app.run(["user", "delete", id, "--force", "--json"]);
+
+          expect(await app.run(["user", "get", id, "--json"])).toFailWith("E_NOT_FOUND");
+        });
+
+        it("leaves a deactivated team readable, as deactivated", async () => {
+          const app = await aSetUpApp();
+          const id = await aTeam(app);
+
+          await app.run(["team", "deactivate", id, "--force", "--json"]);
+
+          expect(await readBack(app, ["team", "get", id])).toEqual({
+            title: "Read Support",
+            id,
+            name: "Support",
+            status: "deactivated",
+            created_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+            updated_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+          });
+        });
+
+        it("leaves a deleted grant out of the list", async () => {
+          const app = await aSetUpApp();
+          const id = await aGrant(app);
+
+          await app.run(["grant", "delete", id, "--force", "--json"]);
+
+          expect(await readBack(app, ["grant", "list"])).toEqual({
+            title: "No grants found",
+            items: [],
+            count: 0,
+            truncated: false,
+            next_page_token: null,
+          });
+        });
       });
 
       it("registers a connection made from its nested fields", async () => {

@@ -341,6 +341,25 @@ describe("release revoke", () => {
         expect(await app.deploy()).toSucceed();
       });
 
+      it("leaves the release it revoked impossible to deploy", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const releaseId = await aRelease(app);
+
+        await app.run(["release", "revoke", releaseId, "--force", "--non-interactive", "--json"]);
+
+        expect(
+          await app.run([
+            "deployment",
+            "create",
+            "--release",
+            releaseId,
+            "--non-interactive",
+            "--json",
+          ]),
+        ).toFail();
+      });
+
       it("refuses a release the server does not hold", async () => {
         const app = await aSetUpApp();
 

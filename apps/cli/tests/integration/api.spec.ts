@@ -553,6 +553,15 @@ describe("api", () => {
         expect(await app.projectVariables()).toEqual([]);
       });
 
+      it("leaves the variable it deleted with --force gone", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+        await app.api("deleteVariable", "FOO", "--force");
+
+        expect(await app.projectVariables()).toEqual([]);
+      });
+
       it("sends a merge patch with a null without asking, as before", async () => {
         const app = await aSetUpApp();
         expect(await app.setVariable("FOO", "bar")).toSucceed();
