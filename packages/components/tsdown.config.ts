@@ -43,11 +43,24 @@ const INLINE_INTERNAL = [/^@zitadel\/api(\/|$)/, /^@zitadel\/design-tokens(\/|$)
 const INLINE_STANDALONE_ONLY = [/^@zitadel\/config(\/|$)/];
 
 /** Third-party runtime deps the components need in the browser. */
-const THIRD_PARTY = ["lit", /^lit\//, "liquidjs", "dompurify", "lucide", /^lucide\//] as const;
+const THIRD_PARTY = [
+  "lit",
+  /^lit\//,
+  "@lit/task",
+  "liquidjs",
+  "dompurify",
+  "lucide",
+  /^lucide\//,
+] as const;
+
+// The HTML and CSS inside the Lit templates are intentionally not minified:
+// a template-literal minifier saved about 0.6 kB gzipped across the package,
+// too little to justify a build step that rewrites the templates (it once
+// broke the avatar's `style=${…}` binding).
 
 export default defineConfig([
   /**
-   * Library build — the npm entrypoints. `lit`/`liquidjs`/`dompurify`/`lucide`
+   * Library build — the npm entrypoints. The THIRD_PARTY runtime deps
    * stay EXTERNAL so a consuming app's bundler resolves a single shared copy
    * (no duplicate-Lit). This is what `import "@zitadel/components"` resolves to.
    */
@@ -65,6 +78,7 @@ export default defineConfig([
       avatar: "src/avatar.ts",
       "tokens/index": "src/tokens/index.ts",
       "orchestrator/index": "src/orchestrator/index.ts",
+      locales: "src/locales.ts",
       // Not a public subpath. As its own entry it stays a separate file that
       // the entries import ahead of the chunks that load `lit`; inlined, it
       // would land below the hoisted `import "lit"` and run too late (see
@@ -124,6 +138,10 @@ export default defineConfig([
     tsconfig: "tsconfig.lib.json",
     dts: false,
     sourcemap: false,
+    // Loaded as is from a CDN, so nothing minifies it after us.
+    minify: true,
+    // One file: the dynamic imports (LiquidJS) are inlined, not split.
+    outputOptions: { codeSplitting: false },
     clean: false,
     target: "es2022",
     deps: {

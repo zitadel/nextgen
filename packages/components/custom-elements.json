@@ -4899,30 +4899,6 @@
         },
         {
           "kind": "js",
-          "name": "de",
-          "declaration": {
-            "name": "de",
-            "module": "./orchestrator/index.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "it",
-          "declaration": {
-            "name": "it",
-            "module": "./orchestrator/index.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "builtinLocales",
-          "declaration": {
-            "name": "builtinLocales",
-            "module": "./orchestrator/index.js"
-          }
-        },
-        {
-          "kind": "js",
           "name": "businessLocales",
           "declaration": {
             "name": "businessLocales",
@@ -5738,6 +5714,71 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/locales.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "builtinLocales",
+          "type": {
+            "text": "Readonly<Record<string, Locale>>"
+          },
+          "default": "{ en, de, it }",
+          "description": "Every built-in dictionary, by primary language subtag."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "businessLocales",
+          "declaration": {
+            "name": "businessLocales",
+            "module": "./orchestrator/locales/business.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "de",
+          "declaration": {
+            "name": "de",
+            "module": "src/locales.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "en",
+          "declaration": {
+            "name": "en",
+            "module": "src/locales.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "it",
+          "declaration": {
+            "name": "it",
+            "module": "src/locales.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "Locale",
+          "declaration": {
+            "name": "Locale",
+            "module": "src/locales.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "builtinLocales",
+          "declaration": {
+            "name": "builtinLocales",
+            "module": "src/locales.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/manifest.ts",
       "declarations": [],
       "exports": []
@@ -5812,6 +5853,31 @@
           "declaration": {
             "name": "AtomManifest",
             "module": "./manifest.js"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/orchestrator/__fixtures__/sanitiser-cases.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "SANITISER_CASES",
+          "type": {
+            "text": "ReadonlyArray<[string, string, string]>"
+          },
+          "default": "[ [ \"keeps atoms with their attributes and text\", `<zl-page-shell data-zl-template-root><h1 class=\"zl-card-title\">Sign in</h1><zl-field name=\"email\" label=\"Email\" type=\"email\" required></zl-field></zl-page-shell>`, `<zl-page-shell data-zl-template-root=\"\"><h1 class=\"zl-card-title\">Sign in</h1><zl-field name=\"email\" label=\"Email\" type=\"email\" required=\"\"></zl-field></zl-page-shell>`, ], [ \"keeps the test id on an atom\", `<zl-button action=\"submit\" data-testid=\"zitadel-action-submit\"></zl-button>`, `<zl-button action=\"submit\" data-testid=\"zitadel-action-submit\"></zl-button>`, ], [ \"keeps data-* and aria-* attributes\", `<div data-theme=\"dark\" data-testid=\"login\" aria-label=\"Login\" aria-live=\"polite\">x</div>`, `<div data-theme=\"dark\" data-testid=\"login\" aria-label=\"Login\" aria-live=\"polite\">x</div>`, ], [ \"keeps inline formatting and its text\", `<p><b>Note:</b> use your <i>work</i> email, <code>name@example.com</code></p>`, `<p><b>Note:</b> use your <i>work</i> email, <code>name@example.com</code></p>`, ], [ \"keeps the attributes a list and a link have by default\", `<ol start=\"3\" reversed><li value=\"2\">x</li></ol><a href=\"/f\" hreflang=\"de\">a</a>`, `<ol start=\"3\" reversed=\"\"><li value=\"2\">x</li></ol><a href=\"/f\" hreflang=\"de\">a</a>`, ], [ \"keeps a table\", `<table><tr><td colspan=\"2\">Cell</td></tr></table>`, `<table><tbody><tr><td colspan=\"2\">Cell</td></tr></tbody></table>`, ], [ \"keeps an image with its size\", `<img src=\"https://cdn.example.com/logo.svg\" width=\"120\" height=\"40\" alt=\"\" loading=\"lazy\">`, `<img src=\"https://cdn.example.com/logo.svg\" width=\"120\" height=\"40\" alt=\"\" loading=\"lazy\">`, ], [ \"keeps the text of a raw button or form, not the controls\", `<button>Continue</button><form><input name=\"i\">Fields</form>`, `ContinueFields`, ], [ \"strips scripts, styles, frames and their content\", `<div>safe</div><script>alert(1)</script><style>:host{}</style><iframe src=\"https://evil.example.com\">x</iframe>`, `<div>safe</div>`, ], [ \"strips event handlers and javascript: links\", `<img src=\"x\" onerror=\"alert(1)\"><a href=\"javascript:alert(1)\" data-action=\"recover\">Reset</a>`, `<img src=\"x\"><a data-action=\"recover\">Reset</a>`, ], [ \"drops an element it does not know, with its content\", `<p>a</p><my-note>Contact support</my-note>`, `<p>a</p>`, ], [ \"strips javascript: links an atom would render\", `<zl-pill href=\"javascript:alert(1)\">x</zl-pill><zl-field name=\"p\" label=\"x\" forgot-password-href=\" java\\tscript:alert(1)\"></zl-field>`, `<zl-pill>x</zl-pill><zl-field name=\"p\" label=\"x\"></zl-field>`, ], [ \"strips data: links an atom would render, but keeps a data: image\", `<zl-pill href=\"data:text/html,x\">x</zl-pill><img src=\"data:image/png;base64,AAAA\" alt=\"\">`, `<zl-pill>x</zl-pill><img src=\"data:image/png;base64,AAAA\" alt=\"\">`, ], [ \"strips a srcset with a script URL\", `<img src=\"a.png\" srcset=\"javascript:alert(1) 1x, b.png 2x\" alt=\"\">`, `<img src=\"a.png\" alt=\"\">`, ], [ \"drops an is attribute but keeps its element, whatever else it carries\", `<p is=\"x-p\" xmlns=\"urn:x\" data-k=\"v\" xlink:href=\"#a\">t</p><sup is=\"x-s\">s</sup>`, `<p data-k=\"v\">t</p><sup>s</sup>`, ], [ \"keeps text that only looks like a script URL\", `<p title=\"javascript:void\" data-x=\"javascript:1\">x</p>`, `<p title=\"javascript:void\" data-x=\"javascript:1\">x</p>`, ], [ \"drops embedded content with its fallback text\", `<p>a</p><object data=\"https://evil.example/x\"><embed src=\"https://evil.example/y\">text</object>`, `<p>a</p>`, ], ...[ `<svg><a href=\"javascript:alert(1)\"><text>x</text></a></svg>`, `<math><mtext><table><mglyph><style><img src=x onerror=alert(1)></style></mglyph></table></mtext></math>`, `<noscript><p>n</p></noscript>`, `<marquee>m</marquee>`, `<details><summary>s</summary>d</details>`, `<video src=\"https://evil.example/v\"></video>`, `<select><option>o</option></select>`, `<template><p>t</p></template>`, `<font>f</font><center>c</center>`, ].map((input): [string, string, string] => [ `drops ${input.slice(0, input.indexOf(\">\") + 1)} with its content`, `<p>a</p>${input}`, `<p>a</p>`, ]), ...[\"name\", \"title\", \"id\", \"action\", \"method\", \"length\", \"location\", \"body\", \"domain\"].map( (value): [string, string, string] => [ `keeps a field named \"${value}\" that collides with a DOM property (#2532)`, `<zl-field name=\"${value}\" label=\"x\"></zl-field>`, `<zl-field name=\"${value}\" label=\"x\"></zl-field>`, ], ), ]",
+          "description": "Template markup and what both sanitisers make of it, exactly: the native one\nand DOMPurify, which Safari loads."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "SANITISER_CASES",
+          "declaration": {
+            "name": "SANITISER_CASES",
+            "module": "src/orchestrator/__fixtures__/sanitiser-cases.ts"
           }
         }
       ]
@@ -6567,30 +6633,6 @@
         },
         {
           "kind": "js",
-          "name": "de",
-          "declaration": {
-            "name": "de",
-            "module": "./locales/index.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "it",
-          "declaration": {
-            "name": "it",
-            "module": "./locales/index.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "builtinLocales",
-          "declaration": {
-            "name": "builtinLocales",
-            "module": "./locales/index.js"
-          }
-        },
-        {
-          "kind": "js",
           "name": "businessLocales",
           "declaration": {
             "name": "businessLocales",
@@ -6634,7 +6676,7 @@
           "name": "createSanitiser",
           "declaration": {
             "name": "createSanitiser",
-            "module": "./sanitiser.js"
+            "module": "./sanitiser/index.js"
           }
         },
         {
@@ -6848,7 +6890,7 @@
           "name": "createLiquidEngine",
           "return": {
             "type": {
-              "text": "Liquid"
+              "text": ""
             }
           },
           "parameters": [
@@ -6856,9 +6898,11 @@
               "name": "options",
               "type": {
                 "text": "CreateLiquidOptions"
-              }
+              },
+              "description": "The locale and any extra templates."
             }
-          ]
+          ],
+          "description": "Creates the engine. LiquidJS loads here, with a dynamic import, so it stays\nout of the bundle of a page until a widget renders."
         },
         {
           "kind": "function",
@@ -7057,105 +7101,16 @@
     {
       "kind": "javascript-module",
       "path": "src/orchestrator/locales/index.ts",
-      "declarations": [
-        {
-          "kind": "variable",
-          "name": "builtinLocales",
-          "type": {
-            "text": "Readonly<Record<string, Locale>>"
-          },
-          "default": "{ en, de, it }"
-        },
-        {
-          "kind": "variable",
-          "name": "CUSTOM_IDENTIFIER_SUFFIX",
-          "type": {
-            "text": "string"
-          },
-          "default": "\".custom_identifier\"",
-          "description": "The variant of a step's description or notice that the step asks for when\nthe identifier it collects is not an email address, such as a schema whose\n`x-identifier` is `employee_number`: the plain sentence may name the email."
-        },
-        {
-          "kind": "function",
-          "name": "mergeLocale",
-          "return": {
-            "type": {
-              "text": "Locale"
-            }
-          },
-          "parameters": [
-            {
-              "name": "builtin",
-              "type": {
-                "text": "Locale"
-              }
-            },
-            {
-              "name": "custom",
-              "type": {
-                "text": "Partial<Locale>"
-              }
-            }
-          ],
-          "description": "A built-in dictionary with an integrator's `locales` entries on top.\n\nEntries are partial: they merge key by key, and an explicit `undefined` is\nskipped rather than shadowing the built-in copy.\n\nA step can ask for a variant of a key (a step that offers sign-in providers\nasks for `<step>.description.sso`), and falls back to the plain key only\nwhen the variant is missing. So when the integrator wrote their own text\nfor a key but not a variant of their own (absent, or the built-in one copied\nin by spreading a built-in dictionary), the built-in variant is dropped:\ntheirs is what shows, rather than built-in copy, possibly in another\nlanguage, that they never saw."
-        },
-        {
-          "kind": "function",
-          "name": "localeFor",
-          "return": {
-            "type": {
-              "text": "Locale"
-            }
-          },
-          "parameters": [
-            {
-              "name": "tag",
-              "type": {
-                "text": "string"
-              }
-            },
-            {
-              "name": "locales",
-              "optional": true,
-              "type": {
-                "text": "Readonly<Record<string, Partial<Locale>>>"
-              }
-            }
-          ],
-          "description": "The dictionary for a BCP 47 language tag. Its layers, strongest first: the\nintegrator's `locales` entries for the tag's primary subtag, the built-in\ndictionary for it, their `en` entries, and the built-in English.\n\nThe integrator's English is thus the fallback for every language: a key a\nlanguage has no text for, such as one for a step they added, shows their\nEnglish rather than the raw key, while a built-in translation still beats it."
-        },
-        {
-          "kind": "function",
-          "name": "isHidden",
-          "return": {
-            "type": {
-              "text": "boolean"
-            }
-          },
-          "parameters": [
-            {
-              "name": "tag",
-              "type": {
-                "text": "string"
-              }
-            },
-            {
-              "name": "locales",
-              "type": {
-                "text": "Readonly<Record<string, Partial<Locale>>> | undefined"
-              }
-            },
-            {
-              "name": "key",
-              "type": {
-                "text": "string"
-              }
-            }
-          ],
-          "description": "Whether the integrator hid a key's text by setting it to `\"\"`: for the tag's\nlanguage or, when they wrote no text of their own for it there, in `en`.\nUnlike localeFor, a built-in translation does not override an\nEnglish `\"\"`, so one entry hides the text in every language."
-        }
-      ],
+      "declarations": [],
       "exports": [
+        {
+          "kind": "js",
+          "name": "businessLocales",
+          "declaration": {
+            "name": "businessLocales",
+            "module": "./business.js"
+          }
+        },
         {
           "kind": "js",
           "name": "en",
@@ -7174,66 +7129,18 @@
         },
         {
           "kind": "js",
-          "name": "de",
-          "declaration": {
-            "name": "de",
-            "module": "./de.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "it",
-          "declaration": {
-            "name": "it",
-            "module": "./it.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "businessLocales",
-          "declaration": {
-            "name": "businessLocales",
-            "module": "./business.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "builtinLocales",
-          "declaration": {
-            "name": "builtinLocales",
-            "module": "src/orchestrator/locales/index.ts"
-          }
-        },
-        {
-          "kind": "js",
           "name": "CUSTOM_IDENTIFIER_SUFFIX",
           "declaration": {
             "name": "CUSTOM_IDENTIFIER_SUFFIX",
-            "module": "src/orchestrator/locales/index.ts"
+            "module": "./translations.js"
           }
         },
         {
           "kind": "js",
-          "name": "mergeLocale",
+          "name": "Translations",
           "declaration": {
-            "name": "mergeLocale",
-            "module": "src/orchestrator/locales/index.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "localeFor",
-          "declaration": {
-            "name": "localeFor",
-            "module": "src/orchestrator/locales/index.ts"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "isHidden",
-          "declaration": {
-            "name": "isHidden",
-            "module": "src/orchestrator/locales/index.ts"
+            "name": "Translations",
+            "module": "./translations.js"
           }
         }
       ]
@@ -7258,6 +7165,243 @@
           "declaration": {
             "name": "it",
             "module": "src/orchestrator/locales/it.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/orchestrator/locales/translations.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "CUSTOM_IDENTIFIER_SUFFIX",
+          "type": {
+            "text": "string"
+          },
+          "default": "\".custom_identifier\"",
+          "description": "The variant of a step's description or notice that the step asks for when\nthe identifier it collects is not an email address, such as a schema whose\n`x-identifier` is `employee_number`: the plain sentence may name the email."
+        },
+        {
+          "kind": "function",
+          "name": "mergeLocale",
+          "return": {
+            "type": {
+              "text": ""
+            }
+          },
+          "parameters": [
+            {
+              "name": "builtin",
+              "type": {
+                "text": "Locale"
+              },
+              "description": "The built-in dictionary."
+            },
+            {
+              "name": "custom",
+              "type": {
+                "text": "Partial<Locale>"
+              },
+              "description": "The integrator's entries for the same language."
+            }
+          ],
+          "description": "A built-in dictionary with an integrator's `locales` entries on top.\n\nEntries are partial: they merge key by key, and an explicit `undefined` is\nskipped rather than shadowing the built-in copy.\n\nA step can ask for a variant of a key (a step that offers sign-in providers\nasks for `<step>.description.sso`), and falls back to the plain key only\nwhen the variant is missing. So when the integrator wrote their own text\nfor a key but not a variant of their own (absent, or the built-in one copied\nin by spreading a built-in dictionary), the built-in variant is dropped:\ntheirs is what shows, rather than built-in copy, possibly in another\nlanguage, that they never saw."
+        },
+        {
+          "kind": "class",
+          "description": "The texts for one language tag. Their layers, strongest first: the app's\n`locales` entries for the tag's primary subtag, the built-in translation\nfor it, the app's `en` entries, and the built-in English.\n\nThe app's English is thus the fallback for every language: a key a language\nhas no text for, such as one for a step the app added, shows the app's\nEnglish rather than the raw key, while a built-in translation still beats it.",
+          "name": "Translations",
+          "members": [
+            {
+              "kind": "field",
+              "name": "texts",
+              "type": {
+                "text": "Locale"
+              },
+              "readonly": true,
+              "description": "The merged texts, by key."
+            },
+            {
+              "kind": "field",
+              "name": "language",
+              "type": {
+                "text": "string"
+              },
+              "privacy": "private",
+              "readonly": true,
+              "description": "The primary language subtag the texts are for.",
+              "default": "language"
+            },
+            {
+              "kind": "field",
+              "name": "locales",
+              "type": {
+                "text": "AppLocales | undefined"
+              },
+              "privacy": "private",
+              "readonly": true,
+              "description": "The app's dictionaries, read again by isHidden.",
+              "default": "locales"
+            },
+            {
+              "kind": "method",
+              "name": "load",
+              "static": true,
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "parameters": [
+                {
+                  "name": "tag",
+                  "type": {
+                    "text": "string"
+                  },
+                  "description": "The BCP 47 language tag."
+                },
+                {
+                  "name": "locales",
+                  "optional": true,
+                  "type": {
+                    "text": "AppLocales"
+                  },
+                  "description": "The app's dictionaries."
+                }
+              ],
+              "description": "Loads the texts for a BCP 47 language tag, with its built-in translation."
+            },
+            {
+              "kind": "method",
+              "name": "english",
+              "static": true,
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "parameters": [
+                {
+                  "name": "tag",
+                  "type": {
+                    "text": "string"
+                  },
+                  "description": "The BCP 47 language tag."
+                },
+                {
+                  "name": "locales",
+                  "optional": true,
+                  "type": {
+                    "text": "AppLocales"
+                  },
+                  "description": "The app's dictionaries."
+                }
+              ],
+              "description": "The texts for a BCP 47 language tag from the bundled English only, for\nuse before load has finished."
+            },
+            {
+              "kind": "method",
+              "name": "isHidden",
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "parameters": [
+                {
+                  "name": "key",
+                  "type": {
+                    "text": "string"
+                  },
+                  "description": "The text key."
+                }
+              ],
+              "description": "Whether the app hid a key's text by setting it to `\"\"`: for this\nlanguage or, when it wrote no text of its own for it there, in `en`. A\nbuilt-in translation does not override an English `\"\"`, so one entry\nhides the text in every language."
+            },
+            {
+              "kind": "method",
+              "name": "merge",
+              "privacy": "private",
+              "static": true,
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "parameters": [
+                {
+                  "name": "language",
+                  "type": {
+                    "text": "string"
+                  },
+                  "description": "The primary language subtag."
+                },
+                {
+                  "name": "locales",
+                  "type": {
+                    "text": "AppLocales | undefined"
+                  },
+                  "description": "The app's dictionaries."
+                },
+                {
+                  "name": "builtin",
+                  "optional": true,
+                  "type": {
+                    "text": "Locale"
+                  },
+                  "description": "The built-in translation, if any."
+                }
+              ],
+              "description": "Merges the layers for a language."
+            },
+            {
+              "kind": "method",
+              "name": "languageOf",
+              "privacy": "private",
+              "static": true,
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "parameters": [
+                {
+                  "name": "tag",
+                  "type": {
+                    "text": "string"
+                  },
+                  "description": "The BCP 47 language tag."
+                }
+              ],
+              "description": "The primary subtag of a language tag, lowercased."
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "CUSTOM_IDENTIFIER_SUFFIX",
+          "declaration": {
+            "name": "CUSTOM_IDENTIFIER_SUFFIX",
+            "module": "src/orchestrator/locales/translations.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "mergeLocale",
+          "declaration": {
+            "name": "mergeLocale",
+            "module": "src/orchestrator/locales/translations.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "Translations",
+          "declaration": {
+            "name": "Translations",
+            "module": "src/orchestrator/locales/translations.ts"
           }
         }
       ]
@@ -7445,7 +7589,481 @@
     },
     {
       "kind": "javascript-module",
-      "path": "src/orchestrator/sanitiser.ts",
+      "path": "src/orchestrator/sanitiser/allowlist.ts",
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "ELEMENTS",
+          "type": {
+            "text": "readonly string[]"
+          },
+          "default": "[ ...new Set([...STRUCTURAL_TAGS, ...manifestRegistry.map((manifest) => manifest.tag)]), ]",
+          "description": "The elements a template may use: the structural tags and every atom."
+        },
+        {
+          "kind": "variable",
+          "name": "ATTRIBUTES",
+          "type": {
+            "text": "readonly string[]"
+          },
+          "description": "The attributes a template may use, each once: the common ones, every atom's,\nand the ARIA ones. `data-*` is allowed as a whole, so none is listed: the\nSanitizer API rejects a configuration that lists one, or any attribute twice."
+        },
+        {
+          "kind": "variable",
+          "name": "HTML_NAMESPACE",
+          "type": {
+            "text": "string"
+          },
+          "default": "\"http://www.w3.org/1999/xhtml\"",
+          "description": "The HTML namespace, which every allowlisted tag is in."
+        },
+        {
+          "kind": "variable",
+          "name": "FOREIGN_NAMESPACES",
+          "type": {
+            "text": "Readonly<Record<string, string>>"
+          },
+          "default": "{ svg: \"http://www.w3.org/2000/svg\", math: \"http://www.w3.org/1998/Math/MathML\", }",
+          "description": "The namespaces of the removed tags that are not HTML: the Sanitizer API\nmatches a tag by name and namespace."
+        },
+        {
+          "kind": "variable",
+          "name": "REMOVED_TAGS",
+          "type": {
+            "text": "readonly string[]"
+          },
+          "default": "[\"svg\", \"math\"]",
+          "description": "Tags the browser's safe configuration allows that templates may not use,\ndropped with their content: inline SVG and MathML (atoms such as\n`<zl-icon>` draw the icons). Everything else the configuration leaves out,\nsuch as `<script>`, `<iframe>` or `<video>`, is dropped already."
+        },
+        {
+          "kind": "variable",
+          "name": "UNWRAPPED_TAGS",
+          "type": {
+            "text": "readonly string[]"
+          },
+          "default": "[\"form\", \"input\", \"button\"]",
+          "description": "Tags dropped while their content stays: templates use `<zl-*>` atoms for\ncontrols, and a stray `<button>Go</button>` keeps its text."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ELEMENTS",
+          "declaration": {
+            "name": "ELEMENTS",
+            "module": "src/orchestrator/sanitiser/allowlist.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ATTRIBUTES",
+          "declaration": {
+            "name": "ATTRIBUTES",
+            "module": "src/orchestrator/sanitiser/allowlist.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "HTML_NAMESPACE",
+          "declaration": {
+            "name": "HTML_NAMESPACE",
+            "module": "src/orchestrator/sanitiser/allowlist.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "FOREIGN_NAMESPACES",
+          "declaration": {
+            "name": "FOREIGN_NAMESPACES",
+            "module": "src/orchestrator/sanitiser/allowlist.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "REMOVED_TAGS",
+          "declaration": {
+            "name": "REMOVED_TAGS",
+            "module": "src/orchestrator/sanitiser/allowlist.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "UNWRAPPED_TAGS",
+          "declaration": {
+            "name": "UNWRAPPED_TAGS",
+            "module": "src/orchestrator/sanitiser/allowlist.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/orchestrator/sanitiser/config.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "keyOf",
+          "return": {
+            "type": {
+              "text": ""
+            }
+          },
+          "parameters": [
+            {
+              "name": "name",
+              "type": {
+                "text": "QualifiedName"
+              },
+              "description": "The qualified name."
+            }
+          ],
+          "description": "The key a qualified name is compared by."
+        },
+        {
+          "kind": "function",
+          "name": "templateConfig",
+          "return": {
+            "type": {
+              "text": ""
+            }
+          },
+          "description": "The template configuration: the browser's built-in safe configuration\n(`browser-defaults.json`, what `new Sanitizer().get()` returns) with the\nallowlist applied exactly as `NativeSanitiser` applies it through the\nSanitizer API, so `DomPurifySanitiser` enforces the same rules where the\nbrowser has no `setHTML()`:\n\n- an allowlisted tag the defaults lack is added with no attributes of its own;\n- an allowlisted attribute is allowed on every element, and so leaves the\n  per-element lists (the API keeps the two apart);\n- a removed or unwrapped tag leaves the element list, and an unwrapped one is\n  listed for unwrapping;\n- `data-*` attributes are kept and comments are not.\n\n`config.browser.spec.ts` checks it against the browser's own result."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "keyOf",
+          "declaration": {
+            "name": "keyOf",
+            "module": "src/orchestrator/sanitiser/config.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "templateConfig",
+          "declaration": {
+            "name": "templateConfig",
+            "module": "src/orchestrator/sanitiser/config.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/orchestrator/sanitiser/dompurify.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Sanitises with DOMPurify, for browsers without the HTML Sanitizer API\n(Safari), enforcing the same configuration `NativeSanitiser` gives the\nbrowser: the browser's built-in safe configuration with the allowlist\napplied (`config.ts`).\n\nDOMPurify walks the tree; the configuration decides what stays:\n\n- an element stays when the configuration lists it (by HTML name: the\n  SVG and MathML roots are removed, so nothing else is reachable), and a\n  listed unwrapped element is replaced by its children; any other element is\n  dropped with its content, as `setHTML()` drops it;\n- an attribute stays by the Sanitizer API's own precedence (Chromium's\n  `Sanitizer::KeepAttribute`): the element's removed attributes, then the\n  global ones, then the element's own, then `data-*`;\n- markup is parsed as `setHTML()` parses it (parse);\n- comments go, and an attribute keeps its value exactly as written\n  (`setHTML()` neither trims a value nor drops one that reads like markup,\n  which DOMPurify does by default, through `SAFE_FOR_XML`);\n- links are not judged by DOMPurify's scheme list but by `dropUnsafeLinks`\n  (`links.ts`), which `NativeSanitiser` runs too.\n\nChromium's own sanitizer tests are intentionally not ported. Parity is\nchecked against the browser itself instead: `config.browser.spec.ts` pins\nthe configuration to what the browser holds, and `dompurify.browser.spec.ts`\ncompares this sanitiser's output with `setHTML()` over the shared cases and\na generated set of templates.\n\nDOM clobbering protection is off because the output renders inside the\n`<zitadel-login>` shadow root, which named access on `document` and\n`window` cannot reach, and the guard would drop field names such as `name`\n(#2532).\n\nDOMPurify keeps the DOM classes it finds when an instance is made, and a\nserver render (such as Angular's) swaps those globals while it runs, so the\ninstance is rebuilt whenever `window.Node` is no longer the one it was made\nwith.",
+          "name": "DomPurifySanitiser",
+          "members": [
+            {
+              "kind": "field",
+              "name": "purify",
+              "type": {
+                "text": "DOMPurify"
+              },
+              "privacy": "private",
+              "readonly": true,
+              "description": "DOMPurify's factory, which binds an instance to a window.",
+              "default": "purify"
+            },
+            {
+              "kind": "field",
+              "name": "template",
+              "type": {
+                "text": "TemplateConfig"
+              },
+              "privacy": "private",
+              "readonly": true,
+              "description": "The configuration both sanitisers enforce.",
+              "default": "template"
+            },
+            {
+              "kind": "field",
+              "name": "rules",
+              "type": {
+                "text": "ReadonlyMap<string, ElementRule>"
+              },
+              "privacy": "private",
+              "readonly": true,
+              "description": "The template configuration's elements, by HTML name.",
+              "default": "new Map( template.elements .filter((element) => element.namespace === HTML_NAMESPACE) .map((element) => [element.name, element]), )"
+            },
+            {
+              "kind": "field",
+              "name": "global",
+              "type": {
+                "text": "ReadonlySet<string>"
+              },
+              "privacy": "private",
+              "readonly": true,
+              "description": "The attributes kept on every element.",
+              "default": "new Set(template.attributes.map((attribute) => attribute.name))"
+            },
+            {
+              "kind": "field",
+              "name": "unwrapped",
+              "type": {
+                "text": "ReadonlySet<string>"
+              },
+              "privacy": "private",
+              "readonly": true,
+              "description": "The elements replaced by their children.",
+              "default": "new Set(template.replaceWithChildrenElements.map((element) => element.name))"
+            },
+            {
+              "kind": "field",
+              "name": "config",
+              "type": {
+                "text": "Config"
+              },
+              "privacy": "private",
+              "readonly": true,
+              "description": "DOMPurify's configuration for the template configuration.",
+              "default": "{ ALLOWED_TAGS: [\"#text\", ...this.rules.keys(), ...this.unwrapped], ALLOWED_ATTR: [ ...this.global, ...[...this.rules.values()].flatMap((rule) => (rule.attributes ?? []).map((attribute) => attribute.name), ), ], ALLOW_DATA_ATTR: template.dataAttributes, ALLOW_ARIA_ATTR: false, ALLOWED_URI_REGEXP: /^/, KEEP_CONTENT: false, RETURN_DOM_FRAGMENT: true, SAFE_FOR_XML: false, SANITIZE_DOM: false, }"
+            },
+            {
+              "kind": "field",
+              "name": "instance",
+              "type": {
+                "text": "{ node: typeof Node; purify: DOMPurify } | null"
+              },
+              "privacy": "private",
+              "default": "null",
+              "description": "The instance for the current window's DOM classes, rebuilt when they change."
+            },
+            {
+              "kind": "method",
+              "name": "load",
+              "static": true,
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "description": "Loads DOMPurify and the template configuration, in their own chunks, and\ncreates the sanitiser."
+            },
+            {
+              "kind": "method",
+              "name": "keeps",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "parameters": [
+                {
+                  "name": "element",
+                  "type": {
+                    "text": "string"
+                  },
+                  "description": "The element's HTML name."
+                },
+                {
+                  "name": "attribute",
+                  "type": {
+                    "text": "string"
+                  },
+                  "description": "The attribute's name."
+                }
+              ],
+              "description": "Whether an attribute stays on an element, by the Sanitizer API's\nprecedence."
+            },
+            {
+              "kind": "method",
+              "name": "instanceForWindow",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "description": "A DOMPurify instance for the current window, with the hooks that apply\nthe template configuration."
+            },
+            {
+              "kind": "method",
+              "name": "sanitise",
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "parameters": [
+                {
+                  "name": "html",
+                  "type": {
+                    "text": "string"
+                  },
+                  "description": "The untrusted markup."
+                }
+              ],
+              "description": "Sanitises markup with DOMPurify and the template configuration, then drops\nunsafe links."
+            },
+            {
+              "kind": "method",
+              "name": "parse",
+              "privacy": "private",
+              "static": true,
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "parameters": [
+                {
+                  "name": "html",
+                  "type": {
+                    "text": "string"
+                  },
+                  "description": "The untrusted markup."
+                }
+              ],
+              "description": "Parses markup the way `setHTML()` does: as a fragment in a body context,\nin an inert document, so nothing in it loads or runs. An element written\nwith an `is` attribute is rebuilt without it: the Sanitizer API drops the\nattribute and keeps the element, while a parser that knows customized\nbuilt-ins (Chromium) would otherwise write the value back on\nserialisation, and DOMPurify drops such an element whole."
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "DomPurifySanitiser",
+          "declaration": {
+            "name": "DomPurifySanitiser",
+            "module": "src/orchestrator/sanitiser/dompurify.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/orchestrator/sanitiser/index.ts",
+      "declarations": [],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Sanitiser",
+          "declaration": {
+            "name": "Sanitiser",
+            "module": "src/orchestrator/sanitiser/index.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/orchestrator/sanitiser/links.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "dropUnsafeLinks",
+          "return": {
+            "type": {
+              "text": ""
+            }
+          },
+          "parameters": [
+            {
+              "name": "root",
+              "type": {
+                "text": "ParentNode"
+              },
+              "description": "The sanitised markup's container."
+            }
+          ],
+          "description": "Removes every link a template may not carry from sanitised markup.\n\nThe HTML Sanitizer API strips `javascript:` only from the browser's own\nnavigating attributes, such as `href` on `<a>`. An atom that renders a link\nfrom its own attribute (`<zl-pill href>`, `<zl-field forgot-password-href>`)\nwould still follow it, so both sanitisers run this over their output."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "dropUnsafeLinks",
+          "declaration": {
+            "name": "dropUnsafeLinks",
+            "module": "src/orchestrator/sanitiser/links.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/orchestrator/sanitiser/native.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Sanitises with the browser's own HTML Sanitizer API, `Element.setHTML()`.\n\nIt starts from the browser's default configuration, which already allows\nsafe HTML such as `<b>` and `<table>`, and adds the atoms and attributes in\n`allowlist.ts`. The markup is parsed into an inert document, so nothing in\nit loads or runs and no custom element upgrades while it is sanitised.\n\nUnsafe links are then dropped by `dropUnsafeLinks` (`links.ts`), which\n`DomPurifySanitiser` runs too.",
+          "name": "NativeSanitiser",
+          "members": [
+            {
+              "kind": "field",
+              "name": "sanitizer",
+              "type": {
+                "text": "Sanitizer"
+              },
+              "privacy": "private",
+              "readonly": true,
+              "description": "The browser's sanitizer, configured once with the allowlist."
+            },
+            {
+              "kind": "method",
+              "name": "isSupported",
+              "static": true,
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "description": "Whether this browser has the HTML Sanitizer API.\n\nChrome 105 to 118 shipped an earlier draft of the API: `setHTML()` exists\nthere, but `Sanitizer` lacks the methods configure calls, so the\nwidget fails to start on those versions. They are intentionally not\nhandled: they are out of support and no longer receive updates."
+            },
+            {
+              "kind": "method",
+              "name": "configure",
+              "static": true,
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "description": "The browser's default configuration with the allowlist applied. A tag the\ndefault already allows is left as it is: allowing it again would replace\nits own attributes, such as `start` on `<ol>`."
+            },
+            {
+              "kind": "method",
+              "name": "sanitise",
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "parameters": [
+                {
+                  "name": "html",
+                  "type": {
+                    "text": "string"
+                  },
+                  "description": "The untrusted markup."
+                }
+              ],
+              "description": "Sanitises markup with `setHTML()` and drops unsafe link URLs."
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "NativeSanitiser",
+          "declaration": {
+            "name": "NativeSanitiser",
+            "module": "src/orchestrator/sanitiser/native.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/orchestrator/sanitiser/sanitiser.ts",
       "declarations": [],
       "exports": []
     },
@@ -8462,7 +9080,7 @@
               "type": {
                 "text": "| Readonly<Record<string, Partial<Locale>>>\n    | undefined"
               },
-              "description": "Custom locale dictionaries keyed by language code. Entries may be\npartial — each is merged over the built-in dictionary for its language,\nso a preset like businessLocales (or a hand-written subset) is\ndirectly assignable. The `en` entries also fill whatever another language\nhas no text for (localeFor):\n\n```ts\nimport { businessLocales } from \"@zitadel/components\";\nloginElement.locales = businessLocales;\n// or override individual keys:\nloginElement.locales = { en: { \"identifier.title\": \"Welcome\" } };\n```"
+              "description": "Custom locale dictionaries keyed by language code. Entries may be\npartial — each is merged over the built-in dictionary for its language,\nso a preset like businessLocales (or a hand-written subset) is\ndirectly assignable. The `en` entries also fill whatever another language\nhas no text for (Translations):\n\n```ts\nimport { businessLocales } from \"@zitadel/components\";\nloginElement.locales = businessLocales;\n// or override individual keys:\nloginElement.locales = { en: { \"identifier.title\": \"Welcome\" } };\n```"
             },
             {
               "kind": "field",
@@ -8551,12 +9169,44 @@
             },
             {
               "kind": "field",
-              "name": "engine",
+              "name": "heldChanges",
+              "privacy": "private",
+              "readonly": true,
+              "default": "new Map<PropertyKey, unknown>()",
+              "description": "Old values of the properties that changed while detached, replayed on reattach."
+            },
+            {
+              "kind": "field",
+              "name": "skippedWhileDetached",
               "type": {
-                "text": "Liquid | null"
+                "text": "boolean"
               },
               "privacy": "private",
-              "default": "null"
+              "default": "false",
+              "description": "Whether an update was skipped while detached. A load that settles then\nasks for an update without naming a property, so heldChanges\nalone would not bring it back on reattach."
+            },
+            {
+              "kind": "field",
+              "name": "rendering",
+              "privacy": "private",
+              "readonly": true,
+              "default": "new Task(this, { args: () => [this.resolveLanguage(), this.locales] as const, task: async ([language, locales]) => { const translations = Translations.load(language, locales); const [loaded, sanitiser, engine] = await Promise.all([ translations, createSanitiser(), createLiquidEngine({ locale: translations.then(({ texts }) => texts) }), ]); return { translations: loaded, engine, sanitiser }; }, onError: (error) => this.reportError(error), })",
+              "description": "What a step renders with: the dictionary for the page's language, the\nLiquidJS engine and the sanitiser. Each loads on demand in its own chunk\n(the translation the page shows, the engine, and DOMPurify where the\nbrowser has no `setHTML()`), all three at once. The loader shows until they\nare there, a change of `lang` or `locales` loads them again, and a load that\nfails (a chunk gone after a deploy, say) shows its error until a later\nload succeeds (loadError)."
+            },
+            {
+              "kind": "field",
+              "name": "loadError",
+              "type": {
+                "text": "string | null"
+              },
+              "privacy": "private",
+              "description": "Why the last load of what the page renders with failed, while that is the\nlatest load: the task's own status, so switching back to a language that\nloads clears it without touching the flow's startupError.",
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "readonly": true
             },
             {
               "kind": "field",
@@ -8570,19 +9220,13 @@
             },
             {
               "kind": "field",
-              "name": "sanitise",
-              "privacy": "private",
-              "readonly": true
-            },
-            {
-              "kind": "field",
               "name": "tenantTemplateCache",
               "type": {
-                "text": "{ source: string; template: Template[] } | null"
+                "text": "{ source: string; engine: Liquid; template: Template[] } | null"
               },
               "privacy": "private",
               "default": "null",
-              "description": "Cached compiled tenant template, keyed by source string. Re-rendering on\nevery `formValues` change otherwise re-parses the same template."
+              "description": "Cached compiled tenant template, keyed by source string and the engine that\nparsed it, whose filters hold its locale. Re-rendering on\nevery `formValues` change otherwise re-parses the same template."
             },
             {
               "kind": "field",
@@ -8613,14 +9257,25 @@
             },
             {
               "kind": "method",
+              "name": "resolveTranslations",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "description": "The texts for the resolved language, with the `locales` map merged over\nthe built-in copy; bundled English until rendering has loaded."
+            },
+            {
+              "kind": "method",
               "name": "resolveLocale",
               "privacy": "private",
               "return": {
                 "type": {
-                  "text": "Locale"
+                  "text": ""
                 }
               },
-              "description": "Resolves the effective locale dictionary for the resolved language, with\nthe `locales` map merged over the built-in copy (localeFor)."
+              "description": "The texts for the resolved language, by key."
             },
             {
               "kind": "method",
@@ -8632,6 +9287,17 @@
                 }
               },
               "description": "The language tag the widget renders in. Priority: explicit `lang` attr →\n`navigator.language` (user preference) → `document.documentElement.lang`\n(page default)."
+            },
+            {
+              "kind": "method",
+              "name": "getUpdateComplete",
+              "privacy": "protected",
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "description": "Resolves once the element has rendered with what rendering loads,\nso `await el.updateComplete` sees the step rather than the loader. A\nfailed load resolves too: it renders as the startup error."
             },
             {
               "kind": "method",
@@ -8922,6 +9588,12 @@
                   "name": "engine",
                   "type": {
                     "text": "Liquid"
+                  }
+                },
+                {
+                  "name": "sanitiser",
+                  "type": {
+                    "text": "Sanitiser"
                   }
                 }
               ]
@@ -9347,6 +10019,26 @@
                   }
                 }
               ]
+            },
+            {
+              "kind": "method",
+              "name": "reportError",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": ""
+                }
+              },
+              "parameters": [
+                {
+                  "name": "error",
+                  "type": {
+                    "text": "unknown"
+                  },
+                  "description": "What was thrown."
+                }
+              ],
+              "description": "Logs an error and announces it with `zitadel-flow-error`."
             },
             {
               "kind": "field",
@@ -10639,30 +11331,6 @@
           "name": "en",
           "declaration": {
             "name": "en",
-            "module": "./orchestrator/locales/index.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "de",
-          "declaration": {
-            "name": "de",
-            "module": "./orchestrator/locales/index.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "it",
-          "declaration": {
-            "name": "it",
-            "module": "./orchestrator/locales/index.js"
-          }
-        },
-        {
-          "kind": "js",
-          "name": "builtinLocales",
-          "declaration": {
-            "name": "builtinLocales",
             "module": "./orchestrator/locales/index.js"
           }
         },

@@ -35,7 +35,7 @@ export { applyFontUrl } from "./font-loader.js";
 // the same reason (re-exporting it from `liquid.js` would pull that `Liquid`
 // import back into the public declaration bundle).
 export { TEMPLATE_NAMES } from "./template-names.js";
-export { en, de, it, builtinLocales, businessLocales, type Locale } from "./locales/index.js";
+export { en, businessLocales, type Locale } from "./locales/index.js";
 export {
   patchMandatoryGates,
   mandatoryGatesMarkerComment,
@@ -43,7 +43,7 @@ export {
 } from "./mandatory-gates.js";
 import defaultTemplateSource from "./templates/default.liquid";
 import layoutChromeCssSource from "./templates/layout-chrome.css?inline";
-export { createSanitiser } from "./sanitiser.js";
+export { createSanitiser } from "./sanitiser/index.js";
 export const defaultTemplate: string = defaultTemplateSource;
 export const layoutChromeCss: string = layoutChromeCssSource;
 export { startFlow, submitStep, getCurrentStep } from "./api-client.js";

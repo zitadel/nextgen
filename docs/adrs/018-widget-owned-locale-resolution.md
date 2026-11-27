@@ -44,7 +44,7 @@ The private `resolveLocale()` method determines the effective dictionary:
    - `navigator.language` (browser preference)
 2. Extract the primary subtag (e.g. `"de"` from `"de-AT"`).
 3. If `this.locales[primary]` exists, merge it key by key on top of the
-   built-in dictionary (`mergeLocale` in `locales/index.ts`), skipping
+   built-in dictionary (`mergeLocale` in `locales/translations.ts`), skipping
    explicit `undefined`. This allows partial overrides without importing the
    full base dictionary. When the custom dictionary rewrites a key, such as a
    step's `<step>.description` or a `notice.<reason>`, but has no variant of
@@ -56,10 +56,14 @@ The private `resolveLocale()` method determines the effective dictionary:
 
 ### Built-in locale registry
 
-`packages/components/src/orchestrator/locales/index.ts` exports a
-`builtinLocales` map (`{ en, de, it }`) and the individual dictionaries. New
-languages are added by creating a `<code>.ts` file in the `locales/`
-directory and registering it in the map.
+`Translations` (`packages/components/src/orchestrator/locales/translations.ts`) bundles `en` and
+loads every other built-in translation with a dynamic import when the page
+shows that language (`Translations.load`), so a page downloads only the translation
+it renders. New languages are added by creating a `<code>.ts` file in the
+`locales/` directory, registering its loader in `BUILTIN` and adding it to
+`builtinLocales` in `src/locales.ts`; a spec fails when the two disagree. The
+dictionaries as values, and the `builtinLocales` map, are exported from
+`@zitadel/components/locales` for an app that extends one.
 
 ### What the SDK does not do
 
@@ -82,7 +86,7 @@ This is inherently app-specific logic and does not belong in the SDK.
 ## Amendment (2026-10-20): the integrator's English is the fallback
 
 Steps 3–5 of the resolution chain are replaced. The dictionary is merged from
-four layers, strongest first (`localeFor` in `locales/index.ts`):
+four layers, strongest first (`Translations` in `locales/translations.ts`):
 
 1. `this.locales[primary]`
 2. the built-in dictionary for `primary`, if there is one

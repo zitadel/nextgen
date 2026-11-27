@@ -21,8 +21,10 @@ import splitTemplate from "./__fixtures__/legacy-designs/split.liquid";
 import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
 import { en } from "./locales/en.js";
 import { mandatoryGatesMarkerComment, patchMandatoryGates } from "./mandatory-gates.js";
-import { createSanitiser } from "./sanitiser.js";
+import { createSanitiser } from "./sanitiser/index.js";
 import { TEMPLATE_NAMES } from "./template-names.js";
+
+const sanitiser = await createSanitiser();
 
 const locale: Record<string, string> = {
   "identifier.title": "Sign in",
@@ -91,10 +93,10 @@ function templateFor(design: string): string {
     : getDefaultBrandingConfig(design).template;
 }
 
-function renderDesign(design: string): string {
-  const engine = createLiquidEngine({ locale });
+async function renderDesign(design: string): Promise<string> {
+  const engine = await createLiquidEngine({ locale });
   const rendered = engine.parseAndRenderSync(templateFor(design), context);
-  const sanitised = createSanitiser()(rendered);
+  const sanitised = sanitiser.sanitise(rendered);
   return patchMandatoryGates(sanitised, step, locale);
 }
 
@@ -139,9 +141,9 @@ describe("account chip", () => {
     ],
   };
 
-  function chip(design: string, data: Record<string, unknown>): Element | null {
-    const engine = createLiquidEngine({ locale });
-    const html = createSanitiser()(engine.parseAndRenderSync(templateFor(design), data));
+  async function chip(design: string, data: Record<string, unknown>): Promise<Element | null> {
+    const engine = await createLiquidEngine({ locale });
+    const html = sanitiser.sanitise(engine.parseAndRenderSync(templateFor(design), data));
     const doc = document.createElement("template");
     doc.innerHTML = html;
     return doc.content.querySelector('zl-account[data-testid="zitadel-account"]');
@@ -149,22 +151,22 @@ describe("account chip", () => {
 
   for (const design of BRANDING_DESIGNS) {
     describe(design, () => {
-      it("signs in: the avatar, and the whole chip goes back to change the account", () => {
-        const account = chip(design, passwordStep);
+      it("signs in: the avatar, and the whole chip goes back to change the account", async () => {
+        const account = await chip(design, passwordStep);
         expect(account?.getAttribute("identifier")).toBe("Maya@Example.com");
         expect(account?.getAttribute("action")).toBe("back");
         expect(account?.getAttribute("label")).toBe("Use another account");
         expect(account?.hasAttribute("avatar")).toBe(true);
       });
 
-      it("signs up: the way back, but no avatar for an account that does not exist yet", () => {
-        const account = chip(design, signUpStep);
+      it("signs up: the way back, but no avatar for an account that does not exist yet", async () => {
+        const account = await chip(design, signUpStep);
         expect(account?.getAttribute("action")).toBe("back");
         expect(account?.hasAttribute("avatar")).toBe(false);
       });
 
-      it("only names the account on a step with its own way out", () => {
-        const account = chip(design, conflictStep);
+      it("only names the account on a step with its own way out", async () => {
+        const account = await chip(design, conflictStep);
         expect(account?.hasAttribute("action")).toBe(false);
         expect(account?.hasAttribute("avatar")).toBe(true);
       });
@@ -178,8 +180,8 @@ describe("branding design catalog", () => {
   });
 
   for (const design of [...BRANDING_DESIGNS, ...LEGACY_DESIGNS]) {
-    describe(design, () => {
-      const html = renderDesign(design);
+    describe(design, async () => {
+      const html = await renderDesign(design);
 
       it("renders the declared field and primary action after the full pipeline", () => {
         expect(html).toContain('name="email"');
@@ -205,13 +207,13 @@ describe("branding design catalog", () => {
         expect(html).toContain("<zl-page-shell");
       });
 
-      it("renders no visible control for a kind: back action (gesture-only)", () => {
-        const engine = createLiquidEngine({ locale });
+      it("renders no visible control for a kind: back action (gesture-only)", async () => {
+        const engine = await createLiquidEngine({ locale });
         const rendered = engine.parseAndRenderSync(templateFor(design), {
           ...context,
           actions: [...step.actions, { name: "back", kind: "back", text_key: "action.back" }],
         });
-        const html2 = createSanitiser()(rendered);
+        const html2 = sanitiser.sanitise(rendered);
         // Back-navigation is gesture-only (ADR 022): the template renders no
         // control for the action, and the kind-based exclusion keeps it out
         // of the secondary-button loop.
@@ -223,8 +225,8 @@ describe("branding design catalog", () => {
 
   // A verified unique provider claim renders read-only, so the user cannot
   // type a value the server refuses on submit.
-  it.each([...BRANDING_DESIGNS])("%s renders a read_only field read-only", (design) => {
-    const engine = createLiquidEngine({ locale });
+  it.each([...BRANDING_DESIGNS])("%s renders a read_only field read-only", async (design) => {
+    const engine = await createLiquidEngine({ locale });
     const rendered = engine.parseAndRenderSync(templateFor(design), {
       ...context,
       fields: [
@@ -232,7 +234,7 @@ describe("branding design catalog", () => {
         { name: "given_name", type: "text", text_key: "identifier.field.email" },
       ],
     });
-    const fields = createSanitiser()(rendered).match(/<zl-field\b[^>]*>/g) ?? [];
+    const fields = sanitiser.sanitise(rendered).match(/<zl-field\b[^>]*>/g) ?? [];
 
     expect(fields).toHaveLength(2);
     expect(fields.find((f) => f.includes('name="email"'))).toMatch(/\sreadonly[\s>=]/);
@@ -249,14 +251,14 @@ describe("branding design catalog", () => {
       ],
     };
 
-    function render(ctx: Record<string, unknown>): string {
-      const engine = createLiquidEngine({ locale });
+    async function render(ctx: Record<string, unknown>): Promise<string> {
+      const engine = await createLiquidEngine({ locale });
       const { template } = getDefaultBrandingConfig(design);
-      return createSanitiser()(engine.parseAndRenderSync(template, ctx));
+      return sanitiser.sanitise(engine.parseAndRenderSync(template, ctx));
     }
 
-    it("renders the provider atom with the step's providers", () => {
-      const html = render(withProviders);
+    it("renders the provider atom with the step's providers", async () => {
+      const html = await render(withProviders);
 
       expect(html).toContain("<zl-sso-providers");
       expect(html).toContain('data-testid="zitadel-sso-providers"');
@@ -268,15 +270,15 @@ describe("branding design catalog", () => {
     // The design draws no rule above the providers -- they sit directly under
     // the primary action -- so the shipped templates pass no divider. The atom
     // keeps the option for a tenant template that wants one.
-    it("passes the localised label format through, and no divider", () => {
-      const html = render(withProviders);
+    it("passes the localised label format through, and no divider", async () => {
+      const html = await render(withProviders);
 
       expect(html).toContain('label-format="Continue with {name}"');
       expect(html).not.toContain("divider-label");
     });
 
-    it("keeps the register row's copy for the register step's own sign_in", () => {
-      const html = render({
+    it("keeps the register row's copy for the register step's own sign_in", async () => {
+      const html = await render({
         ...context,
         actions: [
           ...step.actions,
@@ -288,10 +290,10 @@ describe("branding design catalog", () => {
       expect(html).toContain('data-action="sign_in"');
     });
 
-    it("uses a step's own copy when it supplies one, without the register lead", () => {
+    it("uses a step's own copy when it supplies one, without the register lead", async () => {
       // The SSO conflict screen has just said "you already have an account";
       // repeating "Already have an account?" under it reads as a mistake.
-      const html = render({
+      const html = await render({
         ...context,
         actions: [
           ...step.actions,
@@ -303,11 +305,11 @@ describe("branding design catalog", () => {
       expect(html).not.toContain("Have an account already? ");
     });
 
-    it("renders nothing for a step with no providers", () => {
+    it("renders nothing for a step with no providers", async () => {
       // The shipped presets carry none until `auth-method sso enable` adds one,
       // so this is the common case and must cost the markup nothing.
-      expect(render(context)).not.toContain("zl-sso-providers");
-      expect(render({ ...context, sso_providers: [] })).not.toContain("zl-sso-providers");
+      expect(await render(context)).not.toContain("zl-sso-providers");
+      expect(await render({ ...context, sso_providers: [] })).not.toContain("zl-sso-providers");
     });
   });
 
@@ -333,8 +335,8 @@ describe("branding design catalog", () => {
         ...Object.fromEntries(providerErrorTexts.map((text) => [text, text])),
       };
 
-      function render(stepError: string): string {
-        const engine = createLiquidEngine({ locale: engineLocale });
+      async function render(stepError: string): Promise<string> {
+        const engine = await createLiquidEngine({ locale: engineLocale });
         const errors = localiseFlowErrorKeys(stepError, {
           locale: en,
           stepName: step.name ?? "",
@@ -345,56 +347,59 @@ describe("branding design catalog", () => {
           design === "default.liquid"
             ? engine.renderFileSync(TEMPLATE_NAMES.default, ctx)
             : engine.parseAndRenderSync(getDefaultBrandingConfig(design).template, ctx);
-        return createSanitiser()(rendered);
+        return sanitiser.sanitise(rendered);
       }
 
-      it.each(["error.sso_cancelled", "error.sso_failed"])("renders %s's title and body", (key) => {
-        const html = render(key);
+      it.each(["error.sso_cancelled", "error.sso_failed"])(
+        "renders %s's title and body",
+        async (key) => {
+          const html = await render(key);
 
-        expect(html).toContain(en[`${key}.title`]);
-        expect(html).toContain(en[`${key}.body`]);
-        // The key itself must not leak through as copy.
-        expect(html).not.toContain(key);
-      });
+          expect(html).toContain(en[`${key}.title`]);
+          expect(html).toContain(en[`${key}.body`]);
+          // The key itself must not leak through as copy.
+          expect(html).not.toContain(key);
+        },
+      );
     },
   );
 
-  it("legacy split revisions keep the brand pane and mirror class", () => {
-    const split = renderDesign("split");
+  it("legacy split revisions keep the brand pane and mirror class", async () => {
+    const split = await renderDesign("split");
     expect(split).toContain('class="zl-split"');
     expect(split).toContain('class="zl-split__brand"');
     expect(split).toContain('src="https://cdn.example.com/hero.png"');
     expect(split).not.toContain("zl-split--right");
 
-    const right = renderDesign("split-right");
+    const right = await renderDesign("split-right");
     expect(right).toContain("zl-split--right");
   });
 
-  it("split designs render the placeholder panel until an asset is set", () => {
-    const engine = createLiquidEngine({ locale });
+  it("split designs render the placeholder panel until an asset is set", async () => {
+    const engine = await createLiquidEngine({ locale });
     const noAssets = { ...context, branding: {} };
     for (const design of ["split", "split-right"]) {
       const template = legacyTemplate(design);
-      const bare = createSanitiser()(engine.parseAndRenderSync(template, noAssets));
+      const bare = sanitiser.sanitise(engine.parseAndRenderSync(template, noAssets));
       // An empty brand pane renders the whole design as a lonely off-centre
       // card; the decorative panel must survive the sanitiser.
       expect(bare, design).toContain("zl-split__placeholder");
 
-      const branded = createSanitiser()(engine.parseAndRenderSync(template, context));
+      const branded = sanitiser.sanitise(engine.parseAndRenderSync(template, context));
       expect(branded, design).not.toContain("zl-split__placeholder");
     }
   });
 
-  it("split-family designs render the mobile compact brand header", () => {
+  it("split-family designs render the mobile compact brand header", async () => {
     // The chrome hides .zl-split__brand on narrow widths; the compact
     // node is the fallback that keeps the tenant's identity visible there.
     for (const design of ["split", "split-right", "hero"]) {
-      expect(renderDesign(design), design).toContain('class="zl-split__compact"');
+      expect(await renderDesign(design), design).toContain('class="zl-split__compact"');
     }
   });
 
-  it("hero_url-only tenants still get a compact fallback (banner variant)", () => {
-    const engine = createLiquidEngine({ locale });
+  it("hero_url-only tenants still get a compact fallback (banner variant)", async () => {
+    const engine = await createLiquidEngine({ locale });
     const heroOnly = {
       ...context,
       branding: { hero_url: "https://cdn.example.com/hero.png" },
@@ -402,7 +407,7 @@ describe("branding design catalog", () => {
     for (const design of ["split", "split-right"]) {
       const template = legacyTemplate(design);
       const html = patchMandatoryGates(
-        createSanitiser()(engine.parseAndRenderSync(template, heroOnly)),
+        sanitiser.sanitise(engine.parseAndRenderSync(template, heroOnly)),
         step,
         locale,
       );
@@ -411,8 +416,8 @@ describe("branding design catalog", () => {
     }
   });
 
-  it("hero keeps the landing pane on the split shell", () => {
-    const hero = renderDesign("hero");
+  it("hero keeps the landing pane on the split shell", async () => {
+    const hero = await renderDesign("hero");
     expect(hero).toContain('class="zl-split"');
     expect(hero).toContain('class="zl-split__brand"');
     expect(hero).toContain('class="zl-hero"');
@@ -423,22 +428,22 @@ describe("branding design catalog", () => {
     expect(hero).not.toContain("<button");
   });
 
-  it("minimal renders without card chrome", () => {
-    const minimal = renderDesign("minimal");
+  it("minimal renders without card chrome", async () => {
+    const minimal = await renderDesign("minimal");
     expect(minimal).toContain('class="zl-minimal"');
     expect(minimal).not.toContain("<zl-card");
   });
 
-  it("centered keeps the card and header logo", () => {
-    const centered = renderDesign("centered");
+  it("centered keeps the card and header logo", async () => {
+    const centered = await renderDesign("centered");
     expect(centered).toContain("<zl-card");
     expect(centered).toContain('src="https://cdn.example.com/logo.svg"');
   });
 
   // The step after the flow moved between sign-in and sign-up by itself
   // carries a notice, which <zitadel-login> lifts into `messages`.
-  it("every shipped design shows a notice, as information", () => {
-    const engine = createLiquidEngine({
+  it("every shipped design shows a notice, as information", async () => {
+    const engine = await createLiquidEngine({
       locale: { ...locale, "notice.user_not_found": "No account" },
     });
     const withNotice = {
@@ -446,7 +451,7 @@ describe("branding design catalog", () => {
       messages: [{ level: "info", text_key: "notice.user_not_found" }],
     };
     for (const design of BRANDING_DESIGNS) {
-      const html = createSanitiser()(engine.parseAndRenderSync(templateFor(design), withNotice));
+      const html = sanitiser.sanitise(engine.parseAndRenderSync(templateFor(design), withNotice));
       expect(html, design).toContain(
         '<zl-alert severity="info" data-zl-step-message="">No account</zl-alert>',
       );

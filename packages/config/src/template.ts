@@ -15,15 +15,9 @@
  */
 import { Liquid } from "liquidjs";
 
-/** The `{% mandatory_gates %}` runtime safety-net tag every template must emit. */
-export const MANDATORY_GATES_TAG = "mandatory_gates";
+import { MANDATORY_GATES_TAG, TEMPLATE_TAGS } from "./template-tags.js";
 
-/**
- * Custom Liquid tags the login orchestrator registers beyond the standard
- * set. Validators must register them (as no-ops) or parsing valid templates
- * fails; `@zitadel/components` registers the real implementations.
- */
-export const TEMPLATE_TAGS = [MANDATORY_GATES_TAG] as const;
+export { MANDATORY_GATES_TAG, TEMPLATE_TAGS };
 
 /**
  * Byte cap for stored templates. Mirrors `maxLength` on

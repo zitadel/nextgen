@@ -11,6 +11,7 @@ import {
 import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { zitadelTrustmarkInnerHtml } from "../internal/attribution-markup.js";
 import type { Liquid, Template } from "liquidjs";
+import { Task, TaskStatus } from "@lit/task";
 import { css, html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { property } from "../internal/property.js";
@@ -34,12 +35,12 @@ import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
 import { createLiquidEngine, localiseFlowErrorKeys, stepNotice, stepTexts } from "./liquid.js";
-import { isHidden, localeFor, type Locale } from "./locales/index.js";
+import { type Locale, Translations } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { solveSignupPow, stopIfAborted } from "./signup-pow.js";
 import { resolveApi } from "./resolve-api.js";
 import { returnPathFromLocation } from "./return-path.js";
-import { createSanitiser } from "./sanitiser.js";
+import { createSanitiser, type Sanitiser } from "./sanitiser/index.js";
 import { ZitadelSurface } from "./surface.js";
 import type { FlowError, FlowIdentity, LiquidContext } from "./template-context.js";
 import { TEMPLATE_NAMES } from "./template-names.js";
@@ -410,7 +411,7 @@ export class ZitadelLogin extends ZitadelSurface {
    * partial — each is merged over the built-in dictionary for its language,
    * so a preset like {@link businessLocales} (or a hand-written subset) is
    * directly assignable. The `en` entries also fill whatever another language
-   * has no text for ({@link localeFor}):
+   * has no text for ({@link Translations}):
    *
    * ```ts
    * import { businessLocales } from "@zitadel/components";
@@ -455,7 +456,51 @@ export class ZitadelLogin extends ZitadelSurface {
    */
   private previewRepaint = false;
 
-  private engine: Liquid | null = null;
+  /**
+   * Old values of the properties that changed while detached, replayed on reattach.
+   */
+  private readonly heldChanges = new Map<PropertyKey, unknown>();
+
+  /**
+   * Whether an update was skipped while detached. A load that settles then
+   * asks for an update without naming a property, so {@link heldChanges}
+   * alone would not bring it back on reattach.
+   */
+  private skippedWhileDetached = false;
+
+  /**
+   * What a step renders with: the dictionary for the page's language, the
+   * LiquidJS engine and the sanitiser. Each loads on demand in its own chunk
+   * (the translation the page shows, the engine, and DOMPurify where the
+   * browser has no `setHTML()`), all three at once. The loader shows until they
+   * are there, a change of `lang` or `locales` loads them again, and a load that
+   * fails (a chunk gone after a deploy, say) shows its error until a later
+   * load succeeds ({@link loadError}).
+   */
+  private readonly rendering = new Task(this, {
+    args: () => [this.resolveLanguage(), this.locales] as const,
+    task: async ([language, locales]) => {
+      const translations = Translations.load(language, locales);
+      const [loaded, sanitiser, engine] = await Promise.all([
+        translations,
+        createSanitiser(),
+        createLiquidEngine({ locale: translations.then(({ texts }) => texts) }),
+      ]);
+      return { translations: loaded, engine, sanitiser };
+    },
+    onError: (error) => this.reportError(error),
+  });
+
+  /**
+   * Why the last load of what the page renders with failed, while that is the
+   * latest load: the task's own status, so switching back to a language that
+   * loads clears it without touching the flow's {@link startupError}.
+   *
+   * @returns The message, or `null` when the last load did not fail.
+   */
+  private get loadError(): string | null {
+    return this.rendering.status === TaskStatus.ERROR ? errorMessage(this.rendering.error) : null;
+  }
 
   /**
    * The theme the last commit rendered with. The template output carries the
@@ -465,13 +510,13 @@ export class ZitadelLogin extends ZitadelSurface {
    */
   private lastRenderedTheme: ResolvedTheme | null = null;
 
-  private readonly sanitise = createSanitiser();
-
   /**
-   * Cached compiled tenant template, keyed by source string. Re-rendering on
+   * Cached compiled tenant template, keyed by source string and the engine that
+   * parsed it, whose filters hold its locale. Re-rendering on
    * every `formValues` change otherwise re-parses the same template.
    */
-  private tenantTemplateCache: { source: string; template: Template[] } | null = null;
+  private tenantTemplateCache: { source: string; engine: Liquid; template: Template[] } | null =
+    null;
 
   /**
    * Whether the widget currently owns a same-document history entry (the
@@ -539,8 +584,19 @@ export class ZitadelLogin extends ZitadelSurface {
     return root;
   }
 
+  /**
+   * Updates with what changed while detached ({@link shouldUpdate}).
+   */
   override connectedCallback(): void {
     super.connectedCallback();
+    for (const [name, oldValue] of this.heldChanges) {
+      this.requestUpdate(name, oldValue);
+    }
+    this.heldChanges.clear();
+    if (this.skippedWhileDetached) {
+      this.skippedWhileDetached = false;
+      this.requestUpdate();
+    }
     if (typeof window !== "undefined") {
       window.addEventListener("popstate", this.handlePopState);
     }
@@ -572,11 +628,25 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   /**
-   * Resolves the effective locale dictionary for the resolved language, with
-   * the `locales` map merged over the built-in copy ({@link localeFor}).
+   * The texts for the resolved language, with the `locales` map merged over
+   * the built-in copy; bundled English until {@link rendering} has loaded.
+   *
+   * @returns The translations the element renders with.
+   */
+  private resolveTranslations(): Translations {
+    return (
+      this.rendering.value?.translations ??
+      Translations.english(this.resolveLanguage(), this.locales)
+    );
+  }
+
+  /**
+   * The texts for the resolved language, by key.
+   *
+   * @returns The texts of {@link resolveTranslations}.
    */
   private resolveLocale(): Locale {
-    return localeFor(this.resolveLanguage(), this.locales);
+    return this.resolveTranslations().texts;
   }
 
   /**
@@ -592,10 +662,43 @@ export class ZitadelLogin extends ZitadelSurface {
     );
   }
 
-  override willUpdate(changed: PropertyValues<this>): void {
-    if (!this.engine || changed.has("locales") || changed.has("lang")) {
-      this.engine = createLiquidEngine({ locale: this.resolveLocale() });
+  /**
+   * Resolves once the element has rendered with what {@link rendering} loads,
+   * so `await el.updateComplete` sees the step rather than the loader. A
+   * failed load resolves too: it renders as the startup error.
+   *
+   * @returns Whether the update completed without another pending.
+   */
+  protected override async getUpdateComplete(): Promise<boolean> {
+    await super.getUpdateComplete();
+    await this.rendering.taskComplete.catch(() => undefined);
+    return super.getUpdateComplete();
+  }
+
+  /**
+   * Skips an update while the element is detached and holds what changed, so
+   * the next attach updates with every property that changed meanwhile: what
+   * the element loads on demand can finish after it left the page, and
+   * `updated` needs to see the step or value that changed then. Skipping,
+   * rather than pausing, keeps `updateComplete` settling while detached.
+   *
+   * @param changed - The properties that changed, with their old values.
+   * @returns Whether to update now.
+   */
+  protected override shouldUpdate(changed: PropertyValues<this>): boolean {
+    if (this.isConnected) {
+      return super.shouldUpdate(changed);
     }
+    for (const [name, oldValue] of changed) {
+      if (!this.heldChanges.has(name)) {
+        this.heldChanges.set(name, oldValue);
+      }
+    }
+    this.skippedWhileDetached = true;
+    return false;
+  }
+
+  override willUpdate(changed: PropertyValues<this>): void {
     if (changed.has("previewState") && this.previewState && !this.preview) {
       console.warn(
         `[zitadel-login] preview-state="${this.previewState}" is not a preview state ` +
@@ -743,7 +846,8 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   override render() {
-    if (this.startupError) {
+    const startupError = this.startupError ?? this.loadError;
+    if (startupError) {
       // Same chrome a step renders into (page shell + card), because this is
       // still the login surface — just one that could not start. Without the
       // shell the alert lands bare in the top-left corner of an otherwise
@@ -753,7 +857,7 @@ export class ZitadelLogin extends ZitadelSurface {
       return html`<form class="zl-mount" novalidate>
         <zl-page-shell>
           <zl-card>
-            <zl-alert severity="error">${this.startupError}</zl-alert>
+            <zl-alert severity="error">${startupError}</zl-alert>
           </zl-card>
         </zl-page-shell>
       </form>`;
@@ -761,10 +865,13 @@ export class ZitadelLogin extends ZitadelSurface {
     // `completing` holds the loader through the terminal step: painting a
     // success screen the host immediately navigates away from shows the user
     // two confirmations for one sign-in.
-    if (!this.response || !this.engine || this.completing) {
+    const rendering = this.rendering.value;
+    if (!this.response || !rendering || this.completing) {
       return html`<slot name="loader"></slot>`;
     }
-    const rendered = this.injectAttribution(this.renderStep(this.response.step, this.engine));
+    const rendered = this.injectAttribution(
+      this.renderStep(this.response.step, rendering.engine, rendering.sanitiser),
+    );
     return html`<form
       class="zl-mount"
       part="form"
@@ -1237,7 +1344,7 @@ export class ZitadelLogin extends ZitadelSurface {
     return returnPathFromLocation() ?? this.postSignInUrl;
   }
 
-  private renderStep(step: CreateFlow201Step, engine: Liquid): string {
+  private renderStep(step: CreateFlow201Step, engine: Liquid, sanitiser: Sanitiser): string {
     const tenantSource =
       typeof this.branding?.liquid_template === "string" && this.branding.liquid_template.length > 0
         ? this.branding.liquid_template
@@ -1273,12 +1380,12 @@ export class ZitadelLogin extends ZitadelSurface {
     const actions = step.actions ?? [];
     // Why the flow moved between sign-in and sign-up without being asked, on
     // the step right after the move. A host that sets the notice's text to ""
-    // in `locales` opts out of it ({@link isHidden}). The plain key counts as
+    // in `locales` opts out of it (`Translations.isHidden`). The plain key counts as
     // well as the variant shown: a built-in translation's variant would
     // otherwise outlive an English "".
-    const language = this.resolveLanguage();
+    const translations = this.resolveTranslations();
     const notice =
-      step.notice && !isHidden(language, this.locales, step.notice)
+      step.notice && !translations.isHidden(step.notice)
         ? stepNotice(step.notice, fields, this.resolveLocale())
         : undefined;
     const context: LiquidContext = {
@@ -1298,9 +1405,7 @@ export class ZitadelLogin extends ZitadelSurface {
       challenge: this.loading || this.preview ? null : (step.challenge ?? null),
       identifier: step.identifier ?? null,
       messages:
-        notice && !isHidden(language, this.locales, notice)
-          ? [{ level: "info", text_key: notice }]
-          : [],
+        notice && !translations.isHidden(notice) ? [{ level: "info", text_key: notice }] : [],
       identity: this.deriveIdentity(),
       errors,
       branding: this.brandingForTemplate(),
@@ -1312,10 +1417,11 @@ export class ZitadelLogin extends ZitadelSurface {
     try {
       if (tenantSource) {
         const compiled =
-          this.tenantTemplateCache?.source === tenantSource
+          this.tenantTemplateCache?.source === tenantSource &&
+          this.tenantTemplateCache.engine === engine
             ? this.tenantTemplateCache.template
             : engine.parse(tenantSource);
-        this.tenantTemplateCache = { source: tenantSource, template: compiled };
+        this.tenantTemplateCache = { source: tenantSource, engine, template: compiled };
         raw = engine.renderSync(compiled, context);
       } else {
         raw = engine.renderFileSync(TEMPLATE_NAMES.default, context);
@@ -1330,7 +1436,7 @@ export class ZitadelLogin extends ZitadelSurface {
     }
 
     const patched = patchMandatoryGates(raw, step, this.resolveLocale());
-    return this.sanitise(patched);
+    return sanitiser.sanitise(patched);
   }
 
   /**
@@ -2015,18 +2121,37 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   private handleTransportError(error: unknown): void {
-    // For API rejections, prefer the server's error-envelope message (e.g.
-    // which origins a project allows) over the generic "POST … returned N".
-    const message =
-      error instanceof ApiError
-        ? apiErrorMessage(error)
-        : error instanceof Error
-          ? error.message
-          : "Unexpected error contacting the Flow API.";
-    this.startupError = message;
+    this.startupError = this.reportError(error);
+  }
+
+  /**
+   * Logs an error and announces it with `zitadel-flow-error`.
+   *
+   * @param error - What was thrown.
+   * @returns The message shown for it.
+   */
+  private reportError(error: unknown): string {
+    const message = errorMessage(error);
     console.error("[zitadel-login]", error);
     emit(this, "zitadel-flow-error", { message });
+    return message;
   }
+}
+
+/**
+ * The message shown for an error. For API rejections it prefers the server's
+ * error-envelope message (such as which origins a project allows) over the
+ * generic "POST … returned N".
+ *
+ * @param error - What was thrown.
+ * @returns The message.
+ */
+function errorMessage(error: unknown): string {
+  return error instanceof ApiError
+    ? apiErrorMessage(error)
+    : error instanceof Error
+      ? error.message
+      : "Unexpected error contacting the Flow API.";
 }
 
 /**

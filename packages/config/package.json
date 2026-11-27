@@ -90,6 +90,11 @@
       "types": "./dist/template.d.mts",
       "import": "./dist/template.mjs"
     },
+    "./template-tags": {
+      "@zitadel/source": "./src/template-tags.ts",
+      "types": "./dist/template-tags.d.mts",
+      "import": "./dist/template-tags.mjs"
+    },
     "./defaults/default-human-user.json": "./defaults/default-human-user.json",
     "./defaults/default-login.json": "./defaults/default-login.json",
     "./defaults/branding/*": "./defaults/branding/*",

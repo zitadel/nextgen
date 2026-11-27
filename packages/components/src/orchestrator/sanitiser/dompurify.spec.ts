@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { createSanitiser } from "./sanitiser.js";
+import { DomPurifySanitiser } from "./dompurify.js";
 
-describe("DOMPurify sanitiser", () => {
-  const sanitise = createSanitiser();
+const sanitiser = await DomPurifySanitiser.load();
 
+describe("DomPurifySanitiser", () => {
   it("preserves <zl-*> custom elements", () => {
-    const out = sanitise(
+    const out = sanitiser.sanitise(
       `<div><zl-field name="email" label="Email" type="email" required></zl-field></div>`,
     );
     expect(out).toContain("<zl-field");
@@ -17,13 +17,13 @@ describe("DOMPurify sanitiser", () => {
   it.each(["name", "title", "id", "action", "method", "length", "location", "body", "domain"])(
     'keeps a field named "%s" that collides with a DOM property (#2532)',
     (value) => {
-      const out = sanitise(`<zl-field name="${value}" label="x"></zl-field>`);
+      const out = sanitiser.sanitise(`<zl-field name="${value}" label="x"></zl-field>`);
       expect(out).toContain(`name="${value}"`);
     },
   );
 
   it("preserves <zl-button> with hierarchy, action, and label", () => {
-    const out = sanitise(
+    const out = sanitiser.sanitise(
       `<zl-button hierarchy="primary" size="medium" type="submit" action="submit" label="Continue"></zl-button>`,
     );
     expect(out).toContain("<zl-button");
@@ -32,44 +32,46 @@ describe("DOMPurify sanitiser", () => {
   });
 
   it("strips <script> tags", () => {
-    const out = sanitise("<div>safe</div><script>alert(1)</script>");
+    const out = sanitiser.sanitise("<div>safe</div><script>alert(1)</script>");
     expect(out).not.toContain("<script");
     expect(out).toContain("safe");
   });
 
   it("strips inline event handlers", () => {
-    const out = sanitise(`<img src="x" onerror="alert(1)" />`);
+    const out = sanitiser.sanitise(`<img src="x" onerror="alert(1)" />`);
     expect(out).not.toContain("onerror");
   });
 
   it.each(["onmouseover", "onpointerdown", "onanimationend"])(
     "strips the %s handler from a custom element",
     (handler) => {
-      const out = sanitise(`<zl-button ${handler}="alert(1)" action="submit">Go</zl-button>`);
+      const out = sanitiser.sanitise(
+        `<zl-button ${handler}="alert(1)" action="submit">Go</zl-button>`,
+      );
       expect(out).not.toContain(handler);
       expect(out).toContain('action="submit"');
     },
   );
 
   it("strips <style> blocks (theming is orchestrator-owned)", () => {
-    const out = sanitise(`<div><style>:host { color: red }</style>safe</div>`);
+    const out = sanitiser.sanitise(`<div><style>:host { color: red }</style>safe</div>`);
     expect(out).not.toContain("<style");
   });
 
   it("strips <iframe>", () => {
-    const out = sanitise(`<iframe src="https://evil.example.com"></iframe>`);
+    const out = sanitiser.sanitise(`<iframe src="https://evil.example.com"></iframe>`);
     expect(out).not.toContain("<iframe");
   });
 
   it("strips raw <input> / <button> / <form> (templates use zl-* atoms)", () => {
-    const out = sanitise(`<form><input name="x" /><button>go</button></form>`);
+    const out = sanitiser.sanitise(`<form><input name="x" /><button>go</button></form>`);
     expect(out).not.toContain("<input");
     expect(out).not.toContain("<button");
     expect(out).not.toContain("<form");
   });
 
   it("preserves card nav links (data-action anchors, not zl-button)", () => {
-    const out = sanitise(
+    const out = sanitiser.sanitise(
       `<p class="zl-card-nav">Don't have an account? <a href="#" class="zl-card-nav__link" data-action="register">Sign up</a></p>`,
     );
     expect(out).toContain('class="zl-card-nav__link"');
@@ -78,7 +80,7 @@ describe("DOMPurify sanitiser", () => {
   });
 
   it("keeps the account chip and what the template tells it", () => {
-    const out = sanitise(
+    const out = sanitiser.sanitise(
       `<zl-account identifier="maya@example.com" action="back" label="Use another account" avatar=""></zl-account>`,
     );
     expect(out).toContain(
@@ -87,19 +89,21 @@ describe("DOMPurify sanitiser", () => {
   });
 
   it("keeps the account's avatar and its seed", () => {
-    const out = sanitise(`<zl-avatar seed="maya@example.com"></zl-avatar>`);
+    const out = sanitiser.sanitise(`<zl-avatar seed="maya@example.com"></zl-avatar>`);
     expect(out).toContain('<zl-avatar seed="maya@example.com">');
   });
 
   it("preserves data-* and aria-* attributes", () => {
-    const out = sanitise(`<div data-theme="dark" data-testid="login" aria-label="Login">x</div>`);
+    const out = sanitiser.sanitise(
+      `<div data-theme="dark" data-testid="login" aria-label="Login">x</div>`,
+    );
     expect(out).toContain('data-theme="dark"');
     expect(out).toContain('data-testid="login"');
     expect(out).toContain('aria-label="Login"');
   });
 
   it("preserves stable test ids on auth atoms", () => {
-    const out = sanitise(
+    const out = sanitiser.sanitise(
       `<zl-field name="email" data-testid="zitadel-field-email"></zl-field><zl-button action="submit" data-testid="zitadel-action-submit"></zl-button>`,
     );
     expect(out).toContain('data-testid="zitadel-field-email"');
@@ -107,12 +111,12 @@ describe("DOMPurify sanitiser", () => {
   });
 
   it("preserves <img> with safe src", () => {
-    const out = sanitise(`<img src="https://cdn.example.com/logo.svg" alt="" />`);
+    const out = sanitiser.sanitise(`<img src="https://cdn.example.com/logo.svg" alt="" />`);
     expect(out).toContain('src="https://cdn.example.com/logo.svg"');
   });
 
   it("strips unknown custom elements outside the zl-* namespace", () => {
-    const out = sanitise(`<x-foo>evil</x-foo>`);
+    const out = sanitiser.sanitise(`<x-foo>evil</x-foo>`);
     expect(out).not.toContain("<x-foo");
   });
 });

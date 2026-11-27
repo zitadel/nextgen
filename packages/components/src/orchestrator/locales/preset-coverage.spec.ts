@@ -1,7 +1,7 @@
 import { getDefaultLoginFlow, SETUP_PRESETS, SETUP_USE_CASES } from "@zitadel/config/defaults";
 import { describe, expect, it } from "vitest";
 
-import { builtinLocales } from "./index.js";
+import { builtinLocales } from "../../locales.js";
 
 const AUTH_METHOD_PREFIX = "x-auth-methods#";
 

@@ -10,7 +10,7 @@
  * leaves the whole brand pane blank.
  *
  * The templates cannot fix this themselves. They go through DOMPurify
- * (`sanitiser.ts`), which strips `onerror` along with every other inline
+ * (`sanitiser/`), which strips `onerror` along with every other inline
  * handler, so the recovery has to be orchestrator-side: arm a real `error`
  * listener on each rendered image after every commit, hide what fails, and
  * put the placeholder back when that empties a brand pane.

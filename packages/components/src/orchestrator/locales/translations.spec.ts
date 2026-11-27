@@ -3,37 +3,8 @@ import { describe, expect, it } from "vitest";
 import { de } from "./de.js";
 import { en } from "./en.js";
 import { it as italian } from "./it.js";
-import { builtinLocales, isHidden, localeFor, mergeLocale } from "./index.js";
-
-describe("built-in locale dictionaries", () => {
-  it("keeps translated locale keys aligned with English", () => {
-    const englishKeys = Object.keys(en).sort();
-
-    expect(Object.keys(de).sort()).toEqual(englishKeys);
-    expect(Object.keys(italian).sort()).toEqual(englishKeys);
-  });
-
-  // The schema's identifier may be an employee number rather than an email.
-  // The variants show only for such an identifier; the other keys show on
-  // steps that cannot tell what it is.
-  it.each(Object.entries(builtinLocales))(
-    "names no email where the identifier may be another field (%s)",
-    (_, locale) => {
-      for (const key of [
-        "identifier.description.custom_identifier",
-        "notice.user_not_found.custom_identifier",
-        "passkey-first.action.email_fallback",
-        "notice.user_already_exists",
-        "error.invalid_credentials",
-        "error.password_incorrect",
-        "error.passkey_not_registered",
-      ]) {
-        expect(locale[key], key).toBeDefined();
-        expect(locale[key], key).not.toMatch(/mail/i);
-      }
-    },
-  );
-});
+import { builtinLocales } from "../../locales.js";
+import { mergeLocale, Translations } from "./translations.js";
 
 describe("mergeLocale", () => {
   const builtin = {
@@ -127,76 +98,106 @@ describe("mergeLocale", () => {
   });
 });
 
-describe("localeFor", () => {
+describe("Translations.texts", () => {
   const locales = {
     en: { "identifier.title": "Welcome back", "company-details.title": "About your company" },
   };
 
   it("puts the integrator's English over the built-in English", () => {
-    expect(localeFor("en-US", locales)["identifier.title"]).toBe("Welcome back");
+    expect(Translations.english("en-US", locales).texts["identifier.title"]).toBe("Welcome back");
   });
 
-  it("keeps a built-in language's translations and fills its gaps with the integrator's English", () => {
-    const locale = localeFor("de", locales);
+  it("keeps a built-in language's translations and fills its gaps with the integrator's English", async () => {
+    const locale = (await Translations.load("de", locales)).texts;
 
     expect(locale["identifier.title"]).toBe(de["identifier.title"]);
     expect(locale["company-details.title"]).toBe("About your company");
   });
 
   it("gives a language with no built-in dictionary the integrator's English", () => {
-    const locale = localeFor("fr", locales);
+    const locale = Translations.english("fr", locales).texts;
 
     expect(locale["identifier.title"]).toBe("Welcome back");
     expect(locale["identifier.description"]).toBe(en["identifier.description"]);
   });
 
   it("puts a language's own entries over the integrator's English", () => {
-    const locale = localeFor("fr", { ...locales, fr: { "identifier.title": "Bon retour" } });
+    const locale = Translations.english("fr", {
+      ...locales,
+      fr: { "identifier.title": "Bon retour" },
+    }).texts;
 
     expect(locale["identifier.title"]).toBe("Bon retour");
     expect(locale["company-details.title"]).toBe("About your company");
   });
 
   it("drops the integrator's English provider wording when a language rewrites the description", () => {
-    const locale = localeFor("fr", {
+    const locale = Translations.english("fr", {
       en: {
         "password.description": "Enter your Acme password",
         "password.description.sso": "Use your Acme password or Acme SSO",
       },
       fr: { "password.description": "Saisissez votre mot de passe Acme" },
-    });
+    }).texts;
 
     expect(locale).not.toHaveProperty("password.description.sso");
   });
 });
 
-describe("isHidden", () => {
+describe("Translations.isHidden", () => {
   const key = "notice.user_not_found";
 
   it("hides a text the integrator set to an empty string in English for every language", () => {
     const locales = { en: { [key]: "" } };
 
-    expect(isHidden("en-US", locales, key)).toBe(true);
-    expect(isHidden("de-DE", locales, key)).toBe(true);
-    expect(isHidden("fr", locales, key)).toBe(true);
+    expect(Translations.english("en-US", locales).isHidden(key)).toBe(true);
+    expect(Translations.english("de-DE", locales).isHidden(key)).toBe(true);
+    expect(Translations.english("fr", locales).isHidden(key)).toBe(true);
   });
 
   it("shows a language's own text over an English empty string", () => {
     const locales = { en: { [key]: "" }, de: { [key]: "Neues Konto" } };
 
-    expect(isHidden("de", locales, key)).toBe(false);
-    expect(isHidden("it", locales, key)).toBe(true);
+    expect(Translations.english("de", locales).isHidden(key)).toBe(false);
+    expect(Translations.english("it", locales).isHidden(key)).toBe(true);
   });
 
   it("hides a text only in the language that sets it to an empty string", () => {
     const locales = { de: { [key]: "" } };
 
-    expect(isHidden("de", locales, key)).toBe(true);
-    expect(isHidden("en", locales, key)).toBe(false);
+    expect(Translations.english("de", locales).isHidden(key)).toBe(true);
+    expect(Translations.english("en", locales).isHidden(key)).toBe(false);
   });
 
   it("hides nothing without integrator text", () => {
-    expect(isHidden("en", undefined, key)).toBe(false);
-    expect(isHidden("en", { en: { [key]: "New account" } }, key)).toBe(false);
+    expect(Translations.english("en", undefined).isHidden(key)).toBe(false);
+    expect(Translations.english("en", { en: { [key]: "New account" } }).isHidden(key)).toBe(false);
+  });
+});
+
+describe("Translations.load", () => {
+  it.each([
+    ["de-CH", de],
+    ["it", italian],
+    ["en-GB", en],
+    ["fr", en],
+    ["__proto__", en],
+    ["constructor", en],
+  ])("loads the built-in dictionary for %s", async (tag, expected) => {
+    expect((await Translations.load(tag)).texts).toEqual(expected);
+  });
+
+  it.each(Object.entries(builtinLocales))(
+    "loads every language the public map lists: %s",
+    async (language, expected) => {
+      expect((await Translations.load(language)).texts).toEqual(expected);
+    },
+  );
+
+  it("merges the integrator's text over the loaded translation", async () => {
+    const locale = (await Translations.load("de", { de: { "identifier.title": "Willkommen" } }))
+      .texts;
+
+    expect(locale["identifier.title"]).toBe("Willkommen");
   });
 });

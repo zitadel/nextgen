@@ -66,6 +66,10 @@
       "types": "./dist/events.d.mts",
       "import": "./dist/events.mjs"
     },
+    "./locales": {
+      "types": "./dist/locales.d.mts",
+      "import": "./dist/locales.mjs"
+    },
     "./tokens": {
       "types": "./dist/tokens/index.d.mts",
       "import": "./dist/tokens/index.mjs"
@@ -94,6 +98,7 @@
     "prepack": "publint --strict"
   },
   "dependencies": {
+    "@lit/task": "catalog:",
     "@zitadel/config": "workspace:*",
     "dompurify": "catalog:",
     "liquidjs": "catalog:",

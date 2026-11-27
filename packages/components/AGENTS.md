@@ -109,5 +109,25 @@ test; a warm `.vitest` cache brings that down to seconds.
 
 ## Build
 
-`tsdown.config.ts` keeps `lit`, `liquidjs`, `dompurify` and `lucide` external
+`tsdown.config.ts` keeps `lit`, `@lit/task`, `liquidjs`, `dompurify` and `lucide` external
 in the library build so consumers share one copy; never bundle them there.
+
+## Bundle size
+
+Everything the package root reaches lands in every SDK app's main chunk.
+
+- Load `liquidjs`, `dompurify` and every dictionary but `en` only through
+  `import()` (`liquid.ts`, `sanitiser/dompurify.ts`, `locales/translations.ts`).
+- Never re-export `de`, `it` or `builtinLocales` from the root: a static export keeps
+  them in every bundle; their home is `@zitadel/components/locales`.
+- Add a language as `locales/<code>.ts`, one loader in `BUILTIN`
+  (`locales/translations.ts`) and one entry in `builtinLocales` (`src/locales.ts`);
+  `translations.spec.ts` fails when the two disagree. Resolve texts only through `Translations`.
+- Import an API endpoint by name in `api-client.ts` and call it with the widget's
+  `ZitadelClient`; never through `createZitadelClient`, whose object of every
+  operation defeats tree-shaking.
+- Allow a tag or attribute in `sanitiser/allowlist.ts`, for both sanitisers; never list a
+  `data-*` attribute or one twice: `setHTML()` rejects the whole configuration.
+- `sanitiser/browser-defaults.json` is the browser's `new Sanitizer().get()`; DOMPurify
+  (Safari) enforces it with the allowlist. `config.browser.spec.ts` fails when Chromium's
+  defaults change: export the new ones and commit them.

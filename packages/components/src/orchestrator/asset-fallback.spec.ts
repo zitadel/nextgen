@@ -15,7 +15,9 @@ import splitRightTemplate from "./__fixtures__/legacy-designs/split-right.liquid
 import splitTemplate from "./__fixtures__/legacy-designs/split.liquid";
 import { armAssetFallbacks } from "./asset-fallback.js";
 import { createLiquidEngine } from "./liquid.js";
-import { createSanitiser } from "./sanitiser.js";
+import { createSanitiser } from "./sanitiser/index.js";
+
+const sanitiser = await createSanitiser();
 
 const locale: Record<string, string> = {
   "identifier.title": "Sign in",
@@ -36,10 +38,10 @@ const LEGACY_TEMPLATES: Record<string, string> = {
   hero: heroTemplate,
 };
 
-function render(design: string, branding: Record<string, string>): HTMLElement {
+async function render(design: string, branding: Record<string, string>): Promise<HTMLElement> {
   const template = LEGACY_TEMPLATES[design];
   if (template === undefined) throw new Error(`no legacy fixture for ${design}`);
-  const html = createLiquidEngine({ locale }).parseAndRenderSync(template, {
+  const html = (await createLiquidEngine({ locale })).parseAndRenderSync(template, {
     step: { name: step.name, texts: { title_key: "identifier.title" } },
     fields: step.fields,
     actions: step.actions,
@@ -52,7 +54,7 @@ function render(design: string, branding: Record<string, string>): HTMLElement {
     challenge: null,
   });
   const root = document.createElement("div");
-  root.innerHTML = createSanitiser()(html);
+  root.innerHTML = sanitiser.sanitise(html);
   document.body.append(root);
   return root;
 }
@@ -72,8 +74,8 @@ afterEach(() => {
 });
 
 describe("armAssetFallbacks", () => {
-  it("hides a broken logo and restores the split placeholder", () => {
-    const root = render("split", { logo_url: "https://cdn.example.com/gone.svg" });
+  it("hides a broken logo and restores the split placeholder", async () => {
+    const root = await render("split", { logo_url: "https://cdn.example.com/gone.svg" });
     const pane = root.querySelector(".zl-split__brand") as HTMLElement;
     expect(pane.querySelector(".zl-split__placeholder")).toBeNull();
 
@@ -89,8 +91,8 @@ describe("armAssetFallbacks", () => {
     expect(placeholder?.getAttribute("aria-hidden")).toBe("true");
   });
 
-  it("says out loud what it hid — the failure is silent everywhere else", () => {
-    const root = render("split", { logo_url: "https://cdn.example.com/gone.svg" });
+  it("says out loud what it hid — the failure is silent everywhere else", async () => {
+    const root = await render("split", { logo_url: "https://cdn.example.com/gone.svg" });
     armAssetFallbacks(root);
 
     fail(root.querySelector("img.zl-split__logo") as Element);
@@ -100,8 +102,8 @@ describe("armAssetFallbacks", () => {
     );
   });
 
-  it("leaves the pane alone while one asset still renders", () => {
-    const root = render("split", {
+  it("leaves the pane alone while one asset still renders", async () => {
+    const root = await render("split", {
       logo_url: "https://cdn.example.com/gone.svg",
       hero_url: "https://cdn.example.com/hero.png",
     });
@@ -116,10 +118,10 @@ describe("armAssetFallbacks", () => {
     ).toBe(false);
   });
 
-  it("reveals the hero design's authored fallbacks without decorating its brand pane", () => {
+  it("reveals the hero design's authored fallbacks without decorating its brand pane", async () => {
     // The hero design fills the pane with a landing mock; a dead logo inside
     // it is a missing wordmark, not an empty pane.
-    const root = render("hero", { logo_url: "https://cdn.example.com/gone.svg" });
+    const root = await render("hero", { logo_url: "https://cdn.example.com/gone.svg" });
     const pane = root.querySelector(".zl-split__brand") as HTMLElement;
     const authoredFallbacks = root.querySelectorAll("[data-zl-asset-fallback-content]");
     expect(authoredFallbacks).toHaveLength(2);
@@ -138,8 +140,8 @@ describe("armAssetFallbacks", () => {
     }
   });
 
-  it("adds exactly one placeholder however often it is called", () => {
-    const root = render("split-right", { hero_url: "https://cdn.example.com/gone.png" });
+  it("adds exactly one placeholder however often it is called", async () => {
+    const root = await render("split-right", { hero_url: "https://cdn.example.com/gone.png" });
     const pane = root.querySelector(".zl-split__brand") as HTMLElement;
 
     armAssetFallbacks(root);
@@ -150,8 +152,8 @@ describe("armAssetFallbacks", () => {
     expect(pane.querySelectorAll(".zl-split__placeholder")).toHaveLength(1);
   });
 
-  it("arms each image once, so a re-commit does not stack listeners", () => {
-    const root = render("split", { logo_url: "https://cdn.example.com/gone.svg" });
+  it("arms each image once, so a re-commit does not stack listeners", async () => {
+    const root = await render("split", { logo_url: "https://cdn.example.com/gone.svg" });
     const img = root.querySelector("img.zl-split__logo") as HTMLImageElement;
     const addListener = vi.spyOn(img, "addEventListener");
 
@@ -161,8 +163,8 @@ describe("armAssetFallbacks", () => {
     expect(addListener).toHaveBeenCalledTimes(1);
   });
 
-  it("catches an image that already failed before it was armed", () => {
-    const root = render("split", { logo_url: "https://cdn.example.com/gone.svg" });
+  it("catches an image that already failed before it was armed", async () => {
+    const root = await render("split", { logo_url: "https://cdn.example.com/gone.svg" });
     const img = root.querySelector("img.zl-split__logo") as HTMLImageElement;
     // jsdom never loads, so `complete`/`naturalWidth` are stubbed to the
     // shape a browser reports for an image whose error already fired.
@@ -175,8 +177,8 @@ describe("armAssetFallbacks", () => {
     expect(root.querySelector(".zl-split__placeholder")).not.toBeNull();
   });
 
-  it("leaves a healthy design untouched", () => {
-    const root = render("split", { logo_url: "https://cdn.example.com/logo.svg" });
+  it("leaves a healthy design untouched", async () => {
+    const root = await render("split", { logo_url: "https://cdn.example.com/logo.svg" });
 
     armAssetFallbacks(root);
 

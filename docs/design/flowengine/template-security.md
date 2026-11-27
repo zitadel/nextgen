@@ -73,10 +73,12 @@ LiquidJS provides a `| raw` filter that disables auto-escaping:
 │  All {{ }} output is HTML-escaped by default.       │
 │  Neutralizes payload injection from backend values. │
 ├─────────────────────────────────────────────────────┤
-│  Layer 2: DOMPurify Sanitization                    │
+│  Layer 2: Sanitization                              │
 │  Before innerHTML assignment, the rendered HTML     │
-│  string is passed through DOMPurify to strip        │
-│  dangerous tags and attributes (onerror, onclick).  │
+│  string goes through the browser's Element.setHTML  │
+│  (DOMPurify where the browser lacks it): safe HTML  │
+│  plus the <zl-*> atoms, stripping dangerous tags    │
+│  and attributes (onerror, onclick).                 │
 ├─────────────────────────────────────────────────────┤
 │  Layer 3: Content Security Policy (CSP)             │
 │  The Hosted Login page sets:                        │
@@ -109,21 +111,21 @@ LiquidJS provides a `| raw` filter that disables auto-escaping:
 └─────────────────────────────────────────────────────┘
 ```
 
-In Layer 2, DOMPurify's DOM clobbering guard (`SANITIZE_DOM`) is disabled, because the sanitised HTML renders inside the `<zitadel-login>` shadow root, which `document` and `window` named access cannot reach, and the only form in that tree is the orchestrator's own. Named access on that form can only shadow the form's own methods, and the orchestrator reads none of its named properties. The atoms call `requestSubmit` and `reset` through `HTMLFormElement.prototype`, so a field named after a form method cannot shadow them.
+Layer 2 lives in `packages/components/src/orchestrator/sanitiser/`: `NativeSanitiser` uses the HTML Sanitizer API (`Element.setHTML()`, Chrome and Edge 146, Firefox 148), and `DomPurifySanitiser` loads DOMPurify only in a browser without it (Safari). Both enforce one configuration: the browser's built-in safe configuration (`browser-defaults.json`, what `new Sanitizer().get()` returns) with the atoms and attributes in `allowlist.ts` applied, inline SVG and MathML removed and `<form>`, `<input>` and `<button>` unwrapped. `NativeSanitiser` gives it to the browser; `DomPurifySanitiser` builds the same configuration in `config.ts` and makes DOMPurify enforce it with the Sanitizer API's rules (attribute precedence, values kept as written, body-context parsing). The browser strips `javascript:` only from its own link attributes, so both then drop a `javascript:`, `vbscript:` or `data:` URL (other than a `data:` image) from any `href`, `src`, `srcset` or `*-href` attribute (`links.ts`), which atoms such as `<zl-pill href>` render as links. `config.browser.spec.ts` pins the configuration to the browser's own, and `dompurify.browser.spec.ts` checks that both give the same output, over shared cases and a generated set of templates. Images and inline styles may load from any origin, as a logo or background needs; Layer 3's CSP `img-src` bounds that. In the DOMPurify path, its DOM clobbering guard (`SANITIZE_DOM`) is disabled, because the sanitised HTML renders inside the `<zitadel-login>` shadow root, which `document` and `window` named access cannot reach, and the only form in that tree is the orchestrator's own. Named access on that form can only shadow the form's own methods, and the orchestrator reads none of its named properties. The atoms call `requestSubmit` and `reset` through `HTMLFormElement.prototype`, so a field named after a form method cannot shadow them.
 
 ## Summary
 
 | Vector | Primary Mitigation | Fallback |
 |---|---|---|
-| Backend payload values | LiquidJS auto-escaping | DOMPurify |
-| `innerHTML` inline handlers | CSP `script-src 'self'` | DOMPurify strips `on*` attributes |
-| Ejected template XSS | CLI validation at plan time (Layer 4a) | Server lexical gate + CSP + DOMPurify |
-| Translation dictionary HTML | LiquidJS auto-escaping (via `{{ }}`) | DOMPurify |
+| Backend payload values | LiquidJS auto-escaping | Layer 2 sanitiser |
+| `innerHTML` inline handlers | CSP `script-src 'self'` | Layer 2 sanitiser strips `on*` attributes |
+| Ejected template XSS | CLI validation at plan time (Layer 4a) | Server lexical gate + CSP + Layer 2 sanitiser |
+| Translation dictionary HTML | LiquidJS auto-escaping (via `{{ }}`) | Layer 2 sanitiser |
 | `| raw` filter abuse | Engine neuters `raw` at render | Rejected by Layers 4a/4b |
 | `font_url` document-level CSS injection | Field is read-only in v1: `POST /branding` rejects it (the font stylesheet must load at document level, outside every layer above) | Safe delivery design tracked in ADR 040 |
 | Template publishing with a leaked browser-plane token, or into a foreign project | The Branding management API requires a project-bound operator-grade token (`project.write` \| `branding.write`); the preview secret has no management access, and foreign projects answer like nonexistent ones | ADR 036 credential planes (mintable `branding.*` scopes) |
 
-**The strongest single mitigation is CSP.** A strict `script-src 'self'` header on the Hosted Login page makes all inline script vectors completely inert regardless of whether the HTML was sanitized. Combined with LiquidJS auto-escaping and DOMPurify, this creates three independent layers that an attacker must defeat simultaneously.
+**The strongest single mitigation is CSP.** A strict `script-src 'self'` header on the Hosted Login page makes all inline script vectors completely inert regardless of whether the HTML was sanitized. Combined with LiquidJS auto-escaping and the Layer 2 sanitiser, this creates three independent layers that an attacker must defeat simultaneously.
 
 **Consumer caveat:** the Branding API returns raw template strings. The
 guarantees above hold for rendering through `@zitadel/components`; a

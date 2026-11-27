@@ -13,8 +13,8 @@ import apiPackage from "@zitadel/api/package.json" with { type: "json" };
  * loses the current suite and fails the import.
  *
  * Every `optimizeDepsInclude` entry must be resolvable from this app, so the
- * transitive deps of the excluded workspace packages (`dompurify`, `liquidjs`,
- * `lucide`, `xstate`, `@faker-js/faker`) are declared as
+ * transitive deps of the excluded workspace packages (`@lit/task`, `dompurify`,
+ * `liquidjs`, `lucide`, `xstate`, `@faker-js/faker`) are declared as
  * devDependencies in `apps/storybook/package.json`. Under pnpm's strict
  * node_modules they are otherwise unresolvable from here on a clean install, so
  * Vite cannot pre-bundle them and falls back to the mid-test reload above —
@@ -42,6 +42,7 @@ export const optimizeDepsInclude = [
   // fetch dynamically imported module" that fails cold CI runs of the story
   // tests (passes on a warm local cache, same as the excluded-dep case above).
   "msw-storybook-addon",
+  "@lit/task",
   "dompurify",
   "liquidjs",
   "lucide",

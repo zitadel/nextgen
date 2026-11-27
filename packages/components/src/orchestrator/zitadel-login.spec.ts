@@ -938,6 +938,133 @@ describe("<zitadel-login> against the typed Flow API", () => {
     });
   });
 
+  it("settles updateComplete but does not render while detached", async () => {
+    const element = await mount(host);
+    element.remove();
+    element.lang = "de";
+    await element.updateComplete;
+
+    expect(element.shadowRoot!.querySelector(".zl-card-title")?.textContent).toBe(
+      en["identifier.title"],
+    );
+  });
+
+  it("moves focus into a step that arrived while detached", async () => {
+    const element = await mount(host);
+    const stepped = new Promise((resolve) => {
+      element.addEventListener("zitadel-flow-step", resolve, { once: true });
+    });
+    type(element, "email", "alice@acme.com");
+    submit(element);
+    element.remove();
+    await stepped;
+    host.appendChild(element);
+    await element.updateComplete;
+
+    await waitFor(() =>
+      element.shadowRoot?.activeElement?.matches(`zl-field[name="${PASSWORD_FIELD}"]`),
+    );
+  });
+
+  it("applies what changed while detached when attached again", async () => {
+    const element = await mount(host);
+    element.remove();
+    element.lang = "de";
+    host.appendChild(element);
+    await element.updateComplete;
+
+    expect(element.shadowRoot!.querySelector(".zl-card-title")?.textContent).toBe(
+      de["identifier.title"],
+    );
+  });
+
+  it("shows a language that finished loading while detached when attached again", async () => {
+    const element = await mount(host);
+    element.lang = "de";
+    await Promise.resolve();
+    await Promise.resolve();
+    element.remove();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    host.appendChild(element);
+    await element.updateComplete;
+
+    expect(element.shadowRoot!.querySelector(".zl-card-title")?.textContent).toBe(
+      de["identifier.title"],
+    );
+  });
+
+  it("shows the startup error when what it loads on demand fails", async () => {
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.purpose = "login";
+    element.project = testProject;
+    let reads = 0;
+    element.locales = new Proxy(
+      {},
+      {
+        get() {
+          reads += 1;
+          if (reads === 1) {
+            throw new Error("Translations unavailable");
+          }
+          return undefined;
+        },
+      },
+    );
+    const errors: string[] = [];
+    element.addEventListener("zitadel-flow-error", (event) => {
+      errors.push((event as CustomEvent<{ message: string }>).detail.message);
+    });
+    host.appendChild(element);
+    await element.updateComplete;
+
+    expect(element.shadowRoot!.querySelector("zl-alert")?.textContent).toBe(
+      "Translations unavailable",
+    );
+    expect(errors).toEqual(["Translations unavailable"]);
+  });
+
+  it("clears a failed load's error once a later load succeeds", async () => {
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.purpose = "login";
+    element.project = testProject;
+    let reads = 0;
+    element.locales = new Proxy(
+      {},
+      {
+        get() {
+          reads += 1;
+          if (reads === 1) {
+            throw new Error("Translations unavailable");
+          }
+          return undefined;
+        },
+      },
+    );
+    host.appendChild(element);
+    await element.updateComplete;
+    expect(element.shadowRoot!.querySelector("zl-alert")).not.toBeNull();
+    element.locales = {};
+    await element.updateComplete;
+
+    const title = await waitFor(() => element.shadowRoot!.querySelector(".zl-card-title"));
+
+    expect(title.textContent).toBe(en["identifier.title"]);
+  });
+
+  it("renders a tenant template in the new language after lang changes", async () => {
+    applyBranding({
+      liquid_template: '<p data-testid="tenant-title">{{ "identifier.title" | t }}</p>',
+    });
+    const element = attachLogin(host);
+    await waitFor(() => element.shadowRoot?.querySelector('[data-testid="tenant-title"]'));
+    element.lang = "de";
+    await element.updateComplete;
+
+    expect(element.shadowRoot!.querySelector('[data-testid="tenant-title"]')?.textContent).toBe(
+      de["identifier.title"],
+    );
+  });
+
   it("renders the bundled default template when the server sends no liquid_template", async () => {
     // `clearBranding()` in beforeEach means the mock — like the real server —
     // ships no `branding.liquid_template`. The `data-testid` markers exist
