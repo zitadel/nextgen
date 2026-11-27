@@ -1,0 +1,7 @@
+type: string
+pattern: '^[a-zA-Z0-9_-]+$'
+x-zitadel-pattern-message: "must be one or more letters, digits, _ or -"
+description: |
+  The webhook ID (`hook_<opaque>`): the `id` that `createWebhook`
+  (`POST /webhooks`) returns or `listWebhooks` (`GET /webhooks`) lists.
+example: hook_01KWH3B7K2M9P4R6T8V0X2Z4C6
