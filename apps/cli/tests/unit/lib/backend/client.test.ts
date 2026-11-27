@@ -9,7 +9,7 @@ import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { createZitadelClient, responseFailure } from "@/lib/backend";
 import { connectionOf, REQUEST_TIMEOUT_MS, translateFailure } from "@/lib/backend/client";
-import { InvalidError } from "@/lib/backend/errors";
+import { InvalidError } from "@/lib/backend";
 
 const signal = new AbortController().signal;
 

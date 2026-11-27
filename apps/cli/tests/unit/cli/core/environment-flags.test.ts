@@ -5,8 +5,8 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 import { COMMANDS } from "@/index";
-import { BaseCommand } from "@/cli/core/base";
-import { EnvironmentCommand } from "@/cli/core/environment-command";
+import { BaseCommand } from "@/cli/core";
+import { EnvironmentCommand } from "@/cli/core";
 import { environmentFlags, projectEnvFile } from "@/cli/core/environment-flags";
 import { nodesOf, parsedSource, sourcesUnder } from "@tests/helpers/declarations";
 import { parseFlag } from "@tests/helpers/inputs";

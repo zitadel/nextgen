@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { sourceFiles } from "@tests/helpers/source-files";
 import { stripAnsi } from "@tests/helpers/run-cli";
-import { style } from "@/lib/ui/style";
+import { style } from "@/lib/ui";
 
 const SRC = join(import.meta.dirname, "../../../../src");
 

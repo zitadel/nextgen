@@ -6844,14 +6844,6 @@
       "path": "src/orchestrator/liquid.ts",
       "declarations": [
         {
-          "kind": "variable",
-          "name": "TEMPLATE_NAMES",
-          "type": {
-            "text": "{\n  default: \"default\",\n}"
-          },
-          "default": "{ default: \"default\", }"
-        },
-        {
           "kind": "function",
           "name": "createLiquidEngine",
           "return": {
@@ -6954,14 +6946,6 @@
         }
       ],
       "exports": [
-        {
-          "kind": "js",
-          "name": "TEMPLATE_NAMES",
-          "declaration": {
-            "name": "TEMPLATE_NAMES",
-            "module": "src/orchestrator/liquid.ts"
-          }
-        },
         {
           "kind": "js",
           "name": "createLiquidEngine",

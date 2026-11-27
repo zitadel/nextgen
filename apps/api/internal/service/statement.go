@@ -159,6 +159,10 @@ type CryptoKeyStatements interface {
 	CreateEncryptionKey(ctx context.Context, key *domain.EncryptionKey) error
 	UpdateKey(ctx context.Context, id string, key string) error
 	GetSigningKey(ctx context.Context, filter database.Filter[domain.SigningKeyField]) (*domain.SigningKey, error)
+	// ListSigningKeys returns every signing key filter matches, in no
+	// particular order. A project holds only the few keys of its rotation,
+	// so the list is not paged.
+	ListSigningKeys(ctx context.Context, filter database.Filter[domain.SigningKeyField]) ([]*domain.SigningKey, error)
 	CreateSigningKey(ctx context.Context, key *domain.SigningKey) error
 }
 
@@ -357,6 +361,17 @@ type ApplicationStatements interface {
 	// applicationClientID is the client's row id. An unknown client returns
 	// none.
 	ListApplicationClientSecrets(ctx context.Context, projectID, applicationClientID string) ([]*domain.ApplicationClientSecret, error)
+	// DeleteApplicationClientSecrets removes every secret of the client whose
+	// row id is applicationClientID. A client without secrets is no error.
+	DeleteApplicationClientSecrets(ctx context.Context, projectID, applicationClientID string) error
+	// GetApplicationIdempotencyKey returns the record of keyHash in the
+	// project when it expires after now. No such record returns
+	// *database.NoRowFoundError.
+	GetApplicationIdempotencyKey(ctx context.Context, projectID, keyHash string, now time.Time) (*domain.ApplicationIdempotencyKey, error)
+	// CreateApplicationIdempotencyKey stores key, replacing a record of the
+	// same key that expired by key.CreatedAt. A record that has not expired
+	// returns *database.UniqueError.
+	CreateApplicationIdempotencyKey(ctx context.Context, key *domain.ApplicationIdempotencyKey) error
 }
 
 // IDPIdentityLinkStatements stores which user a provider subject resolves to.

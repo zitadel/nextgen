@@ -2,7 +2,7 @@ import wrapAnsi from "wrap-ansi";
 
 import { type NextSteps, renderNextSteps } from "@/cli/core/next-steps";
 import type { Suggest } from "@/lib/suggestion";
-import { style } from "@/lib/ui/style";
+import { style } from "@/lib/ui";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
 import type { CheckOutcome } from "./checks";

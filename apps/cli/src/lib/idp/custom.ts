@@ -20,12 +20,12 @@ import type { SuggestFlags } from "@/lib/suggestion";
  * The settings that describe a custom connection, in the order a command line
  * spells them.
  */
-export const CUSTOM_SETTINGS = ["slug", "displayName", "issuer", "scopes"] as const;
+const CUSTOM_SETTINGS = ["slug", "displayName", "issuer", "scopes"] as const;
 
 /**
  * One setting that describes a custom connection.
  */
-export type CustomSetting = (typeof CUSTOM_SETTINGS)[number];
+type CustomSetting = (typeof CUSTOM_SETTINGS)[number];
 
 /**
  * Everything a command's custom-connection flags say: the provider, then each
@@ -171,7 +171,7 @@ export function customFlagValues<K extends FlagKeys>(
  * server `zitadel start` runs as a process with the loopback allow list,
  * `container` for one it runs in Docker, `unknown` for any other.
  */
-export const LOOPBACK_REACHES = ["allowed", "container", "unknown"] as const;
+const LOOPBACK_REACHES = ["allowed", "container", "unknown"] as const;
 
 /**
  * How the target server reaches this machine's loopback.

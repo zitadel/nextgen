@@ -8,5 +8,4 @@ export {
   BRANDING_DESIGN_INFO,
   PAGE_LAYOUT_HINT,
   RETIRED_BRANDING_DESIGNS,
-  type BrandingDesignInfo,
 } from "@/lib/zitadel/resources/branding/types";

@@ -55,6 +55,7 @@ export default defineConfig({
       },
       // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
       edgeProject({
+        root: import.meta.dirname,
         // Next's edge bundler adds both.
         conditions: ["react-server", "edge-light"],
         plugins: [clientReferences()],

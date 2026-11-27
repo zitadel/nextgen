@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { BrokenFilesError, RefusedEditError } from "@/lib/zitadel/errors";
-import { BrokenFile } from "@/lib/zitadel/resources/broken";
+import { BrokenFilesError, RefusedEditError } from "@/lib/zitadel";
+import { BrokenFile } from "@/lib/zitadel";
 import {
   ConfigDocument,
   type ContractValue,
@@ -10,10 +10,10 @@ import {
   type DocumentFile,
   type DocumentStatus,
 } from "@/lib/zitadel/resources/document";
-import type { Issue } from "@/lib/zitadel/rules/types";
+import type { Issue } from "@/lib/zitadel";
 import { MemoryStore } from "@tests/helpers/storage/backend/memory";
-import type { ConfigStore } from "@/lib/zitadel/storage/types";
-import type { JsonObject } from "@/lib/zitadel/types";
+import type { ConfigStore } from "@/lib/zitadel";
+import type { JsonObject } from "@/lib/zitadel";
 import { thrownBy } from "@tests/helpers/thrown-value";
 
 /**

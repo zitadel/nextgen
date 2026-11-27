@@ -2,9 +2,9 @@ import { Command, type Config } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
 import { Deployment } from "@/lib/backend";
-import { BaseCommand } from "@/cli/core/base";
+import { BaseCommand } from "@/cli/core";
 import { painted, prose } from "@/lib/oclif/rendering";
-import type { CommandResult, JsonEnvelope } from "@/cli/core/types";
+import type { CommandResult, JsonEnvelope } from "@/cli/core";
 
 /**
  * A command that answers the envelope `emit` built, printing nothing. It runs

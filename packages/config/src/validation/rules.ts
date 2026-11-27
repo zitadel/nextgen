@@ -15,7 +15,7 @@
  * - `flow-schema`: one flow and the user schema it pins.
  * - `project`: the whole working tree — every schema, flow and connection file.
  */
-export type Scope = "flow" | "flow-schema" | "project";
+type Scope = "flow" | "flow-schema" | "project";
 
 type RuleSpec = {
   readonly scope: Scope;
@@ -60,10 +60,10 @@ export const VALIDATION_RULES = {
   "sso/orphaned-verification-key": { scope: "project", goRef: null },
 } as const satisfies Record<string, RuleSpec>;
 
-export type RuleId = keyof typeof VALIDATION_RULES;
+type RuleId = keyof typeof VALIDATION_RULES;
 
 /** The ids of the rules whose scope is one of `S`. */
-export type RuleIdOf<S extends Scope> = {
+type RuleIdOf<S extends Scope> = {
   [K in RuleId]: (typeof VALIDATION_RULES)[K]["scope"] extends S ? K : never;
 }[RuleId];
 

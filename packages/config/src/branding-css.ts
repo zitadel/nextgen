@@ -8,8 +8,8 @@
  * never merely because it avoided the characters someone thought to ban.
  */
 
-export const MAX_BRANDING_COLOR_LENGTH = 128;
-export const MAX_BRANDING_FONT_FAMILY_LENGTH = 256;
+const MAX_BRANDING_COLOR_LENGTH = 128;
+const MAX_BRANDING_FONT_FAMILY_LENGTH = 256;
 /** Asset URL cap in UTF-8 bytes, like the server's `MaxBrandingURLBytes`. */
 export const MAX_BRANDING_URL_BYTES = 2048;
 

@@ -8,6 +8,7 @@ import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, CommandResult } from "@/cli/core";
 import { dryRunResult } from "@/cli/core/crud/shared";
 import { prose } from "@/lib/oclif/rendering";
+import { NOT_A_PROJECT_REFUSAL, refuseOutsideProject } from "@/cli/core/not-a-project";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
 import { createOrca } from "@/lib/orca";
 import { LocalRuntime } from "@/lib/server";
@@ -25,12 +26,8 @@ import { Telemetered } from "@/cli/telemetry/telemetered";
 /** Where the guide to the kit lives, for a refusal to point at. */
 const GUIDE_URL = "https://preview.zitadel.com/docs/guides/test-your-app";
 
-/** How a directory that `setup` has not made a project is refused. */
-const NOT_A_PROJECT_REFUSAL = {
-  message: "This directory is not a Zitadel project",
-  hint: "Run setup first; the test suite runs against the app it wires up.",
-  next: [{ id: "setup" }],
-} as const satisfies Refusal;
+/** Why `tests add` needs a project, for its refusal of a directory that is none. */
+const NEEDS_A_PROJECT = "the test suite runs against the app it wires up.";
 
 /** How a project whose framework has no suite yet is refused. */
 const FRAMEWORK_REFUSAL = {
@@ -311,12 +308,10 @@ export default class TestsAdd extends Telemetered(Previewable(BaseCommand)) {
     plan: ScaffoldPlan;
     planned: ScaffoldResult;
   }> {
-    if (!(await Project.at(this.cwd).hasConfig())) {
-      throw refusalError(NOT_A_PROJECT_REFUSAL, {});
-    }
+    await refuseOutsideProject(this.cwd, NEEDS_A_PROJECT);
     const framework = (await Project.at(this.cwd).config()).frameworkId;
     if (framework === undefined) {
-      throw refusalError(NOT_A_PROJECT_REFUSAL, {});
+      throw refusalError(NOT_A_PROJECT_REFUSAL, { why: NEEDS_A_PROJECT });
     }
     if (!new TestKit(framework).supported()) {
       const orca = createOrca(LocalRuntime.DIR);

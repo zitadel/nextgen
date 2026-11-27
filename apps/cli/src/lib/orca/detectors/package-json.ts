@@ -177,10 +177,7 @@ async function isWorkspaceRoot(dir: string): Promise<boolean> {
  * `node_modules` above the project is never mistaken for the app's install.
  * `undefined` when nothing is installed there, or the file names no valid version.
  */
-export async function installedPackage(
-  cwd: string,
-  name: string,
-): Promise<InstalledPackage | undefined> {
+async function installedPackage(cwd: string, name: string): Promise<InstalledPackage | undefined> {
   const start = await realpath(resolve(cwd)).catch(() => {
     return resolve(cwd);
   });

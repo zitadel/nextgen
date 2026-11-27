@@ -48,7 +48,7 @@
     "test": "vitest run",
     "test:integration": "ZITADEL_SERVER_BINARY=${ZITADEL_SERVER_BINARY-$PWD/../../dist/server/nextgen} NEXTGEN_SERVER_CONSOLE_ENABLED=${NEXTGEN_SERVER_CONSOLE_ENABLED-false} vitest run --config vitest.integration.config.ts",
     "install-browsers": "playwright install chromium",
-    "lint": "biome check .",
+    "lint": "biome check . && knip --directory ../.. --workspace @zitadel/testing --reporter symbols --reporter github-actions",
     "prepack": "publint --strict"
   },
   "dependencies": {

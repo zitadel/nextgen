@@ -1,5 +1,5 @@
 import { Publisher } from "@/lib/publish";
-import { warnings } from "@/lib/ui/warnings";
+import { warnings } from "@/lib/ui";
 
 import type { InitialDeployment, InitialReleaseInput } from "./types";
 

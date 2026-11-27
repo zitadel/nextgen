@@ -2,9 +2,9 @@ import { readFile } from "node:fs/promises";
 import { execa } from "execa";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { DockerLauncher } from "@/lib/server/local/internal/docker-launcher";
-import { CONTAINER_DATA_DIR } from "@/lib/server/local/runtime";
-import type { LogSink } from "@/lib/server/local/server-log";
+import { DockerLauncher } from "@/lib/server";
+import { CONTAINER_DATA_DIR } from "@/lib/server/local";
+import type { LogSink } from "@/lib/server/local";
 
 vi.mock("execa", () => ({ execa: vi.fn() }));
 

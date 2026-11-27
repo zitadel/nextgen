@@ -1,5 +1,5 @@
-import type { BoxAction } from "@/lib/ui/box";
-import { style } from "@/lib/ui/style";
+import type { BoxAction } from "@/lib/ui";
+import { style } from "@/lib/ui";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { NEXT_LABEL } from "@/lib/ui/summary";
 

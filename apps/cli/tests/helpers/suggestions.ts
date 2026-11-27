@@ -282,7 +282,7 @@ export function assertSuggestionsCarryTheRun(
 }
 
 /** The release the commands a test renders are written for, unless it says otherwise. */
-export const SUGGEST_CLI_VERSION = "0.1.0";
+const SUGGEST_CLI_VERSION = "0.1.0";
 
 const config = await Config.load(cliPackageRoot);
 

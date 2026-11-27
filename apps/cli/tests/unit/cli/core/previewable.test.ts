@@ -2,11 +2,11 @@ import { Config, Flags } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
 import { EFFECT } from "@/cli/core/effect";
-import { BaseCommand } from "@/cli/core/base";
+import { BaseCommand } from "@/cli/core";
 import { Destructive } from "@/cli/core/destructive";
 import { Previewable } from "@/cli/core/previewable";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
-import type { CommandResult } from "@/cli/core/types";
+import type { CommandResult } from "@/cli/core";
 
 /**
  * A command that changes something, recording which of its two methods ran.

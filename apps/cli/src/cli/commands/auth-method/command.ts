@@ -2,10 +2,10 @@ import type { Interfaces } from "@oclif/core";
 import { CUSTOM_PROVIDER, IDP_PROVIDERS } from "@zitadel/config/idp";
 
 import { environmentFlags } from "@/cli/core/environment-flags";
-import { nonBlankString } from "@/cli/core/flags";
+import { nonBlankString } from "@/cli/core";
 import { type Refusal, refusalError } from "@/cli/core/refusal";
-import type { Admitted } from "@/cli/core/base";
-import type { CommandResult } from "@/cli/core/types";
+import type { Admitted } from "@/cli/core";
+import type { CommandResult } from "@/cli/core";
 import { Destructive } from "@/cli/core/destructive";
 import { Cmd } from "@/lib/cmd";
 import { Consent } from "@/lib/consent";

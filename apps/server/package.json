@@ -33,7 +33,7 @@
     "generate": "cd ../.. && node scripts/go-generate.mjs",
     "check-generate": "cd ../.. && node scripts/go-generate.mjs --check",
     "vet": "cd ../api && go vet ./...",
-    "lint": "cd ../.. && node scripts/go-lint.mjs",
+    "lint": "knip --directory ../.. --workspace @zitadel/server --reporter symbols --reporter github-actions && cd ../.. && node scripts/go-lint.mjs",
     "check-pow-vectors": "cd ../.. && node docs/design/flowengine/testdata/generate-pow-v1-vectors.mjs --check",
     "test:pow": "cd ../api && go test -race -count=1 -timeout 60s ./internal/crypto/pow",
     "test:unit": "cd ../api && go test -v -count=1 -timeout 10m ./...",

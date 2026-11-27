@@ -1,7 +1,7 @@
 import { chmod, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { warnings } from "@/lib/ui/warnings";
+import { warnings } from "@/lib/ui";
 
 /** A file that may carry a credential is owner read/write only. */
 const SECRET_MODE = 0o600;

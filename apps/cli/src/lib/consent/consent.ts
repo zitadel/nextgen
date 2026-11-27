@@ -1,14 +1,14 @@
 import { ZitadelError } from "@/lib/errors";
 import { Ui } from "@/lib/ui";
 import type { SuggestedCommand } from "@/lib/suggestion";
-import type { Confirmer } from "@/lib/ui/questions";
+import type { Confirmer } from "@/lib/ui";
 
 /**
  * What a destructive command does, as one word. It is the stable token of the
  * skipped envelope a declined prompt ends in (`remove-cancelled`), so it is a
  * closed list: a new action is added here, not spelled at the call site.
  */
-export type Verb =
+type Verb =
   | "call"
   | "cancel"
   | "deactivate"

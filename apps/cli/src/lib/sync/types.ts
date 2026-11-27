@@ -7,7 +7,7 @@
  * missing one fails `doctor`. `presentation` files (the generated pages) are
  * released to the user as a starting point — a missing one only warns.
  */
-export const SCAFFOLD_FILE_CLASSES = ["infrastructure", "presentation"] as const;
+const SCAFFOLD_FILE_CLASSES = ["infrastructure", "presentation"] as const;
 
 /**
  * Ownership class of one scaffolded app file, recorded in the scaffold manifest.
@@ -23,7 +23,7 @@ export type ScaffoldFileClass = (typeof SCAFFOLD_FILE_CLASSES)[number];
  * app's own shell — the default when setup meets a pre-existing route-based
  * app (Next, Nuxt).
  */
-export const SCAFFOLD_POSTURES = ["page", "widget"] as const;
+const SCAFFOLD_POSTURES = ["page", "widget"] as const;
 
 /**
  * Embedding posture of the scaffolded auth/profile pages (ADR 044).

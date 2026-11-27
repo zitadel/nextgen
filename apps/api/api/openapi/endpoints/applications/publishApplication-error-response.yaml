@@ -7,6 +7,7 @@ content:
         - $ref: '../../components/schemas/errors/app-client_id_taken.yaml'
         - $ref: '../../components/schemas/errors/app-declared.yaml'
         - $ref: '../../components/schemas/errors/app-field_immutable.yaml'
+        - $ref: '../../components/schemas/errors/app-idempotency_key_reused.yaml'
         - $ref: '../../components/schemas/errors/app-invalid.yaml'
         - $ref: '../../components/schemas/errors/app-not_found.yaml'
         - $ref: '../../components/schemas/errors/app-permission_denied.yaml'
@@ -23,6 +24,7 @@ content:
           app.client_id_taken: '../../components/schemas/errors/app-client_id_taken.yaml'
           app.declared: '../../components/schemas/errors/app-declared.yaml'
           app.field_immutable: '../../components/schemas/errors/app-field_immutable.yaml'
+          app.idempotency_key_reused: '../../components/schemas/errors/app-idempotency_key_reused.yaml'
           app.invalid: '../../components/schemas/errors/app-invalid.yaml'
           app.not_found: '../../components/schemas/errors/app-not_found.yaml'
           app.permission_denied: '../../components/schemas/errors/app-permission_denied.yaml'
@@ -40,6 +42,8 @@ content:
         $ref: '../../components/examples/errors/app-declared.yaml'
       app.field_immutable:
         $ref: '../../components/examples/errors/app-field_immutable.yaml'
+      app.idempotency_key_reused:
+        $ref: '../../components/examples/errors/app-idempotency_key_reused.yaml'
       app.invalid:
         $ref: '../../components/examples/errors/app-invalid.yaml'
       app.not_found:

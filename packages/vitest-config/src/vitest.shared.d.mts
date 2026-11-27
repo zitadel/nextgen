@@ -27,6 +27,8 @@ export declare const sourceConditions: string[];
 export declare const edgeSpecs: string;
 
 export interface EdgeProjectOptions {
+  /** The package's own directory, where `include` is matched: pass `import.meta.dirname`. */
+  root: string;
   /** Canonical specs that also run in the edge VM, relative to the package root. */
   include?: string[];
   /** Spec files that read the filesystem or need Node built-ins. */

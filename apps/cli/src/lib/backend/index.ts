@@ -8,13 +8,12 @@
  * knows the command line or who agreed to what. It fails only with a
  * {@link BackendError}, and depends on nothing else under `lib/`.
  */
-export type { Page, PageOptions } from "./api-service";
+
 export {
   createZitadelClient,
   isCancelled,
   type OperationName,
   pagedFunctions,
-  REQUEST_TIMEOUT_MS,
   responseFailure,
   type ZitadelClient,
 } from "./client";
@@ -28,55 +27,14 @@ export {
   UnavailableError,
   type UnavailableReason,
 } from "./errors";
+export { AuthAttemptService } from "./services/auth-attempt";
+export { BrandingService } from "./services/branding";
+export { ClaimService } from "./services/claim";
+export { Deployment, DeploymentService, type DeployToPrimaryResult } from "./services/deployment";
+export { FlowService } from "./services/flow";
+export { IdpService } from "./services/idp";
 export {
-  type AttemptFactor,
-  type AttemptProof,
-  type AttemptProofResult,
-  AuthAttemptService,
-} from "./services/auth-attempt";
-export {
-  type BrandingPage,
-  type BrandingQuery,
-  type BrandingRevision,
-  BrandingService,
-  type BrandingSummary,
-} from "./services/branding";
-export {
-  type ClaimChallenge,
-  type ClaimProgress,
-  ClaimService,
-  type ClaimStart,
-  type CompletedClaim,
-} from "./services/claim";
-export {
-  Deployment,
-  type DeploymentInput,
-  type DeploymentPageQuery,
-  type DeploymentQuery,
-  DeploymentService,
-  type DeployToPrimaryRequest,
-  type DeployToPrimaryResult,
-  type ExtendPrimaryResult,
-  type LiveOnResult,
-  type RollbackInput,
-  type RollbackPlan,
-  type RollbackTarget,
-} from "./services/deployment";
-export {
-  type CreatedFlow,
-  type FlowInput,
-  type FlowPage,
-  type FlowQuery,
-  type FlowRecord,
-  FlowService,
-  type FlowSummary,
-} from "./services/flow";
-export { IdpService, type IdpSummary } from "./services/idp";
-export {
-  type CreatedInvitation,
   type Invitation,
-  type InvitationInput,
-  type InvitationPageQuery,
   invitationGrant,
   type InvitationRelation,
   invitationRole,
@@ -85,41 +43,11 @@ export {
   type InvitationType,
   UNACCEPTED_INVITATION_STATUSES,
 } from "./services/invitation";
-export {
-  type ApiOperation,
-  type ApiRequest,
-  type ApiResponse,
-  Operation,
-  type OperationQuery,
-  OperationService,
-  type Target,
-} from "./services/operation";
-export {
-  Origin,
-  type OriginKind,
-  type OriginRemoval,
-  OriginService,
-  Origins,
-} from "./services/origin";
-export {
-  type Policy,
-  type PolicyDecision,
-  type PolicyEvaluation,
-  type PolicyInput,
-  type PolicyPage,
-  type PolicyQuery,
-  type PolicyRecord,
-  type PolicyRevision,
-  PolicyService,
-  type PublishedPolicy,
-} from "./services/policy";
-export { type LivePreview, type PreviewPageQuery, PreviewService } from "./services/preview";
-export {
-  type CreatedProject,
-  type Project,
-  type ProjectInput,
-  ProjectService,
-} from "./services/project";
+export { type ApiRequest, Operation, OperationService, type Target } from "./services/operation";
+export { OriginService, Origins } from "./services/origin";
+export { type PolicyEvaluation, PolicyService } from "./services/policy";
+export { PreviewService } from "./services/preview";
+export { type CreatedProject, ProjectService } from "./services/project";
 export {
   type Release,
   type ReleaseInput,
@@ -127,34 +55,14 @@ export {
   type ReleasePointerKind,
   type ReleaseRecord,
   ReleaseService,
-  type RevokeOutcome,
-  type ServingOrigin,
 } from "./services/release";
-export {
-  type CreatedSchema,
-  type SchemaInput,
-  type SchemaPage,
-  type SchemaQuery,
-  type SchemaRecord,
-  SchemaService,
-  type SchemaSummary,
-} from "./services/schema";
-export {
-  type Credential,
-  type IdentityLinks,
-  type QueriedUser,
-  type UserQuery,
-  UserService,
-} from "./services/user";
+export { SchemaService } from "./services/schema";
+export { type Credential, type QueriedUser, type UserQuery, UserService } from "./services/user";
 export {
   type Held,
   type Scalar,
   Variable,
-  type VariableKind,
   VariableRemoval,
   VariableService,
-  type VariableState,
-  type VariableValue,
   VariableWrite,
-  type VariableWritten,
 } from "./services/variable";

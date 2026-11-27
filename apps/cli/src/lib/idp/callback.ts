@@ -21,7 +21,7 @@ export type CallbackPath = `/__nextgen/idp/${string}/callback`;
  * @param slug - The connection's slug.
  * @returns The path, with the slug encoded as one segment.
  */
-export function idpCallbackPath(slug: string): CallbackPath {
+function idpCallbackPath(slug: string): CallbackPath {
   return `/__nextgen/idp/${encodeURIComponent(slug)}/callback`;
 }
 

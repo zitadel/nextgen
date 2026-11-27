@@ -9,9 +9,9 @@ import {
   FileExistsError,
   NoSignInLeftError,
 } from "@/lib/zitadel";
-import { stepName } from "@/lib/zitadel/names";
-import type { IncomingTransition } from "@/lib/zitadel/resources/flows/types";
-import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel/rules/types";
+import { stepName } from "@/lib/zitadel";
+import type { IncomingTransition } from "@/lib/zitadel";
+import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel";
 import { googleSelection } from "@tests/helpers/idp-values";
 
 /**

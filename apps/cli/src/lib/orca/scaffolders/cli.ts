@@ -178,7 +178,7 @@ function truncateCommandOutput(output: string): string {
   return `${output.slice(0, limit)}\n... output truncated ...`;
 }
 
-export function npmPackageNameErrors(name: string): string[] {
+function npmPackageNameErrors(name: string): string[] {
   // This local preflight catches common package-name failures before the
   // scaffolder mutates disk; framework generators still own stricter checks.
   const errors: string[] = [];

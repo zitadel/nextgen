@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { PM } from "@/lib/pm";
-import { InstallError, ReleaseLookupError } from "@/lib/upgrade/errors";
+import { InstallError, ReleaseLookupError } from "@/lib/upgrade";
 
 const INSTALL = PM.named("npm").addExact(["@zitadel/api@2.0.0"]);
 

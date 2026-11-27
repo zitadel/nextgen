@@ -35,7 +35,7 @@
     "build": "vite build && attw --pack . --profile=esm-only --no-emoji --no-summary",
     "typecheck": "svelte-check --tsconfig ./tsconfig.lib.json && svelte-check --tsconfig ./tsconfig.spec.json",
     "test": "vitest run",
-    "lint": "biome check .",
+    "lint": "biome check . && knip --directory ../.. --workspace @zitadel/sdk-svelte --reporter symbols --reporter github-actions",
     "prepack": "publint --strict",
     "docs:api": "typedoc"
   },

@@ -30,7 +30,7 @@ export type Answer = string | boolean | readonly string[];
  * One question as a person saw it on screen: what was asked, and the choices
  * under it, if it was a choice.
  */
-export interface Seen {
+interface Seen {
   question: string;
   choices: string[];
 }

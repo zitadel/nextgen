@@ -13,7 +13,7 @@ import open from "open";
  *   most dev servers for "never open anything".
  * - `spawn-failed` — the opener could not be started.
  */
-export type OpenFailure = "headless" | "disabled" | "spawn-failed";
+type OpenFailure = "headless" | "disabled" | "spawn-failed";
 
 /** Outcome of {@link openInBrowser}. `opened` is best effort: see the note there. */
 export type OpenResult = { opened: boolean; reason?: OpenFailure };

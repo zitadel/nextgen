@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { LOCAL_ADMIN_FILE } from "@/lib/server/local/admin-credential";
+import { LOCAL_ADMIN_FILE } from "@/lib/server/local";
 import {
   LOCAL_DATA_DIR,
   LOCAL_RUNTIME_FILE,

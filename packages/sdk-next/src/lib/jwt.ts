@@ -13,9 +13,4 @@ export {
   isJwtShaped,
   verifyJwt,
 } from "@zitadel/sdk-core/jwt";
-export type {
-  ZitadelJwtPayload,
-  ZitadelJwtHeader,
-  ZitadelDecodedJwt,
-  ZitadelVerifyJwtOptions,
-} from "@zitadel/sdk-core/jwt";
+export type { ZitadelVerifyJwtOptions } from "@zitadel/sdk-core/jwt";

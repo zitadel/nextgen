@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { style } from "@/lib/ui";
 import { Ending } from "@/lib/ui/ending";
-import { section, type Summary } from "@/lib/ui/summary";
+import { section, type Summary } from "@/lib/ui";
 import { Where } from "@/lib/ui/where";
 
 const plain = (text: string | undefined): string => stripAnsi(text ?? "");
