@@ -2210,6 +2210,202 @@ function grantResponse(grant: GrantRecord): Record<string, unknown> {
   };
 }
 
+/** One criterion of a query body's `filter`. */
+type QueryFilter = {
+  field: string;
+  operation: string;
+  value?: string | number | boolean | null;
+};
+
+/**
+ * Whether a stored value passes one filter, with the operations the contract
+ * defines: `equals` is exact, `contains` and `starts_with` fold case, and the
+ * ordering operations compare text, which orders RFC3339 timestamps.
+ *
+ * @param actual - The stored value, or null when the record has none.
+ * @param filter - The criterion, its value already checked to be a string.
+ * @returns Whether the record passes.
+ */
+function passesFilter(actual: string | null, filter: QueryFilter): boolean {
+  const expected = String(filter.value);
+  if (filter.operation === "not_equals") {
+    return actual !== expected;
+  }
+  if (actual === null) {
+    return filter.operation === "not_contains";
+  }
+  const folded = actual.toLowerCase();
+  const wanted = expected.toLowerCase();
+  switch (filter.operation) {
+    case "equals":
+      return actual === expected;
+    case "contains":
+      return folded.includes(wanted);
+    case "not_contains":
+      return !folded.includes(wanted);
+    case "starts_with":
+      return folded.startsWith(wanted);
+    case "less_than":
+      return actual < expected;
+    case "less_than_or_equal":
+      return actual <= expected;
+    case "greater_than":
+      return actual > expected;
+    default:
+      return actual >= expected;
+  }
+}
+
+/**
+ * Why a query's filters are refused: a value that is not text, which no
+ * filterable field of users or grants holds, answers 400 as the contract says.
+ *
+ * @param filters - The query's criteria.
+ * @returns The refusal, or undefined when every value is text.
+ */
+function filterValueRefusal(
+  filters: readonly QueryFilter[] | undefined,
+): HttpResponse<ErrorBody> | undefined {
+  const bad = (filters ?? []).find((filter) => {
+    return typeof filter.value !== "string";
+  });
+  if (bad === undefined) {
+    return undefined;
+  }
+  return HttpResponse.json(errorBody("req.invalid", `filter on ${bad.field} needs a text value`), {
+    status: 400,
+  });
+}
+
+/**
+ * Why a user query's filters are refused beyond their values: `identifier`
+ * takes only `starts_with`, once, and no `sorting`; `team_id` takes only
+ * `equals`, once.
+ *
+ * @param filters - The query's criteria.
+ * @param sorted - Whether the query also asks for a sort.
+ * @returns The refusal, or undefined when the filters are allowed.
+ */
+function userFilterRefusal(
+  filters: readonly QueryFilter[] | undefined,
+  sorted: boolean,
+): HttpResponse<ErrorBody> | undefined {
+  const valueRefusal = filterValueRefusal(filters);
+  if (valueRefusal !== undefined) {
+    return valueRefusal;
+  }
+  const rules = [
+    { field: "identifier", operation: "starts_with" },
+    { field: "team_id", operation: "equals" },
+  ];
+  for (const rule of rules) {
+    const uses = (filters ?? []).filter((filter) => {
+      return filter.field === rule.field;
+    });
+    const misused =
+      uses.length > 1 ||
+      uses.some((filter) => {
+        return filter.operation !== rule.operation;
+      }) ||
+      (rule.field === "identifier" && uses.length > 0 && sorted);
+    if (misused) {
+      return HttpResponse.json(errorBody("req.invalid", `invalid filter on ${rule.field}`), {
+        status: 400,
+      });
+    }
+  }
+  return undefined;
+}
+
+/**
+ * A user's value for a filter or sort field, as the server reads it. The mock
+ * keeps no team memberships and no lifecycle owners, so `team_id` and
+ * `lifecycle_owner_team_id` read as null and match no `equals`.
+ *
+ * @param user - The user.
+ * @param field - The filter or sort field.
+ * @returns The value, or null when the user has none.
+ */
+function userField(user: UserRecord, field: string): string | null {
+  switch (field) {
+    case "created_at":
+      return user.createdAt;
+    case "id":
+      return user.id;
+    case "identifier":
+      return identifierOf(user) ?? null;
+    case "schema":
+      return user.schema;
+    case "schema_object_type":
+      return store.schemas.get(user.schema)?.objectType ?? "";
+    case "status":
+      return "active";
+    default:
+      return null;
+  }
+}
+
+/**
+ * A grant's value for a filter or sort field.
+ *
+ * @param grant - The grant.
+ * @param field - The filter or sort field.
+ * @returns The value, or null when the grant has none.
+ */
+function grantField(grant: GrantRecord, field: string): string | null {
+  switch (field) {
+    case "created_at":
+      return grant.createdAt;
+    case "expires_at":
+      return grant.expiresAt;
+    case "id":
+      return grant.id;
+    case "relation":
+      return grant.relation;
+    case "user_id":
+      return "user_id" in grant.principal ? grant.principal.user_id : null;
+    default:
+      return "team_id" in grant.principal ? grant.principal.team_id : null;
+  }
+}
+
+/**
+ * Orders two values of a sort field, a missing value first.
+ *
+ * @param a - The first value.
+ * @param b - The second value.
+ * @returns Negative, zero or positive, as `Array.prototype.sort` wants.
+ */
+function compareNullable(a: string | null, b: string | null): number {
+  return (a ?? "").localeCompare(b ?? "");
+}
+
+/**
+ * A grant with its principal expanded: `schema`, `attributes` and `metadata`
+ * on a user, `status`, `created_at` and `updated_at` on a team. A principal
+ * that cannot be loaded stays a bare ref.
+ *
+ * @param grant - The grant.
+ * @returns The grant as an expanded read answers it.
+ */
+function expandedGrantResponse(grant: GrantRecord): Record<string, unknown> {
+  const base = grantResponse(grant);
+  if ("user_id" in grant.principal) {
+    const user = store.users.get(grant.principal.user_id);
+    if (user === undefined) {
+      return base;
+    }
+    const { schema, attributes, metadata } = userResponse(user);
+    return { ...base, user: { ...grant.principal, schema, attributes, metadata } };
+  }
+  const team = store.teams.get(grant.principal.team_id);
+  if (team === undefined) {
+    return base;
+  }
+  const { status, created_at, updated_at } = teamResponse(team);
+  return { ...base, team: { ...grant.principal, status, created_at, updated_at } };
+}
+
 /**
  * The project whose secret the request carries as its bearer, the way the
  * server scopes a team or a user read by id alone.
@@ -3271,19 +3467,46 @@ export function setupPlatformHandlers() {
           status: 401,
         });
       }
+      const refusal = userFilterRefusal(body.data.filter, body.data.sorting !== undefined);
+      if (refusal !== undefined) {
+        return refusal;
+      }
+      const byIdentifier = (body.data.filter ?? []).some((filter) => {
+        return filter.field === "identifier";
+      });
+      const sortField = byIdentifier ? "identifier" : (body.data.sorting?.field ?? "created_at");
+      const direction = byIdentifier || body.data.sorting?.direction === "asc" ? 1 : -1;
       const users = [...store.users.values()]
         .filter((user) => {
           return user.projectId === project.id;
         })
+        .filter((user) => {
+          return (body.data.filter ?? []).every((filter) => {
+            return passesFilter(userField(user, filter.field), filter);
+          });
+        })
         .sort((a, b) => {
-          return b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id);
+          const order =
+            compareNullable(userField(a, sortField), userField(b, sortField)) ||
+            a.id.localeCompare(b.id);
+          return direction * order;
         });
       const paged = pageOf(users, body.data.limit, body.data.page_token ?? undefined);
       if (!paged.ok) {
         return paged.response;
       }
+      const expand = body.data.expand ?? [];
       return HttpResponse.json({
-        users: paged.page.map(userResponse),
+        users: paged.page.map((user) => {
+          const read = userResponse(user);
+          return {
+            ...read,
+            ...(expand.includes("teams") ? { teams: [] } : {}),
+            ...(expand.includes("lifecycle_owner_team")
+              ? { metadata: { ...(read.metadata as object), lifecycle_owner_team: null } }
+              : {}),
+          };
+        }),
         next_page_token: paged.next ?? null,
       });
     }),
@@ -4263,15 +4486,33 @@ export function setupPlatformHandlers() {
       if (!body.ok) {
         return body.response;
       }
+      const refusal = filterValueRefusal(body.data.filter);
+      if (refusal !== undefined) {
+        return refusal;
+      }
+      const sortField = body.data.sorting?.field ?? "created_at";
+      const direction = body.data.sorting?.direction === "desc" ? -1 : 1;
       const grants = [...store.grants.values()]
-        .filter((grant) => grant.projectId === query.data.project_id)
-        .sort((a, b) => a.seq - b.seq);
+        .filter((grant) => {
+          return grant.projectId === query.data.project_id;
+        })
+        .filter((grant) => {
+          return (body.data.filter ?? []).every((filter) => {
+            return passesFilter(grantField(grant, filter.field), filter);
+          });
+        })
+        .sort((a, b) => {
+          const order =
+            compareNullable(grantField(a, sortField), grantField(b, sortField)) || a.seq - b.seq;
+          return direction * order;
+        });
       const paged = pageOf(grants, body.data.limit, body.data.page_token ?? undefined);
       if (!paged.ok) {
         return paged.response;
       }
+      const expanded = body.data.expand?.includes("principal") ?? false;
       const out = parseOut(QueryGrantsResponse, {
-        grants: paged.page.map(grantResponse),
+        grants: paged.page.map(expanded ? expandedGrantResponse : grantResponse),
         next_page_token: paged.next ?? null,
       });
       if (!out.ok) {

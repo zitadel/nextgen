@@ -4457,6 +4457,158 @@ describe("api-mock teams, users and grants", () => {
       after: [],
     });
   });
+
+  async function listed<T>(project: Project, path: string, body: Record<string, unknown>) {
+    const res = await fetch(`${API}${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...project.auth },
+      body: JSON.stringify(body),
+    });
+    return { status: res.status, body: (await res.json()) as T };
+  }
+
+  async function twoUsers(name: string): Promise<{ project: Project; ada: string; bob: string }> {
+    const project = await newProject(name);
+    const ada = await created(project, `/users?project_id=${project.id}`, {
+      schema: project.schemaId,
+      attributes: { email: "ada@example.com" },
+    });
+    const bob = await created(project, `/users?project_id=${project.id}`, {
+      schema: project.schemaId,
+      attributes: { email: "bob@example.com" },
+    });
+    return { project, ada, bob };
+  }
+
+  test("filters the user list by identifier", async () => {
+    const { project, bob } = await twoUsers("users-filter-identifier");
+
+    const res = await listed<{ users: { id: string }[] }>(project, "/users/query", {
+      filter: [{ field: "identifier", operation: "starts_with", value: "BO" }],
+    });
+
+    expect(res.body.users.map((user) => user.id)).toEqual([bob]);
+  });
+
+  test("sorts the user list by the field asked for", async () => {
+    const { project, ada, bob } = await twoUsers("users-sort");
+
+    const res = await listed<{ users: { id: string }[] }>(project, "/users/query", {
+      sorting: { field: "id", direction: "asc" },
+    });
+
+    expect(res.body.users.map((user) => user.id)).toEqual([ada, bob].sort());
+  });
+
+  test("refuses an identifier filter combined with sorting", async () => {
+    const { project } = await twoUsers("users-identifier-sorted");
+
+    const res = await listed<unknown>(project, "/users/query", {
+      filter: [{ field: "identifier", operation: "starts_with", value: "a" }],
+      sorting: { field: "id", direction: "asc" },
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  test("refuses a user filter whose value is not text", async () => {
+    const { project } = await twoUsers("users-filter-value");
+
+    const res = await listed<unknown>(project, "/users/query", {
+      filter: [{ field: "status", operation: "equals", value: 1 }],
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  test("embeds the expansions a user list asks for", async () => {
+    const project = await newProject("users-expand");
+    await created(project, `/users?project_id=${project.id}`, {
+      schema: project.schemaId,
+      attributes: { email: "ada@example.com" },
+    });
+
+    const res = await listed<{
+      users: { teams?: unknown[]; metadata: { lifecycle_owner_team?: unknown } }[];
+    }>(project, "/users/query", { expand: ["teams", "lifecycle_owner_team"] });
+
+    expect(
+      res.body.users.map((user) => {
+        return { teams: user.teams, owner: user.metadata.lifecycle_owner_team };
+      }),
+    ).toEqual([{ teams: [], owner: null }]);
+  });
+
+  test("filters the grant list by relation", async () => {
+    const project = await newProject("grants-filter");
+    const support = await created(project, `/teams?project_id=${project.id}`, { name: "Support" });
+    const ops = await created(project, `/teams?project_id=${project.id}`, { name: "Ops" });
+    await created(project, `/grants?project_id=${project.id}`, {
+      relation: "viewer",
+      team: { team_id: support },
+    });
+    const admin = await created(project, `/grants?project_id=${project.id}`, {
+      relation: "admin",
+      team: { team_id: ops },
+    });
+
+    const res = await listed<{ grants: { id: string }[] }>(
+      project,
+      `/grants/query?project_id=${project.id}`,
+      { filter: [{ field: "relation", operation: "equals", value: "admin" }] },
+    );
+
+    expect(res.body.grants.map((grant) => grant.id)).toEqual([admin]);
+  });
+
+  test("sorts the grant list in the direction asked for", async () => {
+    const project = await newProject("grants-sort");
+    const support = await created(project, `/teams?project_id=${project.id}`, { name: "Support" });
+    const ops = await created(project, `/teams?project_id=${project.id}`, { name: "Ops" });
+    const first = await created(project, `/grants?project_id=${project.id}`, {
+      relation: "viewer",
+      team: { team_id: support },
+    });
+    const second = await created(project, `/grants?project_id=${project.id}`, {
+      relation: "viewer",
+      team: { team_id: ops },
+    });
+
+    const res = await listed<{ grants: { id: string }[] }>(
+      project,
+      `/grants/query?project_id=${project.id}`,
+      { sorting: { field: "created_at", direction: "desc" } },
+    );
+
+    expect(res.body.grants.map((grant) => grant.id)).toEqual([second, first]);
+  });
+
+  test("expands a grant's principal when asked", async () => {
+    const project = await newProject("grants-expand");
+    const userId = await created(project, `/users?project_id=${project.id}`, {
+      schema: project.schemaId,
+      attributes: { email: "ada@example.com" },
+    });
+    await created(project, `/grants?project_id=${project.id}`, {
+      relation: "viewer",
+      user: { user_id: userId },
+    });
+
+    const res = await listed<{ grants: { user?: Record<string, unknown> }[] }>(
+      project,
+      `/grants/query?project_id=${project.id}`,
+      { expand: ["principal"] },
+    );
+
+    expect(res.body.grants.map((grant) => grant.user)).toEqual([
+      {
+        user_id: userId,
+        schema: project.schemaId,
+        attributes: { email: "ada@example.com" },
+        metadata: expect.objectContaining({ status: "active" }),
+      },
+    ]);
+  });
 });
 
 describe("api-mock route coverage — every handler answers by the contract", () => {
