@@ -1,6 +1,6 @@
 # ADR 016: Global SDK Configuration for the Client SDK
 
-> **Status:** Accepted
+> **Status:** Accepted (amended 2026-11-27: the base URL, token and request settings live on an immutable `ZitadelClient`, not in module slots; see [Amendment](#amendment-2026-11-27-no-module-slots))
 > **Date:** 2026-05-28
 > **Context:** SDK client initialization and shared component configuration
 
@@ -385,3 +385,19 @@ This would require:
 - [`packages/sdk-next/src/middleware.ts`](../../packages/sdk-next/src/middleware.ts)
 - [`packages/sdk-nuxt/src/runtime/plugin.ts`](../../packages/sdk-nuxt/src/runtime/plugin.ts)
 - [ADR 005: Public Runtime and Private Credentials](005-public-runtime-private-credentials.md)
+
+## Amendment 2026-11-27: no module slots
+
+The base URL, bearer token, request policy and CSRF token no longer live in
+module-level or `globalThis` slots that each client rewrote before every call.
+A `ZitadelClient` holds them, immutable, and every generated operation takes
+its client as a required first argument; the transport reads everything from
+that client. Two clients on one page (an app's own and the sign-in widget's)
+can no longer leak a timeout, signal, token or CSRF token into each other's
+requests.
+
+`configureZitadel()` keeps its one write-once app-wide project handle, the
+decision above. `getClient(project)` derives the project's client and
+`getApi(project)` binds every operation to it; nothing is written when the
+project is configured.
+

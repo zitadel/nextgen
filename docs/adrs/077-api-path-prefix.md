@@ -167,8 +167,8 @@ GA removes it with the root alias.
   own. Code that reads the request path before ogen does handles both
   spellings: the no-store rule for session responses, and the audit, which
   records the operation rather than the mount.
-- **Clients:** the generated TypeScript client adds the prefix to its runtime
-  base URL, and the Go client module (`go.zitadel.com/zitadel/v5`) gets a
+- **Clients:** the generated TypeScript client adds the prefix after each
+  client's base URL, and the Go client module (`go.zitadel.com/zitadel/v5`) gets a
   helper that adds it to an origin. The CLI, the console, the login
   components, the SDKs' own calls (`/sessions/me` in `@zitadel/sdk-core`),
   `@zitadel/api-mock` and the benchmark harness follow. `zitadel api` keeps
