@@ -4300,20 +4300,21 @@ describe("api-mock teams, users and grants", () => {
     },
   );
 
-  test.each(["teams", "users", "grants"])(
-    "refuses a %s create for a project that does not exist",
-    async (path) => {
-      const project = await newProject(`missing-${path}`);
+  test.each([
+    ["teams", 404],
+    ["users", 401],
+    ["grants", 401],
+  ])("refuses a %s create for a project that does not exist", async (path, status) => {
+    const project = await newProject(`missing-${path}`);
 
-      const res = await fetch(`${API}/${path}?project_id=proj_missing`, {
-        method: "POST",
-        headers: { "content-type": "application/json", ...project.auth },
-        body: JSON.stringify({ name: "Support" }),
-      });
+    const res = await fetch(`${API}/${path}?project_id=proj_missing`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...project.auth },
+      body: JSON.stringify({ name: "Support" }),
+    });
 
-      expect(res.status).toBe(404);
-    },
-  );
+    expect(res.status).toBe(status);
+  });
 
   test("refuses a user list without a project secret", async () => {
     const res = await fetch(`${API}/users/query`, {

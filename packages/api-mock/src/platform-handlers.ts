@@ -587,7 +587,7 @@ type GrantRecord = {
 const INVITATION_TTL_MS = 72 * 60 * 60 * 1000;
 
 const INVITATION_NOT_FOUND = errorBody("inv.not_found", "invitation not found");
-const TEAM_NOT_FOUND = errorBody("team.not_found", "team not found");
+const TEAM_NOT_FOUND = errorBody("team.team_not_found", "team not found");
 const USER_NOT_FOUND = errorBody("user.not_found", "user not found");
 const GRANT_NOT_FOUND = errorBody("grant.not_found", "grant not found");
 const SESSION_NOT_FOUND = errorBody("sess.not_found", "The session was not found");
@@ -2553,16 +2553,23 @@ function bearerProjectId(request: Request): string | undefined {
 }
 
 /**
- * Why a request on `projectId` is refused before its body is read: the
- * project does not exist (404), or the bearer is not that project's secret (401).
+ * Why a request on `projectId` is refused before its body is read: the bearer
+ * is not that project's secret (401). An operation that declares its own code
+ * for a project that does not exist answers that with 404 first; one that
+ * declares none answers 401, since no secret can name a missing project.
  *
  * @param request - The request.
  * @param projectId - The project the request names.
+ * @param projectNotFound - The operation's own code for a missing project, if it declares one.
  * @returns The refusal, or undefined when the request may go on.
  */
-function projectRefusal(request: Request, projectId: string): HttpResponse<ErrorBody> | undefined {
-  if (!store.projects.has(projectId)) {
-    return HttpResponse.json(errorBody("proj.not_found", "resource not found"), { status: 404 });
+function projectRefusal(
+  request: Request,
+  projectId: string,
+  projectNotFound?: string,
+): HttpResponse<ErrorBody> | undefined {
+  if (projectNotFound !== undefined && !store.projects.has(projectId)) {
+    return HttpResponse.json(errorBody(projectNotFound, "project not found"), { status: 404 });
   }
   if (bearerProjectId(request) !== projectId) {
     return HttpResponse.json(errorBody("auth.unauthorized", "missing or invalid credentials"), {
@@ -4432,7 +4439,7 @@ export function setupPlatformHandlers() {
       if (!query.ok) {
         return query.response;
       }
-      const refusal = projectRefusal(request, query.data.project_id);
+      const refusal = projectRefusal(request, query.data.project_id, "team.project_not_found");
       if (refusal !== undefined) {
         return refusal;
       }
@@ -4605,9 +4612,7 @@ export function setupPlatformHandlers() {
         return body.response;
       }
       if (!store.projects.has(body.data.project_id)) {
-        return HttpResponse.json(errorBody("proj.not_found", "resource not found"), {
-          status: 404,
-        });
+        return HttpResponse.json(errorBody("req.invalid", "project not found"), { status: 400 });
       }
       const createdAt = new Date();
       const session: SessionRecord = {
