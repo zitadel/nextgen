@@ -1,0 +1,172 @@
+{{define "scenarios"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{{.Title}} · cell hierarchy</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>{{template "layout-styles" .}}</style>
+</head>
+<body>
+<div class="app">
+  {{template "layout-nav" .}}
+  <div class="content">
+    <div class="content-main">
+      <h1>Lab</h1>
+      <p class="muted">Primary demo path. After each step, open the Trace drawer (or <a href="/trace-view">Trace</a>) and observe <a href="/projects/acme-fra">/projects/acme-fra</a>. Entry cell = which cell you hit for that action.</p>
+      {{if .ScenarioOK}}<div class="flash-ok">{{.ScenarioOK}}</div>{{end}}
+      {{if .ScenarioErr}}<div class="flash-err">{{.ScenarioErr}}</div>{{end}}
+
+      <div class="controls" id="shared-controls">
+        <label for="shared_entry_cell">Entry cell</label>
+        <select id="shared_entry_cell" name="entry_cell">
+          {{range .Cells}}
+          <option value="{{.Label}}">{{.Label}}</option>
+          {{end}}
+        </select>
+      </div>
+
+      <div class="panel">
+        <h2>1 · Create joe on acme-fra (float)</h2>
+        <p class="muted">Creates <code>joe@example.com</code> on the entry cell’s site (eu-1 → acme-fra). Watch lookup float to platform in Trace; observe users + lookup on the project page.</p>
+        <form method="post" action="/lab/create-user" class="scenario-form" data-default-cell="eu-1">
+          <input type="hidden" name="email" value="joe@example.com"/>
+          <button type="submit">Create joe</button>
+        </form>
+      </div>
+
+      <div class="panel">
+        <h2>2 · Grant joe viewer on chat</h2>
+        <p class="muted">Foreign or local grant on the entry cell’s site. Registers interest on joe’s home. Observe tuples + interests on the project page.</p>
+        <form method="post" action="/lab/grant-joe" class="scenario-form" data-default-cell="eu-1">
+          <button type="submit">Grant joe viewer</button>
+        </form>
+      </div>
+
+      <div class="panel">
+        <h2>3 · Global login discovery</h2>
+        <p class="muted">Lookup from the <strong>platform</strong> project — finds home without a region picker.</p>
+        <form method="post" action="/lab/global-login" class="scenario-form" data-default-cell="platform">
+          <input type="hidden" name="email" value="joe@example.com"/>
+          <label><input type="checkbox" name="issue_token" value="1" checked/> Issue token + auth on home chat</label>
+          <button type="submit">Global login</button>
+        </form>
+        {{if .GlobalLogin}}
+        <div style="margin-top:1rem">
+          <p class="muted">
+            {{.GlobalLogin.Email}}
+            {{if .GlobalLogin.Hit}}
+            → home <code>{{.GlobalLogin.HomeProject}}</code> @ <code>{{.GlobalLogin.HomeCell}}</code>
+            · found_at <code>{{.GlobalLogin.FoundAt}}</code>
+            {{if .GlobalLogin.Token}}
+            · auth: {{if .GlobalLogin.AuthAllowed}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.GlobalLogin.AuthReason}}</span>{{end}}
+            {{end}}
+            {{else}}miss{{end}}
+          </p>
+          {{if .GlobalLogin.ClaimsJSON}}
+          <pre style="margin:0.25rem 0 0;padding:0.75rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;overflow:auto;font-size:0.8rem">{{.GlobalLogin.ClaimsJSON}}</pre>
+          {{end}}
+        </div>
+        {{end}}
+      </div>
+
+      <div class="panel">
+        <h2>4 · Group check (optional)</h2>
+        <p class="muted">Cross-cell expand hops visible in Trace. Chain: acme-fra group:A → platform group:B → app:chat.</p>
+        <form method="post" action="/lab/group-check-joe" class="scenario-form" data-default-cell="eu-1">
+          <input type="hidden" name="auto_seed" value="1"/>
+          <button type="submit">Group check joe → app:chat</button>
+        </form>
+        {{if .GroupCheck}}
+        <div style="margin-top:1rem">
+          <p class="muted">
+            {{if .GroupCheck.Allowed}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.GroupCheck.Reason}}</span>{{end}}
+            · total <strong>{{.GroupCheck.TotalMs}} ms</strong>
+            · cross-cell hops <strong>{{.GroupCheck.CrossCellHops}}</strong>
+          </p>
+        </div>
+        {{end}}
+      </div>
+
+      <div class="panel">
+        <h2>5 · Delete joe → tombstones</h2>
+        <p class="muted">Deletes joe at home; interests fan out; grants on the resource site show tombstone badges. Observe <a href="/projects/acme-fra">acme-fra</a>.</p>
+        <form method="post" action="/lab/delete-joe" class="scenario-form" data-default-cell="eu-1">
+          <button type="submit" class="secondary">Delete joe</button>
+        </form>
+        {{if .Lifecycle}}
+        <div style="margin-top:1rem">
+          <p class="muted">
+            action=<code>{{.Lifecycle.Action}}</code>
+            · epoch <strong>{{.Lifecycle.Epoch}}</strong>
+            {{if .Lifecycle.Deleted}} · deleted{{end}}
+            · resource <code>{{.Lifecycle.ResourceProject}}</code>@{{.Lifecycle.ResourceCell}}
+            · active joe-tuples <strong>{{.Lifecycle.USTuplesBefore}} → {{.Lifecycle.USTuplesActiveAfter}}</strong>
+            {{if .Lifecycle.Deleted}} · tombstoned <strong>{{.Lifecycle.USTuplesTombstonedAfter}}</strong>{{end}}
+            {{if ne .Lifecycle.LookupState ""}} · lookup <code>{{.Lifecycle.LookupState}}</code>{{end}}
+          </p>
+          {{if .Lifecycle.InterestsNotified}}
+          <p class="muted">Interests notified:</p>
+          <ul class="compact">{{range .Lifecycle.InterestsNotified}}<li><code>{{.}}</code></li>{{end}}</ul>
+          {{end}}
+        </div>
+        {{end}}
+      </div>
+
+      <details class="panel" style="padding:1rem">
+        <summary style="cursor:pointer;font-weight:600">Extra · Sign-in / block / lookup</summary>
+        <p class="muted" style="margin-top:0.75rem">Optional extras; happy path above is enough for the proof.</p>
+        <form method="post" action="/lab/sign-in-joe" class="scenario-form" data-default-cell="eu-1" style="margin-bottom:0.5rem">
+          <input type="hidden" name="auto_grant" value="1"/>
+          <button type="submit" class="secondary">Sign in as joe</button>
+        </form>
+        {{if .SignIn}}
+        <p class="muted">
+          Home: <code>{{.SignIn.HomeProject}}</code> @ <code>{{.SignIn.HomeCell}}</code>
+          · online: {{if .SignIn.AllowedOnline}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.SignIn.ReasonOnline}}</span>{{end}}
+        </p>
+        {{end}}
+        <form method="post" action="/lab/block-joe" class="scenario-form" data-default-cell="eu-1" style="margin-bottom:0.5rem">
+          <button type="submit" class="secondary">Block joe</button>
+        </form>
+        <form method="post" action="/lab/lookup" class="scenario-form" data-default-cell="eu-1">
+          <input type="hidden" name="key" value="joe@example.com"/>
+          <button type="submit" class="secondary">Lookup walk</button>
+        </form>
+      </details>
+    </div>
+  </div>
+</div>
+<script>
+  (function () {
+    var cellSel = document.getElementById('shared_entry_cell');
+    var cellDirty = false;
+    function ensureHidden(form, name, value) {
+      var el = form.querySelector('input[name="' + name + '"]');
+      if (!el) {
+        el = document.createElement('input');
+        el.type = 'hidden';
+        el.name = name;
+        form.appendChild(el);
+      }
+      el.value = value;
+    }
+    if (cellSel) {
+      for (var i = 0; i < cellSel.options.length; i++) {
+        if (cellSel.options[i].value === 'eu-1') { cellSel.selectedIndex = i; break; }
+      }
+      cellSel.addEventListener('change', function () { cellDirty = true; });
+    }
+    document.querySelectorAll('form.scenario-form').forEach(function (form) {
+      form.addEventListener('submit', function () {
+        var def = form.getAttribute('data-default-cell') || 'eu-1';
+        var cell = (cellDirty && cellSel && cellSel.value) ? cellSel.value : def;
+        ensureHidden(form, 'entry_cell', cell);
+      });
+    });
+  })();
+</script>
+</body>
+</html>
+{{end}}

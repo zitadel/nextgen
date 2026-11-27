@@ -1,0 +1,73 @@
+{{define "detail"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{{.Title}} · cell hierarchy</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>{{template "layout-styles" .}}</style>
+</head>
+<body>
+<div class="app">
+  {{template "layout-nav" .}}
+  <div class="content">
+    <div class="content-main">
+      <h1>{{.Title}}</h1>
+      {{with .Detail}}
+        {{if .Error}}<div class="flash-err">{{.Error}}</div>{{end}}
+        <div class="panel">
+          <h2>Me</h2>
+          <p><code>{{.Me.Label}}</code> {{if .Me.Display}}· {{.Me.Display}}{{end}}</p>
+          <p class="muted">{{.Me.URL}} · status={{.Me.Status}}
+            {{if .Me.IsParent}}· parent{{end}}
+            {{if .Me.ParentURL}}· parent_url={{.Me.ParentURL}}{{end}}
+          </p>
+        </div>
+        <div class="panel">
+          <h2>Children</h2>
+          {{if .Children}}
+          <table>
+            <thead><tr><th>Label</th><th>URL</th><th>Alive</th><th>Last seen</th></tr></thead>
+            <tbody>
+            {{range .Children}}
+              <tr>
+                <td>{{.Label}}</td>
+                <td><code>{{.ChildURL}}</code></td>
+                <td>{{if .Alive}}yes{{else}}no{{end}}</td>
+                <td class="muted">{{.LastSeenAt}}</td>
+              </tr>
+            {{end}}
+            </tbody>
+          </table>
+          {{else}}
+          <p class="muted">No children.</p>
+          {{end}}
+        </div>
+        <div class="panel">
+          <h2>Projects</h2>
+          {{if .Projects}}
+          <table>
+            <thead><tr><th>ID</th><th>Name</th><th>Workspace</th><th>Lookup</th></tr></thead>
+            <tbody>
+            {{range .Projects}}
+              <tr>
+                <td><a href="/projects/{{.ID}}"><code>{{.ID}}</code></a></td>
+                <td>{{.Name}}</td>
+                <td class="muted">{{.WorkspaceID}}</td>
+                <td>{{if .LookupEnabled}}on{{else}}off{{end}}</td>
+              </tr>
+            {{end}}
+            </tbody>
+          </table>
+          {{else}}
+          <p class="muted">No projects.</p>
+          {{end}}
+        </div>
+      {{end}}
+    </div>
+  </div>
+</div>
+</body>
+</html>
+{{end}}

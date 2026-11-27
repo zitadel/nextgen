@@ -1,0 +1,69 @@
+{{define "workspace"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{{.Title}} · cell hierarchy</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>{{template "layout-styles" .}}</style>
+</head>
+<body>
+<div class="app">
+  {{template "layout-nav" .}}
+  <div class="content">
+    <div class="content-main">
+      {{template "layout-breadcrumbs" .}}
+      {{with .Workspace}}
+      <h1>Workspace <code>{{.ID}}</code></h1>
+      <p class="muted">{{.Name}} — sites below. Open a site to observe Lab results.</p>
+      {{end}}
+      {{if .Flash}}<div class="flash-ok">{{.Flash}}</div>{{end}}
+      {{if .FlashErr}}<div class="flash-err">{{.FlashErr}}</div>{{end}}
+
+      <div class="panel">
+        <h2>Sites</h2>
+        {{if .Sites}}
+        <table>
+          <thead><tr><th>Site</th><th>Cell</th><th>Users</th><th>Apps</th></tr></thead>
+          <tbody>
+          {{range .Sites}}
+            <tr>
+              <td><a href="/projects/{{.ID}}"><code>{{.ID}}</code></a> {{.Name}}</td>
+              <td>{{.HostLabel}}{{if .HostDisplay}} · {{.HostDisplay}}{{end}}</td>
+              <td>{{.UserCount}}</td>
+              <td>{{.AppCount}}</td>
+            </tr>
+          {{end}}
+          </tbody>
+        </table>
+        {{else}}
+        <p class="muted">No sites in this workspace yet.</p>
+        {{end}}
+      </div>
+
+      <div class="panel">
+        <h2>Add site</h2>
+        <p class="muted">Creates a project on the chosen cell with this workspace_id, then attaches lookup parent to <code>platform</code>.</p>
+        {{with .Workspace}}
+        <form method="post" action="/workspaces/{{.ID}}/sites">
+          <label for="id">Site id</label>
+          <input id="id" name="id" required placeholder="{{.ID}}-fra"/>
+          <label for="cell">Cell</label>
+          <select id="cell" name="cell" required>
+            {{$home := .HomeCell}}
+            {{range $.Cells}}
+            <option value="{{.Label}}" {{if eq .Label $home}}selected{{end}}>{{.Label}}</option>
+            {{end}}
+          </select>
+          <input type="hidden" name="parent_project_id" value="platform"/>
+          <button type="submit">Add site</button>
+        </form>
+        {{end}}
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
+{{end}}
