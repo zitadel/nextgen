@@ -35,12 +35,13 @@ var csrfOriginGuard = http.NewCrossOriginProtection()
 // widgets read it through the app's SDK proxy, which forwards only the app's
 // own cookie (ADR 073). Lookup is CSRF-on-writes only (ADR 086).
 var csrfTokenExemptOperations = map[api.OperationName]bool{
-	api.QueryUsersOperation:       true,
-	api.QueryTeamsOperation:       true,
-	api.QueryGrantsOperation:      true,
-	api.QueryIdpsOperation:        true,
-	api.LookupInvitationOperation: true,
-	api.SearchOperation:           true,
+	api.QueryUsersOperation:        true,
+	api.QueryTeamsOperation:        true,
+	api.QueryGrantsOperation:       true,
+	api.QueryIdpsOperation:         true,
+	api.QueryApplicationsOperation: true,
+	api.LookupInvitationOperation:  true,
+	api.SearchOperation:            true,
 }
 
 type csrfRequestKey struct{}

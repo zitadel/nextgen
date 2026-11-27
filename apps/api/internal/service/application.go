@@ -38,9 +38,25 @@ type ServedApplicationClient struct {
 	Stored      *domain.ApplicationClient
 }
 
+type ListApplicationsInput struct {
+	ProjectID string
+	Sorting   *Sorting // optional; defaults to created_at asc
+	Filters   []Filter
+	Limit     int
+	PageToken string
+}
+
+type ListApplicationsOutput struct {
+	Items         []*domain.Application
+	NextPageToken string
+}
+
 type ApplicationService interface {
 	CreateOrReviseRegistered(ctx context.Context, projectID string, document []byte, idempotencyKey string) (*CreateApplicationOutput, error)
 	Get(ctx context.Context, projectID, id string) (*domain.Application, error)
+	// List returns each application of the project once, declared or
+	// registered, at its newest revision.
+	List(ctx context.Context, input ListApplicationsInput) (*ListApplicationsOutput, error)
 	// GetRevision reads one revision by its id, the one a release pins.
 	GetRevision(ctx context.Context, projectID, revisionID string) (*domain.Application, error)
 	// Client resolves the client's document for the deployment's release.
@@ -231,6 +247,39 @@ func (s *applicationService) Get(ctx context.Context, projectID, id string) (_ *
 	defer end(&err)
 
 	return s.get(ctx, projectID, domain.ApplicationFieldID, id)
+}
+
+func (s *applicationService) List(ctx context.Context, input ListApplicationsInput) (_ *ListApplicationsOutput, err error) {
+	ctx, end := startSpan(ctx, "ApplicationService.List")
+	defer end(&err)
+
+	filters := make([]database.Filter[domain.ApplicationField], 0, len(input.Filters)+1)
+	filters = append(filters, database.Equal(database.Col(domain.ApplicationFieldProjectID), input.ProjectID))
+	for _, f := range input.Filters {
+		filter, err := applicationFilter(f)
+		if err != nil {
+			return nil, err
+		}
+		filters = append(filters, filter)
+	}
+
+	orderBy, err := listOrderBy(input.Sorting, domain.ApplicationFieldCreatedAt, database.OrderAsc, applicationField, domain.ApplicationFieldID)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := s.v2Pool.Statements().ListApplications(ctx, &database.ListOptions[domain.ApplicationField]{
+		Filter: database.And(filters...),
+		Pagination: database.Page[domain.ApplicationField]{
+			Limit:   uint32(normalizeLimit(input.Limit)),
+			OrderBy: orderBy,
+			Cursor:  []byte(input.PageToken),
+		},
+	})
+	if err != nil {
+		return nil, mapListError(err, "failed to list applications")
+	}
+	return &ListApplicationsOutput{Items: result.Items, NextPageToken: string(result.NextCursor)}, nil
 }
 
 func (s *applicationService) GetRevision(ctx context.Context, projectID, revisionID string) (_ *domain.Application, err error) {
@@ -444,6 +493,34 @@ func applicationBy(projectID string, field domain.ApplicationField, value string
 		database.Equal(database.Col(domain.ApplicationFieldProjectID), projectID),
 		database.Equal(database.Col(field), value),
 	)
+}
+
+// applicationFilter maps an API filter predicate to a storage filter.
+func applicationFilter(f Filter) (database.Filter[domain.ApplicationField], error) {
+	switch f.Field {
+	case "created_at":
+		return createdAtFilter(f.Operation, database.Col(domain.ApplicationFieldCreatedAt), f.Value)
+	case "slug":
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
+		}
+		return stringFilter(f.Operation, database.Col(domain.ApplicationFieldSlug), value)
+	default:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", f.Field))
+	}
+}
+
+// applicationField maps an API sort field to its storage field.
+func applicationField(field string) (domain.ApplicationField, error) {
+	switch field {
+	case "created_at":
+		return domain.ApplicationFieldCreatedAt, nil
+	case "slug":
+		return domain.ApplicationFieldSlug, nil
+	default:
+		return domain.ApplicationFieldUnspecified, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", field))
+	}
 }
 
 func clientSecrets(clients []*domain.ApplicationClient, plain []string) []ApplicationClientSecret {

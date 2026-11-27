@@ -189,6 +189,7 @@ var gateRows = []gateRow{
 		},
 	},
 
+	{op: "QueryApplications", cookie: true, relation: viewer, why: whyQuery, target: onProject, list: true, miss: applicationCodes.readMiss},
 	// An application revision is gated on its application, an unknown one on
 	// its own id as the target (#2112).
 	{

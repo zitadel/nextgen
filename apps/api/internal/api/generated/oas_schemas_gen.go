@@ -93110,13 +93110,15 @@ func (*QueryApplicationsBadRequest) queryApplicationsRes() {}
 // QueryApplicationsErrorResponse represents sum type.
 type QueryApplicationsErrorResponse struct {
 	// Type selects the active sum variant, switch on this field.
-	Type             QueryApplicationsErrorResponseType
-	AuthCsrfInvalid  AuthCsrfInvalid
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	NotImplemented   NotImplemented
-	ReqInvalid       ReqInvalid
-	Unavailable      Unavailable
+	Type                QueryApplicationsErrorResponseType
+	AppNotFound         AppNotFound
+	AppPermissionDenied AppPermissionDenied
+	AuthCsrfInvalid     AuthCsrfInvalid
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	NotImplemented      NotImplemented
+	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // QueryApplicationsErrorResponseType is oneOf type of QueryApplicationsErrorResponse.
@@ -93124,13 +93126,25 @@ type QueryApplicationsErrorResponseType string
 
 // Possible values for QueryApplicationsErrorResponseType.
 const (
-	AuthCsrfInvalidQueryApplicationsErrorResponse  QueryApplicationsErrorResponseType = "auth.csrf_invalid"
-	AuthUnauthorizedQueryApplicationsErrorResponse QueryApplicationsErrorResponseType = "auth.unauthorized"
-	InternalQueryApplicationsErrorResponse         QueryApplicationsErrorResponseType = "internal"
-	NotImplementedQueryApplicationsErrorResponse   QueryApplicationsErrorResponseType = "not_implemented"
-	ReqInvalidQueryApplicationsErrorResponse       QueryApplicationsErrorResponseType = "req.invalid"
-	UnavailableQueryApplicationsErrorResponse      QueryApplicationsErrorResponseType = "unavailable"
+	AppNotFoundQueryApplicationsErrorResponse         QueryApplicationsErrorResponseType = "app.not_found"
+	AppPermissionDeniedQueryApplicationsErrorResponse QueryApplicationsErrorResponseType = "app.permission_denied"
+	AuthCsrfInvalidQueryApplicationsErrorResponse     QueryApplicationsErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedQueryApplicationsErrorResponse    QueryApplicationsErrorResponseType = "auth.unauthorized"
+	InternalQueryApplicationsErrorResponse            QueryApplicationsErrorResponseType = "internal"
+	NotImplementedQueryApplicationsErrorResponse      QueryApplicationsErrorResponseType = "not_implemented"
+	ReqInvalidQueryApplicationsErrorResponse          QueryApplicationsErrorResponseType = "req.invalid"
+	UnavailableQueryApplicationsErrorResponse         QueryApplicationsErrorResponseType = "unavailable"
 )
+
+// IsAppNotFound reports whether QueryApplicationsErrorResponse is AppNotFound.
+func (s QueryApplicationsErrorResponse) IsAppNotFound() bool {
+	return s.Type == AppNotFoundQueryApplicationsErrorResponse
+}
+
+// IsAppPermissionDenied reports whether QueryApplicationsErrorResponse is AppPermissionDenied.
+func (s QueryApplicationsErrorResponse) IsAppPermissionDenied() bool {
+	return s.Type == AppPermissionDeniedQueryApplicationsErrorResponse
+}
 
 // IsAuthCsrfInvalid reports whether QueryApplicationsErrorResponse is AuthCsrfInvalid.
 func (s QueryApplicationsErrorResponse) IsAuthCsrfInvalid() bool {
@@ -93160,6 +93174,48 @@ func (s QueryApplicationsErrorResponse) IsReqInvalid() bool {
 // IsUnavailable reports whether QueryApplicationsErrorResponse is Unavailable.
 func (s QueryApplicationsErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableQueryApplicationsErrorResponse
+}
+
+// SetAppNotFound sets QueryApplicationsErrorResponse to AppNotFound.
+func (s *QueryApplicationsErrorResponse) SetAppNotFound(v AppNotFound) {
+	s.Type = AppNotFoundQueryApplicationsErrorResponse
+	s.AppNotFound = v
+}
+
+// GetAppNotFound returns AppNotFound and true boolean if QueryApplicationsErrorResponse is AppNotFound.
+func (s QueryApplicationsErrorResponse) GetAppNotFound() (v AppNotFound, ok bool) {
+	if !s.IsAppNotFound() {
+		return v, false
+	}
+	return s.AppNotFound, true
+}
+
+// NewAppNotFoundQueryApplicationsErrorResponse returns new QueryApplicationsErrorResponse from AppNotFound.
+func NewAppNotFoundQueryApplicationsErrorResponse(v AppNotFound) QueryApplicationsErrorResponse {
+	var s QueryApplicationsErrorResponse
+	s.SetAppNotFound(v)
+	return s
+}
+
+// SetAppPermissionDenied sets QueryApplicationsErrorResponse to AppPermissionDenied.
+func (s *QueryApplicationsErrorResponse) SetAppPermissionDenied(v AppPermissionDenied) {
+	s.Type = AppPermissionDeniedQueryApplicationsErrorResponse
+	s.AppPermissionDenied = v
+}
+
+// GetAppPermissionDenied returns AppPermissionDenied and true boolean if QueryApplicationsErrorResponse is AppPermissionDenied.
+func (s QueryApplicationsErrorResponse) GetAppPermissionDenied() (v AppPermissionDenied, ok bool) {
+	if !s.IsAppPermissionDenied() {
+		return v, false
+	}
+	return s.AppPermissionDenied, true
+}
+
+// NewAppPermissionDeniedQueryApplicationsErrorResponse returns new QueryApplicationsErrorResponse from AppPermissionDenied.
+func NewAppPermissionDeniedQueryApplicationsErrorResponse(v AppPermissionDenied) QueryApplicationsErrorResponse {
+	var s QueryApplicationsErrorResponse
+	s.SetAppPermissionDenied(v)
+	return s
 }
 
 // SetAuthCsrfInvalid sets QueryApplicationsErrorResponse to AuthCsrfInvalid.

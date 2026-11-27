@@ -19157,6 +19157,45 @@ func (c *MockApplicationServiceGetRevisionCall) DoAndReturn(f func(context.Conte
 	return c
 }
 
+// List mocks base method.
+func (m *MockApplicationService) List(ctx context.Context, input service.ListApplicationsInput) (*service.ListApplicationsOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "List", ctx, input)
+	ret0, _ := ret[0].(*service.ListApplicationsOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// List indicates an expected call of List.
+func (mr *MockApplicationServiceMockRecorder) List(ctx, input any) *MockApplicationServiceListCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockApplicationService)(nil).List), ctx, input)
+	return &MockApplicationServiceListCall{Call: call}
+}
+
+// MockApplicationServiceListCall wrap *gomock.Call
+type MockApplicationServiceListCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockApplicationServiceListCall) Return(arg0 *service.ListApplicationsOutput, arg1 error) *MockApplicationServiceListCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockApplicationServiceListCall) Do(f func(context.Context, service.ListApplicationsInput) (*service.ListApplicationsOutput, error)) *MockApplicationServiceListCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockApplicationServiceListCall) DoAndReturn(f func(context.Context, service.ListApplicationsInput) (*service.ListApplicationsOutput, error)) *MockApplicationServiceListCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ServedClient mocks base method.
 func (m *MockApplicationService) ServedClient(ctx context.Context, projectID, clientID string) (*service.ServedApplicationClient, error) {
 	m.ctrl.T.Helper()

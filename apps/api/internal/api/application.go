@@ -6,6 +6,7 @@ import (
 
 	api "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 func (h *Handler) PublishApplication(ctx context.Context, req *api.CreateApplicationRequest, params api.PublishApplicationParams) (api.PublishApplicationRes, error) {
@@ -56,6 +57,40 @@ func (h *Handler) GetApplication(ctx context.Context, params api.GetApplicationP
 		return nil, err
 	}
 	return &resp, nil
+}
+
+func (h *Handler) QueryApplications(ctx context.Context, req *api.QueryApplicationsRequest, params api.QueryApplicationsParams) (api.QueryApplicationsRes, error) {
+	ctx, _, err := h.requireProjectListAccess(ctx, string(params.ProjectID), applicationAccess, domain.ResourceKindApplication)
+	if err != nil {
+		return nil, err
+	}
+	input := service.ListApplicationsInput{
+		ProjectID: string(params.ProjectID),
+		Limit:     int(req.Limit.Or(0)),
+		PageToken: string(req.PageToken.Or("")),
+	}
+	if sorting, ok := req.Sorting.Get(); ok {
+		input.Sorting = sortingToService(sorting.Field, sorting.Direction)
+	}
+	for _, filter := range req.Filter {
+		input.Filters = append(input.Filters, filterToService(filter.Field, filter.Operation, filter.Value))
+	}
+	result, err := h.applicationService.List(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	resp := &api.QueryApplicationsResponse{Applications: make([]api.ApplicationResponse, 0, len(result.Items))}
+	for _, entity := range result.Items {
+		application, err := toAPIApplicationResponse(entity)
+		if err != nil {
+			return nil, err
+		}
+		resp.Applications = append(resp.Applications, application)
+	}
+	if result.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(result.NextPageToken))
+	}
+	return resp, nil
 }
 
 func (h *Handler) GetApplicationRevision(ctx context.Context, params api.GetApplicationRevisionParams) (api.GetApplicationRevisionRes, error) {

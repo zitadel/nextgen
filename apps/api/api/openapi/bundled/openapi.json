@@ -35236,6 +35236,12 @@
             "schema": {
               "oneOf": [
                 {
+                  "$ref": "#/components/schemas/app-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/app-permission_denied"
+                },
+                {
                   "$ref": "#/components/schemas/auth-csrf_invalid"
                 },
                 {
@@ -35257,6 +35263,8 @@
               "discriminator": {
                 "propertyName": "code",
                 "mapping": {
+                  "app.not_found": "#/components/schemas/app-not_found",
+                  "app.permission_denied": "#/components/schemas/app-permission_denied",
                   "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
                   "internal": "#/components/schemas/internal",
@@ -35267,6 +35275,12 @@
               }
             },
             "examples": {
+              "app.not_found": {
+                "$ref": "#/components/examples/app-not_found"
+              },
+              "app.permission_denied": {
+                "$ref": "#/components/examples/app-permission_denied"
+              },
               "auth.csrf_invalid": {
                 "$ref": "#/components/examples/auth-csrf_invalid"
               },

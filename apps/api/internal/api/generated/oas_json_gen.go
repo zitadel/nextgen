@@ -133918,6 +133918,38 @@ func (s QueryApplicationsErrorResponse) Encode(e *jx.Encoder) {
 
 func (s QueryApplicationsErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
+	case AppNotFoundQueryApplicationsErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.not_found")
+		{
+			s := s.AppNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AppPermissionDeniedQueryApplicationsErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.permission_denied")
+		{
+			s := s.AppPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case AuthCsrfInvalidQueryApplicationsErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.csrf_invalid")
@@ -134040,6 +134072,12 @@ func (s *QueryApplicationsErrorResponse) Decode(d *jx.Decoder) error {
 					return err
 				}
 				switch typ {
+				case "app.not_found":
+					s.Type = AppNotFoundQueryApplicationsErrorResponse
+					found = true
+				case "app.permission_denied":
+					s.Type = AppPermissionDeniedQueryApplicationsErrorResponse
+					found = true
 				case "auth.csrf_invalid":
 					s.Type = AuthCsrfInvalidQueryApplicationsErrorResponse
 					found = true
@@ -134072,6 +134110,14 @@ func (s *QueryApplicationsErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
+	case AppNotFoundQueryApplicationsErrorResponse:
+		if err := s.AppNotFound.Decode(d); err != nil {
+			return err
+		}
+	case AppPermissionDeniedQueryApplicationsErrorResponse:
+		if err := s.AppPermissionDenied.Decode(d); err != nil {
+			return err
+		}
 	case AuthCsrfInvalidQueryApplicationsErrorResponse:
 		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
 			return err

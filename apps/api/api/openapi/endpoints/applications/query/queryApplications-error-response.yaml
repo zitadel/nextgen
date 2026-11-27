@@ -4,6 +4,8 @@ content:
   application/json:
     schema:
       oneOf:
+        - $ref: '../../../components/schemas/errors/app-not_found.yaml'
+        - $ref: '../../../components/schemas/errors/app-permission_denied.yaml'
         - $ref: '../../../components/schemas/errors/auth-csrf_invalid.yaml'
         - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
@@ -13,6 +15,8 @@ content:
       discriminator:
         propertyName: code
         mapping:
+          app.not_found: '../../../components/schemas/errors/app-not_found.yaml'
+          app.permission_denied: '../../../components/schemas/errors/app-permission_denied.yaml'
           auth.csrf_invalid: '../../../components/schemas/errors/auth-csrf_invalid.yaml'
           auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
@@ -20,6 +24,10 @@ content:
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           unavailable: '../../../components/schemas/errors/unavailable.yaml'
     examples:
+      app.not_found:
+        $ref: '../../../components/examples/errors/app-not_found.yaml'
+      app.permission_denied:
+        $ref: '../../../components/examples/errors/app-permission_denied.yaml'
       auth.csrf_invalid:
         $ref: '../../../components/examples/errors/auth-csrf_invalid.yaml'
       auth.unauthorized:
