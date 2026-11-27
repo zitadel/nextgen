@@ -31,8 +31,7 @@ import {
   revokeMySession,
   submitFlowStep,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen";
-import { setApiAuthToken } from "@zitadel/api/runtime/auth";
-import { setProxyPath } from "@zitadel/api/runtime/base-url";
+import { callWith, type CallSettings } from "@zitadel/api/runtime/call";
 import type {
   CreateFlow201,
   CreateFlowBody,
@@ -47,15 +46,14 @@ import { ApiError, CSRF_HEADER, apiErrorCode } from "@zitadel/api/runtime/fetch"
 const apiRequestInit: RequestInit = { credentials: "include" };
 
 /**
- * Points the generated functions at the project's proxy path and key. It runs
- * before each call, as another project on the page may have changed them.
+ * The settings a call for the project runs with: its proxy path and key, and no
+ * request policy, so nothing another client on the page set reaches the call.
  *
  * @param project - The project the call is for.
- * @returns Nothing; it sets the generated client's module configuration.
+ * @returns The settings for `callWith`.
  */
-function useProject(project: ZitadelProject): void {
-  setProxyPath(project.proxyPath);
-  setApiAuthToken(project.publishableKey);
+function settingsOf(project: ZitadelProject): CallSettings {
+  return { baseUrl: project.proxyPath, token: project.publishableKey, policy: {} };
 }
 
 /**
@@ -78,8 +76,7 @@ export async function startFlow(
   project: ZitadelProject,
   input: CreateFlowBody,
 ): Promise<CreateFlow201> {
-  useProject(project);
-  return createFlow(input, apiRequestInit);
+  return callWith(settingsOf(project), createFlow, input, apiRequestInit);
 }
 
 /**
@@ -101,8 +98,7 @@ export async function submitStep(
   body: SubmitFlowStepBody,
 ): Promise<CreateFlow201> {
   try {
-    useProject(project);
-    return await submitFlowStep(id, body, apiRequestInit);
+    return await callWith(settingsOf(project), submitFlowStep, id, body, apiRequestInit);
   } catch (error) {
     if (error instanceof ApiError && error.status === 400 && isFlowResponse(error.body)) {
       return error.body;
@@ -131,8 +127,7 @@ function isFlowResponse(body: unknown): body is CreateFlow201 {
  * @throws {ApiError} When the flow is gone or the server refuses the request.
  */
 export async function getCurrentStep(project: ZitadelProject, id: string): Promise<CreateFlow201> {
-  useProject(project);
-  return getFlowStep(id, apiRequestInit);
+  return callWith(settingsOf(project), getFlowStep, id, apiRequestInit);
 }
 
 /**
@@ -153,8 +148,7 @@ export async function exchangeSession(
   body: ExchangeHandoffBody,
   params: ExchangeHandoffParams,
 ): Promise<ExchangeHandoff200> {
-  useProject(project);
-  return exchangeHandoff(body, params, apiRequestInit);
+  return callWith(settingsOf(project), exchangeHandoff, body, params, apiRequestInit);
 }
 
 /**
@@ -176,12 +170,16 @@ export async function getSession(
   project: ZitadelProject,
   projectId: string,
 ): Promise<SessionIdentity | null> {
-  useProject(project);
   if (!projectId) {
-    return getMySession(undefined, apiRequestInit);
+    return callWith(settingsOf(project), getMySession, undefined, apiRequestInit);
   }
   try {
-    const session = await getMySession({ project_id: projectId }, apiRequestInit);
+    const session = await callWith(
+      settingsOf(project),
+      getMySession,
+      { project_id: projectId },
+      apiRequestInit,
+    );
     return session.project_id === projectId ? session : null;
   } catch (error) {
     if (apiErrorCode(error) === "sess.project_mismatch") {
@@ -212,10 +210,13 @@ export async function getSession(
 export async function revokeSession(project: ZitadelProject, projectId: string): Promise<void> {
   const params = projectId ? { project_id: projectId } : undefined;
   try {
-    useProject(project);
-    const { csrf_token } = await getMySessionCsrfToken(params, apiRequestInit);
-    useProject(project);
-    await revokeMySession(params, {
+    const { csrf_token } = await callWith(
+      settingsOf(project),
+      getMySessionCsrfToken,
+      params,
+      apiRequestInit,
+    );
+    await callWith(settingsOf(project), revokeMySession, params, {
       ...apiRequestInit,
       headers: { [CSRF_HEADER]: csrf_token },
     });

@@ -19,9 +19,7 @@
 import * as endpoints from "../generated/endpoints/zitadelNextGen";
 import { paging } from "../generated/paging";
 
-import { setApiAuthToken } from "./auth";
-import { setProxyPath } from "./base-url";
-import { setRequestPolicy } from "./fetch";
+import { callWith, type CallSettings } from "./call";
 import { paged } from "./paged";
 
 /**
@@ -132,6 +130,11 @@ export function createZitadelClient(opts: ZitadelClientOptions): ZitadelClient {
       throw error;
     },
   };
+  const settings: CallSettings = {
+    baseUrl,
+    token: opts.token,
+    policy: { signal: opts.signal, timeoutMs: opts.timeoutMs, userAgent: opts.userAgent },
+  };
   const hooked = opts.onResponse !== undefined || opts.onError !== undefined;
   // Built once per function, not on every property read.
   const bound = new Map<PropertyKey, unknown>();
@@ -148,14 +151,7 @@ export function createZitadelClient(opts: ZitadelClientOptions): ZitadelClient {
       // Every request, each page included, sets this client's base URL and
       // token again: another client may have run in between.
       const send = (...args: unknown[]) => {
-        setProxyPath(baseUrl);
-        setApiAuthToken(opts.token);
-        setRequestPolicy({
-          signal: opts.signal,
-          timeoutMs: opts.timeoutMs,
-          userAgent: opts.userAgent,
-        });
-        return (value as (...a: unknown[]) => unknown)(...args);
+        return callWith(settings, value as (...a: unknown[]) => unknown, ...args);
       };
       // The URL builders orval exports beside the requests return strings, so
       // only a pending result is hooked. A then-check rather than `instanceof`,
