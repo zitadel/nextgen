@@ -103,12 +103,8 @@ describe("a client's destructive operations", () => {
     expect(arrived).toEqual([]);
   });
 
-  it("are refused when reached around the type", async () => {
-    const revoke = Reflect.get(client(), "revokeRelease") as (
-      ...args: unknown[]
-    ) => Promise<unknown>;
-
-    await expect(revoke("rel_1", { project_id: "proj_1" })).rejects.toMatchObject({
+  it("are refused by name, whichever one is called", async () => {
+    await expect(client().revokeRelease("rel_1", { project_id: "proj_1" })).rejects.toMatchObject({
       operation: "revokeRelease",
     });
   });

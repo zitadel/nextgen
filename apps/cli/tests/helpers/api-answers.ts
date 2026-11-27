@@ -1,6 +1,6 @@
 import type { OperationName, PageOf, PagedOperation, ZitadelApi } from "@zitadel/api/client";
 import { operations } from "@zitadel/api/generated/operations";
-import { HttpResponse, http, type JsonBodyType } from "msw";
+import { HttpResponse, http } from "msw";
 import type { SetupServer } from "msw/node";
 
 import { createZitadelClient, type ZitadelClient } from "@/lib/backend";
@@ -75,7 +75,16 @@ export function refusal(status: number, code: string, message = code): Response 
   return HttpResponse.json({ code, message }, { status });
 }
 
-/** The method and the MSW path of a generated operation, from the spec's own table. */
+/** MSW's handler for each method the spec uses. */
+const VERBS = {
+  GET: http.get,
+  PUT: http.put,
+  POST: http.post,
+  DELETE: http.delete,
+  PATCH: http.patch,
+} as const;
+
+/** The MSW handler and path of a generated operation, from the spec's own table. */
 function routeOf(operation: OperationName) {
   const found = operations.find((candidate) => {
     return candidate.id.charAt(0).toLowerCase() + candidate.id.slice(1) === operation;
@@ -85,7 +94,7 @@ function routeOf(operation: OperationName) {
   }
   const path = found.path.replace(/\{([^}]+)\}/g, ":$1");
   return {
-    method: found.method.toLowerCase() as Lowercase<typeof found.method>,
+    handle: VERBS[found.method],
     url: `${TEST_SERVER}/api/v1${path}`,
     paging: found.paging,
   };
@@ -116,7 +125,9 @@ function responseOf(value: unknown): Response {
   if (value === undefined) {
     return new HttpResponse(null, { status: 204 });
   }
-  return HttpResponse.json(value as JsonBodyType);
+  return new HttpResponse(JSON.stringify(value), {
+    headers: { "content-type": "application/json" },
+  });
 }
 
 /**
@@ -133,15 +144,23 @@ export function answering<K extends OperationName>(
   reply: Reply<K>,
 ): readonly Sent[] {
   const sent: Sent[] = [];
-  const { method, url } = routeOf(operation);
+  const { handle, url } = routeOf(operation);
   server.use(
-    http[method](url, async ({ request, params }) => {
+    handle(url, async ({ request, params }) => {
       const received = await sentOf(request, params);
       sent.push(received);
       return responseOf(typeof reply === "function" ? await reply(received) : reply);
     }),
   );
   return sent;
+}
+
+/** The `page_token` a JSON body carries, if any. */
+function bodyToken(body: unknown): string | undefined {
+  if (typeof body === "object" && body !== null && "page_token" in body) {
+    return typeof body.page_token === "string" ? body.page_token : undefined;
+  }
+  return undefined;
 }
 
 /**
@@ -162,9 +181,7 @@ export function answeringPages<K extends PagedOperation & OperationName>(
   const { paging } = routeOf(operation);
   return answering(server, operation, (sent) => {
     const token =
-      paging?.token === "body"
-        ? (sent.body as { page_token?: string } | undefined)?.page_token
-        : sent.url.searchParams.get("page_token");
+      paging?.token === "body" ? bodyToken(sent.body) : sent.url.searchParams.get("page_token");
     const index = token ? Number(token.replace("page-", "")) : 0;
     const page = pages[index] ?? {};
     return responseOf({

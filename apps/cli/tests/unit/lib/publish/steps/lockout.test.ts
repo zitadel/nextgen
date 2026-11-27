@@ -1,3 +1,4 @@
+import { QueryUsersBody as QueryUsersBodySchema } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import type {
   QueryUsers200UsersItemMetadataStatus,
   QueryUsersBody,
@@ -193,7 +194,7 @@ function aPlatform(server: SetupServer, platform: Platform = {}): Received {
   answeringPages(server, "listDeployments", { deployments: liveOn(platform) });
   return {
     queried: answering(server, "queryUsers", ({ body }) => {
-      return pageOf(platform, users, body as QueryUsersBody);
+      return pageOf(platform, users, QueryUsersBodySchema.parse(body));
     }),
     links: answering(server, "listUserIdentityLinks", ({ params }) => {
       return (

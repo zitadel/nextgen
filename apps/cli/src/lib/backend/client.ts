@@ -153,10 +153,14 @@ export function allowDestructive(client: ZitadelClient): ZitadelClient {
 /** The typed Zitadel client: every operation of the API. */
 export type ZitadelClient = ZitadelApi;
 
-/** What the CLI makes a client from: the run's signal is required, the rest optional. */
+/**
+ * What the CLI makes a client from: the run's signal is required, the rest
+ * optional. No `fetch`: `OperationService` sends its own requests from the
+ * connection, so every request must go through the runtime's `fetch`.
+ */
 export type ZitadelClientOptions = Omit<
   ZitadelClientSettings,
-  "allowDestructive" | "csrf" | "signal"
+  "allowDestructive" | "fetch" | "signal"
 > & {
   signal: AbortSignal;
 };
