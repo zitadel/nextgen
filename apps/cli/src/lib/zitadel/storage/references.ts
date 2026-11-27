@@ -11,7 +11,7 @@ const FILE_REFERENCE_KEY = "$file";
 /**
  * The keys and list indexes from a document's root down to one value.
  */
-export type JsonLocation = readonly (string | number)[];
+type JsonLocation = readonly (string | number)[];
 
 /**
  * A reference found in a document: the keys and indexes leading to it, and

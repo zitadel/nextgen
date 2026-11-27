@@ -143,8 +143,8 @@ beforeAll(() => {
   write("apps/api/internal/build/testdata/fixture.txt", "test fixture\n");
   for (const file of ["vitest.shared.mjs", "vitest.shared.d.mts"]) {
     write(
-      `packages/vitest-config/${file}`,
-      readFileSync(join(repo, "packages/vitest-config", file)),
+      `packages/vitest-config/src/${file}`,
+      readFileSync(join(repo, "packages/vitest-config/src", file)),
     );
   }
   run("git", ["init", "-q", "-b", "main"]);
@@ -248,6 +248,16 @@ describe.sequential("task graph cache and ordering contracts", () => {
     }
   });
 
+  test("a lint waits for api-mock's build only where its own Vitest config loads it", () => {
+    const lint = (pkg) => baseline.get(`${pkg}#lint`).dependencies;
+    for (const pkg of ["@zitadel/components", "@zitadel/sdk-qwik"]) {
+      expect(lint(pkg), pkg).toContain("@zitadel/api-mock#build");
+    }
+    for (const pkg of ["@zitadel/sdk-react", "@zitadel/cli"]) {
+      expect(lint(pkg), pkg).not.toContain("@zitadel/api-mock#build");
+    }
+  });
+
   // Turbo's release graph has no second build: pack, snapshot and publish
   // depend on every public package's own build and on each server platform
   // package's binary, and so wait for no test (tools/release/turbo.json).
@@ -277,7 +287,7 @@ describe.sequential("task graph cache and ordering contracts", () => {
   });
 
   test("shared Vitest changes invalidate its readers without invalidating builds", () => {
-    changed("packages/vitest-config/vitest.shared.mjs", "export const baseTest = {};\n", () => {
+    changed("packages/vitest-config/src/vitest.shared.mjs", "export const baseTest = {};\n", () => {
       const next = dry();
       for (const [id, task] of baseline) {
         if (task.task === "build" && task.command !== "<NONEXISTENT>")

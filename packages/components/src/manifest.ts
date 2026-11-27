@@ -14,11 +14,11 @@
  *
  * Renaming any value here is a breaking change to the override contract.
  */
-export type ConsumesField = {
+type ConsumesField = {
   readonly required?: boolean;
 };
 
-export type ConsumesAction = {
+type ConsumesAction = {
   readonly kind: string;
   readonly required?: boolean;
 };

@@ -14,7 +14,7 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll } from "vitest";
 import { z } from "zod";
 
-import type { JsonObject } from "@/lib/zitadel/types";
+import type { JsonObject } from "@/lib/zitadel";
 import { toJsonObject } from "@/lib/zitadel/utils/json";
 import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
@@ -51,7 +51,7 @@ export function requestsObserved(): readonly ObservedRequest[] {
 }
 
 /** What the platform was asked to publish, for a surface the mock does not keep. */
-export interface Captured<T> {
+interface Captured<T> {
   readonly all: T[];
   readonly count: number;
   readonly last: T | undefined;

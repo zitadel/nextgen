@@ -7,7 +7,7 @@ import { country } from "@/lib/telemetry/dimensions/country";
 import { hostAgent } from "@/lib/telemetry/dimensions/host-agent";
 import { invocationChannel } from "@/lib/telemetry/dimensions/invocation-channel";
 import { operatingSystem } from "@/lib/telemetry/dimensions/operating-system";
-import type { GlobalOptions } from "@/cli/core/types";
+import type { GlobalOptions } from "@/cli/core";
 
 /**
  * CLI-specific telemetry glue: the only place that turns a {@link GlobalOptions}

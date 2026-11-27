@@ -597,6 +597,6 @@ export async function claimFreePort(
   throw new NoFreePortError(first);
 }
 
-export function serverUrlFor(port: number): string {
+function serverUrlFor(port: number): string {
   return `http://localhost:${String(port)}`;
 }

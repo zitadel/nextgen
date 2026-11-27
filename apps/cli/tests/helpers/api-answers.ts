@@ -38,7 +38,7 @@ type Resolves<K extends OperationName> = Awaited<ReturnType<ZitadelApi[K]>>;
  * sends (before any default is filled in): `createTeam` takes the input of
  * `CreateTeamBody`. `undefined` for an operation without a body.
  */
-export type BodyOf<K extends OperationName> = `${Capitalize<K>}Body` extends keyof typeof schemas
+type BodyOf<K extends OperationName> = `${Capitalize<K>}Body` extends keyof typeof schemas
   ? z.input<(typeof schemas)[`${Capitalize<K>}Body`]>
   : undefined;
 

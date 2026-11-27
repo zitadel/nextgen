@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { parentPort } from "node:worker_threads";
 
 import { qwikVite } from "@qwik.dev/core/optimizer";
@@ -8,6 +9,7 @@ import { createServer } from "vite";
 // leaves a MessagePort open that would keep Vitest's own process from exiting;
 // the parent terminates the worker instead.
 const server = await createServer({
+  root: fileURLToPath(new URL("../..", import.meta.url)),
   configFile: false,
   logLevel: "silent",
   plugins: [qwikVite({ csr: true })],
@@ -17,7 +19,9 @@ const server = await createServer({
 let rendered;
 try {
   await server.pluginContainer.buildStart({});
-  rendered = await server.ssrLoadModule("/src/__tests__/server-login.tsx");
+  rendered = await server.ssrLoadModule(
+    fileURLToPath(new URL("./server-login.tsx", import.meta.url)),
+  );
 } finally {
   await server.close();
 }

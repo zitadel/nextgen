@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { Flow } from "@/lib/zitadel";
-import { stepName } from "@/lib/zitadel/names";
+import { stepName } from "@/lib/zitadel";
 import { Step } from "@/lib/zitadel/resources/flows/step";
-import type { JsonObject } from "@/lib/zitadel/types";
+import type { JsonObject } from "@/lib/zitadel";
 import { aFile } from "@tests/helpers/config";
 import { aFlowBody } from "@tests/helpers/flows";
 

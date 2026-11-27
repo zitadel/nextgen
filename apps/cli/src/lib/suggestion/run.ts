@@ -1,5 +1,5 @@
 import { errorMessage, ZitadelError } from "@/lib/errors";
-import { log } from "@/lib/ui/log";
+import { log } from "@/lib/ui";
 import { named } from "@/lib/names";
 
 import {

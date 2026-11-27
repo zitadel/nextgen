@@ -16,7 +16,7 @@ import { type ObservedRequest, requestsObserved } from "@tests/helpers/platform"
  * - `/releases/build`: builds the release a deploy would publish, to validate
  *   the bundle, and publishes none.
  */
-export const READS_BY_POST: readonly string[] = [
+const READS_BY_POST: readonly string[] = [
   "/users/query",
   "/idps/query",
   "/policies/evaluate",

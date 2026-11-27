@@ -146,7 +146,7 @@
     "check-advisories": "vitest run --config vitest.advisories.config.ts",
     "readme": "oclif readme",
     "prepack": "publint --strict",
-    "lint": "biome check ."
+    "lint": "biome check . && knip --directory ../.. --workspace @zitadel/cli --reporter symbols --reporter github-actions"
   },
   "dependencies": {
     "@clack/prompts": "catalog:",
@@ -194,7 +194,6 @@
     "@types/wrap-ansi": "^3.0.0",
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/api-mock": "workspace:*",
-    "@zitadel/sdk-next": "workspace:*",
     "@zitadel/vitest-config": "workspace:*",
     "memfs": "catalog:",
     "msw": "catalog:",

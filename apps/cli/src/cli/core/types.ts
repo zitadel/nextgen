@@ -22,7 +22,7 @@ export type EnvelopeMeta = {
  * Successful result envelope. `data` is the command-specific payload; optional
  * `warnings` surface non-fatal advisories without changing the success status.
  */
-export type OkEnvelope = EnvelopeMeta & {
+type OkEnvelope = EnvelopeMeta & {
   status: "ok";
   data: unknown;
   warnings: string[];

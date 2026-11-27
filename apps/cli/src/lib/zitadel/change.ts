@@ -7,12 +7,12 @@ import type { ConfigFile } from "@/lib/zitadel/types";
  * Every way a caller reports a notice: a warning for something to act on, info
  * for something to know.
  */
-export const NOTICE_SEVERITIES = ["warning", "info"] as const;
+const NOTICE_SEVERITIES = ["warning", "info"] as const;
 
 /**
  * How a caller reports a notice.
  */
-export type NoticeSeverity = (typeof NOTICE_SEVERITIES)[number];
+type NoticeSeverity = (typeof NOTICE_SEVERITIES)[number];
 
 /**
  * Something a caller should tell the person about a change: left alone,

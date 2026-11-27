@@ -15,7 +15,7 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
  * too. An id, a path, a version read from a registry and a server's own
  * message all arrive here, and none of them may drive the reader's terminal.
  */
-export class Style {
+class Style {
   /** The color of each outcome, for a mark in another shape, like doctor's `[✓]`. */
   readonly statusColor = { pass: pc.green, warn: pc.yellow, fail: pc.red } as const;
 

@@ -4,7 +4,7 @@ import { afterEach, describe, expect } from "vitest";
 import { log } from "@/lib/ui";
 import { PromptCancelled, ZitadelError } from "@/lib/errors";
 import { DrawnSpinner } from "@/lib/ui/spinner";
-import { Ui } from "@/lib/ui/ui";
+import { Ui } from "@/lib/ui";
 import { it } from "@tests/unit/lib/ui/at-terminal";
 import { answering, type Terminal } from "@tests/helpers/keyboard";
 

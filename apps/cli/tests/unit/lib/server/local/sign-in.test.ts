@@ -4,7 +4,7 @@ import { afterEach, describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
 
-import type { LocalAdmin } from "@/lib/server/local/admin-credential";
+import type { LocalAdmin } from "@/lib/server";
 import { EXIT_CODES, toZitadelError, type ZitadelError } from "@/lib/errors";
 import { adminSessionCookie, consoleSignInUrl } from "@/lib/server/local/sign-in";
 

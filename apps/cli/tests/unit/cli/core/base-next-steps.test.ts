@@ -1,11 +1,11 @@
 import type { Config } from "@oclif/core";
 import { describe, expect, it, vi } from "vitest";
 
-import { BaseCommand } from "@/cli/core/base";
+import { BaseCommand } from "@/cli/core";
 import { asStepsShown } from "@/cli/core/next-steps";
 import { asTerminal, offTerminal } from "@tests/fixtures/terminal";
 import { json, prose, rows } from "@/lib/oclif/rendering";
-import type { CommandResult, JsonEnvelope } from "@/cli/core/types";
+import type { CommandResult, JsonEnvelope } from "@/cli/core";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { aSuggest } from "@tests/helpers/suggestions";
 import { warnings } from "@/lib/ui";

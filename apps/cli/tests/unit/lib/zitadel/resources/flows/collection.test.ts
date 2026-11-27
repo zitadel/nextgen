@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { BrokenFlowsError, type ConfigOptions, NotFoundError, UserSchema } from "@/lib/zitadel";
-import type { JsonObject } from "@/lib/zitadel/types";
+import type { JsonObject } from "@/lib/zitadel";
 import {
   aConfig,
   aFile,

@@ -2,7 +2,7 @@ import type { RequestListener } from "node:http";
 
 import { describe, expect } from "vitest";
 
-import { UnavailableError } from "@/lib/backend/errors";
+import { UnavailableError } from "@/lib/backend";
 import { request } from "@/lib/backend/transport";
 import { ZitadelError } from "@/lib/errors";
 import { it } from "@tests/fixtures";

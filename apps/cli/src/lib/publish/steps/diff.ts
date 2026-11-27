@@ -40,7 +40,7 @@ const SHORT_SHA = 12;
  * The diff as `--json` reports it, in `data.diff`: what the terminal shows,
  * split by file.
  */
-export type ConfigDiff = {
+type ConfigDiff = {
   /**
    * The commit of the release the primary origins serve: what the diff is against.
    */

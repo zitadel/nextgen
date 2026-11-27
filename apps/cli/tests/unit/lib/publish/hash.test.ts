@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { abbreviate } from "@/lib/publish/hash";
+import { abbreviate } from "@/lib/publish";
 
 describe("abbreviate", () => {
   // `Deployed sha256:<64 hex>` is wider than a closing line may be.

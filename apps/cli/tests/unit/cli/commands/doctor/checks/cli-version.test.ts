@@ -1,7 +1,7 @@
 import { HttpResponse, http } from "msw";
 import { describe, expect } from "vitest";
 
-import { checkCliVersion } from "@/cli/commands/doctor/checks/cli-version";
+import { checkCliVersion } from "@/cli/commands/doctor/checks";
 import { it } from "@tests/fixtures";
 import { aSuggest } from "@tests/helpers/suggestions";
 

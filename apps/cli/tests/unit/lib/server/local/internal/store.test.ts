@@ -1,7 +1,7 @@
 import { describe, expect } from "vitest";
 
-import { RuntimeFileStore } from "@/lib/server/local/internal/store";
-import { writeRuntimeMetadata } from "@/lib/server/local/runtime";
+import { RuntimeFileStore } from "@/lib/server/local";
+import { writeRuntimeMetadata } from "@/lib/server/local";
 import { it } from "@tests/fixtures";
 import { aBinaryRecord, aDockerRecord } from "@tests/helpers/runtime-record";
 

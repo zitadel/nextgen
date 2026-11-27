@@ -5,10 +5,4 @@
 export { Flows } from "@/lib/zitadel/resources/flows/collection";
 export { Flow } from "@/lib/zitadel/resources/flows/flow";
 export type { Step } from "@/lib/zitadel/resources/flows/step";
-export {
-  PASSWORD_FIELD,
-  type IncomingTransition,
-  type MethodUse,
-  type Offer,
-  type Transition,
-} from "@/lib/zitadel/resources/flows/types";
+export type { IncomingTransition, MethodUse } from "@/lib/zitadel/resources/flows/types";

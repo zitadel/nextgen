@@ -15,7 +15,7 @@ import type {
  * already there, so a scaffold never overwrites a developer's file by
  * accident; `replace` writes over it.
  */
-export const WRITE_MODES = ["create", "replace"] as const;
+const WRITE_MODES = ["create", "replace"] as const;
 
 /**
  * How a file is written.
@@ -26,7 +26,7 @@ export type WriteMode = (typeof WRITE_MODES)[number];
  * Every way to treat a `$file` reference whose file is not there: `throw`
  * refuses it, `omit` leaves its value out.
  */
-export const MISSING_REFERENCES = ["throw", "omit"] as const;
+const MISSING_REFERENCES = ["throw", "omit"] as const;
 
 /**
  * What to do with a `$file` reference whose file is not there.

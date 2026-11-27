@@ -1,8 +1,8 @@
 import { Config } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
-import { BaseCommand } from "@/cli/core/base";
-import type { CommandResult } from "@/cli/core/types";
+import { BaseCommand } from "@/cli/core";
+import type { CommandResult } from "@/cli/core";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 
 const config = await Config.load(cliPackageRoot);

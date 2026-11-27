@@ -16,10 +16,10 @@ import type {
 } from "@/lib/zitadel/resources/connections/types";
 import { ConflictError, NotFoundError } from "@/lib/zitadel/errors";
 import { assertFlowsIntact } from "@/lib/zitadel/rules/flows";
-import type { Flow } from "@/lib/zitadel/resources/flows/flow";
+import type { Flow } from "@/lib/zitadel/resources/flows";
 import type { SkippedRegion } from "@/lib/zitadel/resources/document";
-import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
-import type { ForceOptions } from "@/lib/zitadel/resources/schemas/types";
+import type { UserSchema } from "@/lib/zitadel/resources/schemas";
+import type { ForceOptions } from "@/lib/zitadel/resources/schemas";
 import { CONFIG_DIRECTORIES } from "@/lib/zitadel/types";
 
 /**

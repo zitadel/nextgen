@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { FrameworkFacts } from "@/lib/orca/detectors/types";
+import type { FrameworkFacts } from "@/lib/orca";
 import { AngularPatcher } from "@/lib/orca/patchers/rule/angular";
 import { NextPatcher } from "@/lib/orca/patchers/rule/next";
 import { NuxtPatcher } from "@/lib/orca/patchers/rule/nuxt";

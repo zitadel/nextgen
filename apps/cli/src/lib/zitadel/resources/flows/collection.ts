@@ -4,7 +4,7 @@ import { NotFoundError } from "@/lib/zitadel/errors";
 import { PinnedCollection } from "@/lib/zitadel/resources/collection";
 import type { Flow } from "@/lib/zitadel/resources/flows/flow";
 import type { Offer, PinnedOffer } from "@/lib/zitadel/resources/flows/types";
-import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
+import type { UserSchema } from "@/lib/zitadel/resources/schemas";
 import { assertFlowsIntact } from "@/lib/zitadel/rules/flows";
 import { CONFIG_DIRECTORIES } from "@/lib/zitadel/types";
 
