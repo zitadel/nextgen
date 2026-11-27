@@ -53,8 +53,8 @@ func newClient(clientID string, doc domain.ApplicationClientDocument) *client {
 	return c
 }
 
-func (c *client) GetID() string            { return c.id }
-func (c *client) RedirectURIs() []string   { return c.redirectURIs }
+func (c *client) GetID() string                    { return c.id }
+func (c *client) RedirectURIs() []string           { return c.redirectURIs }
 func (c *client) PostLogoutRedirectURIs() []string { return nil }
 
 // ApplicationType picks the library's redirect policy. Confidential clients

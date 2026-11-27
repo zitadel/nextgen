@@ -22,9 +22,10 @@ export function grantTypeLabel(grantType: GrantType): string {
   return GRANT_TYPE_LABELS[grantType];
 }
 
-/** A client type as the screen names it; today the API has only `confidential`. */
+/** A client type as the screen names it. */
 const CLIENT_TYPE_LABELS: Record<ApplicationClient["type"], string> = {
   confidential: "Confidential",
+  public: "Public",
 };
 
 export function clientTypeLabel(type: ApplicationClient["type"]): string {

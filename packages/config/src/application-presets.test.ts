@@ -77,7 +77,10 @@ describe("spa application preset", () => {
 });
 
 describe("native application preset", () => {
-  const redirectUris: [string, ...string[]] = ["com.acme.tunes:/callback", "http://127.0.0.1/callback"];
+  const redirectUris: [string, ...string[]] = [
+    "com.acme.tunes:/callback",
+    "http://127.0.0.1/callback",
+  ];
   const app = nativeApplication({ slug: "tunes", name: "Acme Tunes", redirectUris });
 
   it("builds a document the application schema accepts", () => {
