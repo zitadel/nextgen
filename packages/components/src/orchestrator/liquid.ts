@@ -15,6 +15,7 @@
  */
 import type { Liquid } from "liquidjs";
 
+import { MANDATORY_GATES_TAG } from "@zitadel/config/template-tags";
 import type { CreateFlow201Step, CreateFlow201StepFieldsItem } from "@zitadel/api/generated/model";
 import type { FlowError } from "./template-context.js";
 import type { Locale } from "./locales/en.js";
@@ -69,11 +70,7 @@ const fieldErrorKeys: Record<string, string> = {
  * @returns The configured engine.
  */
 export async function createLiquidEngine(options: CreateLiquidOptions): Promise<Liquid> {
-  const [{ Liquid }, { MANDATORY_GATES_TAG }, locale] = await Promise.all([
-    import("liquidjs"),
-    import("@zitadel/config/template"),
-    options.locale,
-  ]);
+  const [{ Liquid }, locale] = await Promise.all([import("liquidjs"), options.locale]);
 
   const templates: Record<string, string> = {
     [TEMPLATE_NAMES.default]: defaultTemplate,

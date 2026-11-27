@@ -30,6 +30,11 @@ describe("standalone artifact", () => {
     expect(source).not.toMatch(/\(this\.seed\)\)\};/);
   });
 
+  it("leaves out the template validator, which only authoring runs", () => {
+    const source = readFileSync(STANDALONE_PATH, "utf8");
+    expect(source).not.toContain("MaxBrandingTemplateBytes");
+  });
+
   it("the checker catches the known-bad shapes", () => {
     expect(
       findArtifactViolations(`import { MANDATORY_GATES_TAG } from "@zitadel/config/template";\n`),
