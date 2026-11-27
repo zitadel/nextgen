@@ -44,7 +44,7 @@ let mock: MockHandle = setupMockHandlers();
  * The client the flows are driven with. Any absolute URL works: the
  * orval-generated handlers match any origin before their `/flows` paths.
  */
-const client = new ZitadelClient({ baseUrl: "http://localhost", allowDestructive: false });
+const client = new ZitadelClient({ baseUrl: "http://localhost" });
 
 beforeAll(() => {
   server.listen({ onUnhandledRequest: "error" });

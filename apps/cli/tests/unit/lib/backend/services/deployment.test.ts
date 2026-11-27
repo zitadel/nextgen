@@ -8,7 +8,7 @@ import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { ForbiddenError } from "@/lib/backend/errors";
 import { Deployment, DeploymentService } from "@/lib/backend/services/deployment";
-import { createZitadelClient, type ZitadelClient, allowDestructive } from "@/lib/backend";
+import { createZitadelClient, type ZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { answering, answeringPages, refusal } from "@tests/helpers/api-answers";
 import { PRIMARY_ORIGIN } from "@tests/helpers/records";
@@ -60,7 +60,7 @@ function serviceListing(
   deployments: readonly ListDeployments200DeploymentsItem[],
 ): DeploymentService {
   answeringPages(server, "listDeployments", { deployments });
-  return new DeploymentService(allowDestructive(client), "proj_1");
+  return new DeploymentService(client, "proj_1");
 }
 
 /** The query a request was sent with, as plain fields. */
@@ -216,10 +216,7 @@ describe("DeploymentService.servingLivePreviews", () => {
       { deployments: [preview("dep_1", FIRST)] },
     );
 
-    const serving = await new DeploymentService(
-      allowDestructive(client),
-      "proj_1",
-    ).servingLivePreviews(page, false);
+    const serving = await new DeploymentService(client, "proj_1").servingLivePreviews(page, false);
 
     expect([...serving.keys()]).toEqual(["dep_1"]);
   });
@@ -236,10 +233,7 @@ describe("DeploymentService.servingLivePreviews", () => {
       { deployments: [preview("dep_2", SECOND)] },
     );
 
-    await new DeploymentService(allowDestructive(client), "proj_1").servingLivePreviews(
-      page,
-      false,
-    );
+    await new DeploymentService(client, "proj_1").servingLivePreviews(page, false);
 
     expect(reads).toHaveLength(1);
   });
@@ -248,10 +242,7 @@ describe("DeploymentService.servingLivePreviews", () => {
     const page = [Deployment.of(preview("dep_1", FIRST))];
     const reads = answeringPages(server, "listDeployments", { deployments: [] });
 
-    await new DeploymentService(allowDestructive(client), "proj_1").servingLivePreviews(
-      page,
-      false,
-    );
+    await new DeploymentService(client, "proj_1").servingLivePreviews(page, false);
 
     expect(reads.map(queryOf)).toEqual([{ project_id: "proj_1", live: "true", limit: "100" }]);
   });
@@ -259,10 +250,7 @@ describe("DeploymentService.servingLivePreviews", () => {
   it("reads nothing for a page with no live preview deployment", async ({ client }) => {
     const page = [Deployment.of(primary("dep_1"))];
 
-    const serving = await new DeploymentService(
-      allowDestructive(client),
-      "proj_1",
-    ).servingLivePreviews(page, false);
+    const serving = await new DeploymentService(client, "proj_1").servingLivePreviews(page, false);
 
     expect([...serving.keys()]).toEqual([]);
   });
@@ -270,10 +258,7 @@ describe("DeploymentService.servingLivePreviews", () => {
   it("reads nothing when the page is the live view", async ({ client }) => {
     const page = [Deployment.of(preview("dep_1", FIRST))];
 
-    const serving = await new DeploymentService(
-      allowDestructive(client),
-      "proj_1",
-    ).servingLivePreviews(page, true);
+    const serving = await new DeploymentService(client, "proj_1").servingLivePreviews(page, true);
 
     expect(serving.get("dep_1")?.origins).toEqual([FIRST]);
   });
@@ -301,7 +286,7 @@ describe("DeploymentService.list", () => {
   it("lists the project it is bound to, narrowed by the query", async ({ server, client }) => {
     const reads = answeringPages(server, "listDeployments", { deployments: [] });
 
-    await new DeploymentService(allowDestructive(client), "proj_1").list({ live: true });
+    await new DeploymentService(client, "proj_1").list({ live: true });
 
     expect(reads.map(queryOf)).toEqual([{ project_id: "proj_1", live: "true" }]);
   });
@@ -316,7 +301,7 @@ describe("DeploymentService.page", () => {
       { deployments: [primary("dep_1")] },
     );
 
-    const page = await new DeploymentService(allowDestructive(client), "proj_1").page();
+    const page = await new DeploymentService(client, "proj_1").page();
 
     expect(page.items.map((deployment) => deployment.id)).toEqual(["dep_2"]);
     expect(page.next).toBe("page-1");
@@ -330,10 +315,7 @@ describe("DeploymentService.page", () => {
       { deployments: [primary("dep_1")] },
     );
 
-    const page = await new DeploymentService(allowDestructive(client), "proj_1").page(
-      {},
-      { all: true },
-    );
+    const page = await new DeploymentService(client, "proj_1").page({}, { all: true });
 
     expect(page.items.map((deployment) => deployment.id)).toEqual(["dep_2", "dep_1"]);
     expect(page.next).toBeNull();
@@ -345,10 +327,7 @@ describe("DeploymentService.page", () => {
   }) => {
     const reads = answeringPages(server, "listDeployments", { deployments: [] });
 
-    await new DeploymentService(allowDestructive(client), "proj_1").page(
-      { limit: 5 },
-      { all: true },
-    );
+    await new DeploymentService(client, "proj_1").page({ limit: 5 }, { all: true });
 
     expect(reads.map(queryOf)).toEqual([{ project_id: "proj_1", limit: "5" }]);
   });
@@ -358,9 +337,7 @@ describe("DeploymentService.get", () => {
   it("answers the deployment the project holds", async ({ server, client }) => {
     answering(server, "getDeployment", primary("dep_1"));
 
-    await expect(
-      new DeploymentService(allowDestructive(client), "proj_1").get("dep_1"),
-    ).resolves.toMatchObject({
+    await expect(new DeploymentService(client, "proj_1").get("dep_1")).resolves.toMatchObject({
       id: "dep_1",
     });
   });
@@ -368,7 +345,7 @@ describe("DeploymentService.get", () => {
   it("reads it for the project it is bound to", async ({ server, client }) => {
     const reads = answering(server, "getDeployment", primary("dep_1"));
 
-    await new DeploymentService(allowDestructive(client), "proj_1").get("dep_1");
+    await new DeploymentService(client, "proj_1").get("dep_1");
 
     expect(reads.map((sent) => [sent.params.deployment_id, queryOf(sent)])).toEqual([
       ["dep_1", { project_id: "proj_1" }],
@@ -379,7 +356,7 @@ describe("DeploymentService.get", () => {
     answering(server, "getDeployment", primary("dep_1"));
     const variableReads = answering(server, "listDeploymentVariables", {});
 
-    await new DeploymentService(allowDestructive(client), "proj_1").get("dep_1");
+    await new DeploymentService(client, "proj_1").get("dep_1");
 
     expect(variableReads).toEqual([]);
   });
@@ -389,9 +366,7 @@ describe("DeploymentService.variables", () => {
   it("answers a secret as held, without its value", async ({ server, client }) => {
     answering(server, "listDeploymentVariables", { TOKEN: { secret: true } });
 
-    const [variable] = await new DeploymentService(allowDestructive(client), "proj_1").variables(
-      "dep_1",
-    );
+    const [variable] = await new DeploymentService(client, "proj_1").variables("dep_1");
 
     expect(variable?.secret).toBe(true);
     expect(variable?.value).toBeUndefined();
@@ -416,9 +391,7 @@ describe("DeploymentService.primary", () => {
   }) => {
     const reads = answeringPages(server, "listDeployments", { deployments: [] });
 
-    await new DeploymentService(allowDestructive(client), "proj_1").primary({
-      origin: "https://app.test",
-    });
+    await new DeploymentService(client, "proj_1").primary({ origin: "https://app.test" });
 
     expect(reads.map(queryOf)).toEqual([
       {
@@ -545,7 +518,7 @@ describe("DeploymentService.create", () => {
     const writes = answering(server, "createDeployment", primary("dep_1"));
     const input = { release_id: "rel_1", targets: ["primary" as const] };
 
-    await new DeploymentService(allowDestructive(client), "proj_1").create(input);
+    await new DeploymentService(client, "proj_1").create(input);
 
     expect(writes.map((sent) => [sent.body, queryOf(sent)])).toEqual([
       [input, { project_id: "proj_1" }],
@@ -557,9 +530,7 @@ describe("DeploymentService.rollback", () => {
   it("sends the options as given, with the project as the scope", async ({ server, client }) => {
     const writes = answering(server, "rollbackDeployment", primary("dep_2"));
 
-    await new DeploymentService(allowDestructive(client), "proj_1").rollback("dep_1", {
-      message: "undo",
-    });
+    await new DeploymentService(client, "proj_1").rollback("dep_1", { message: "undo" });
 
     expect(writes.map((sent) => [sent.params.deployment_id, queryOf(sent), sent.body])).toEqual([
       ["dep_1", { project_id: "proj_1" }, { message: "undo" }],
@@ -569,7 +540,7 @@ describe("DeploymentService.rollback", () => {
   it("sends an empty body when it carries nothing", async ({ server, client }) => {
     const writes = answering(server, "rollbackDeployment", primary("dep_2"));
 
-    await new DeploymentService(allowDestructive(client), "proj_1").rollback("dep_1");
+    await new DeploymentService(client, "proj_1").rollback("dep_1");
 
     expect(writes.map((sent) => [sent.params.deployment_id, queryOf(sent), sent.body])).toEqual([
       ["dep_1", { project_id: "proj_1" }, {}],
@@ -585,7 +556,7 @@ describe("DeploymentService.deployToPrimary", () => {
     answeringPages(server, "listDeployments", { deployments: [primary("dep_1")] });
     const writes = answering(server, "createDeployment", primary("dep_2"));
 
-    await new DeploymentService(allowDestructive(client), "proj_1").deployToPrimary({
+    await new DeploymentService(client, "proj_1").deployToPrimary({
       releaseId: "rel_2",
       message: "ship",
     });
@@ -610,7 +581,7 @@ describe("DeploymentService.deployToPrimary", () => {
     answeringPages(server, "listDeployments", { deployments: [] });
     const writes = answering(server, "createDeployment", primary("dep_1"));
 
-    await new DeploymentService(allowDestructive(client), "proj_1").deployToPrimary({
+    await new DeploymentService(client, "proj_1").deployToPrimary({
       releaseId: "rel_1",
     });
 
@@ -626,7 +597,7 @@ describe("DeploymentService.deployToPrimary", () => {
     answeringPages(server, "listDeployments", { deployments: [preview("dep_1")] });
     const writes = answering(server, "createDeployment", primary("dep_2"));
 
-    await new DeploymentService(allowDestructive(client), "proj_1").deployToPrimary({
+    await new DeploymentService(client, "proj_1").deployToPrimary({
       releaseId: "rel_2",
     });
 
@@ -640,9 +611,7 @@ describe("DeploymentService.deployToPrimary", () => {
     answering(server, "createDeployment", primary("dep_1"));
 
     await expect(
-      new DeploymentService(allowDestructive(client), "proj_1").deployToPrimary({
-        releaseId: "rel_1",
-      }),
+      new DeploymentService(client, "proj_1").deployToPrimary({ releaseId: "rel_1" }),
     ).resolves.toMatchObject({
       outcome: "deployed",
       deployment: { id: "dep_1" },
@@ -657,9 +626,7 @@ describe("DeploymentService.deployToPrimary", () => {
     answering(server, "createDeployment", refusal(409, "rel.revoked"));
 
     await expect(
-      new DeploymentService(allowDestructive(client), "proj_1").deployToPrimary({
-        releaseId: "rel_1",
-      }),
+      new DeploymentService(client, "proj_1").deployToPrimary({ releaseId: "rel_1" }),
     ).resolves.toEqual({
       outcome: "revoked",
     });
@@ -670,9 +637,7 @@ describe("DeploymentService.deployToPrimary", () => {
     answering(server, "createDeployment", refusal(409, "dep.conflict"));
 
     await expect(
-      new DeploymentService(allowDestructive(client), "proj_1").deployToPrimary({
-        releaseId: "rel_1",
-      }),
+      new DeploymentService(client, "proj_1").deployToPrimary({ releaseId: "rel_1" }),
     ).resolves.toMatchObject({
       outcome: "raced",
       current: { id: "dep_9" },
@@ -687,9 +652,7 @@ describe("DeploymentService.deployToPrimary", () => {
     answering(server, "createDeployment", refusal(409, "dep.conflict"));
 
     await expect(
-      new DeploymentService(allowDestructive(client), "proj_1").deployToPrimary({
-        releaseId: "rel_1",
-      }),
+      new DeploymentService(client, "proj_1").deployToPrimary({ releaseId: "rel_1" }),
     ).resolves.toEqual({
       outcome: "raced",
       current: undefined,
@@ -710,9 +673,7 @@ describe("DeploymentService.deployToPrimary", () => {
     answering(server, "createDeployment", refusal(409, "dep.conflict"));
 
     await expect(
-      new DeploymentService(allowDestructive(client), "proj_1").deployToPrimary({
-        releaseId: "rel_1",
-      }),
+      new DeploymentService(client, "proj_1").deployToPrimary({ releaseId: "rel_1" }),
     ).resolves.toEqual({
       outcome: "raced",
       current: undefined,
@@ -725,9 +686,7 @@ describe("DeploymentService.deployToPrimary", () => {
 
     expect(
       await rejectionOf(() =>
-        new DeploymentService(allowDestructive(client), "proj_1").deployToPrimary({
-          releaseId: "rel_1",
-        }),
+        new DeploymentService(client, "proj_1").deployToPrimary({ releaseId: "rel_1" }),
       ),
     ).toBeInstanceOf(ForbiddenError);
   });
@@ -743,10 +702,7 @@ describe("DeploymentService.extendPrimary", () => {
     });
     const writes = answering(server, "createDeployment", primary("dep_2", "http://localhost:3101"));
 
-    await new DeploymentService(allowDestructive(client), "proj_1").extendPrimary(
-      "http://localhost:3101",
-      "moved",
-    );
+    await new DeploymentService(client, "proj_1").extendPrimary("http://localhost:3101", "moved");
 
     expect(writes.map((sent) => [sent.body, queryOf(sent)])).toEqual([
       [
@@ -768,10 +724,7 @@ describe("DeploymentService.extendPrimary", () => {
     answering(server, "createDeployment", primary("dep_2", "http://localhost:3101"));
 
     await expect(
-      new DeploymentService(allowDestructive(client), "proj_1").extendPrimary(
-        "http://localhost:3101",
-        "moved",
-      ),
+      new DeploymentService(client, "proj_1").extendPrimary("http://localhost:3101", "moved"),
     ).resolves.toMatchObject({
       outcome: "deployed",
       deployment: { id: "dep_2" },
@@ -787,7 +740,7 @@ describe("DeploymentService.extendPrimary", () => {
     });
     const writes = answering(server, "createDeployment", primary("dep_2"));
 
-    const extended = await new DeploymentService(allowDestructive(client), "proj_1").extendPrimary(
+    const extended = await new DeploymentService(client, "proj_1").extendPrimary(
       "http://localhost:3101",
       "moved",
     );
@@ -800,7 +753,7 @@ describe("DeploymentService.extendPrimary", () => {
     answeringPages(server, "listDeployments", { deployments: [preview("dep_1")] });
     const writes = answering(server, "createDeployment", primary("dep_1"));
 
-    const extended = await new DeploymentService(allowDestructive(client), "proj_1").extendPrimary(
+    const extended = await new DeploymentService(client, "proj_1").extendPrimary(
       "http://localhost:3101",
       "moved",
     );
@@ -812,9 +765,7 @@ describe("DeploymentService.extendPrimary", () => {
 
 describe("DeploymentService.planRollback", () => {
   it("takes a named deployment as given, with no guard, and reads nothing", async ({ client }) => {
-    await expect(
-      new DeploymentService(allowDestructive(client), "proj_1").planRollback("dep_1"),
-    ).resolves.toEqual({
+    await expect(new DeploymentService(client, "proj_1").planRollback("dep_1")).resolves.toEqual({
       outcome: "target",
       target: { id: "dep_1", expectedDeploymentId: undefined },
     });

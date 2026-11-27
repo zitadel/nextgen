@@ -1,4 +1,3 @@
-import { destructiveOperations } from "../generated/operations";
 import { API_PREFIX, apiBaseUrl } from "./base-url";
 import type { ZitadelClient } from "./client";
 
@@ -83,39 +82,16 @@ export type RequestPolicy = Readonly<{
 }>;
 
 /**
- * Thrown, before anything is sent, when a client that does not allow
- * destructive operations ({@link ZitadelClient.allowDestructive}) runs one:
- * every `DELETE`, and any operation the spec marks `x-zitadel-destructive`.
- */
-export class DestructiveOperationError extends Error {
-  /** The generated function that was called, such as `deleteUser`. */
-  readonly operation: string;
-
-  /**
-   * @param operation - The generated function that was called.
-   */
-  constructor(operation: string) {
-    super(`${operation} is destructive, and this client does not allow destructive operations`);
-    this.name = "DestructiveOperationError";
-    this.operation = operation;
-  }
-}
-
-/** The generated functions that run a destructive operation. */
-const DESTRUCTIVE: ReadonlySet<string> = new Set(destructiveOperations);
-
-/**
  * The orval `mutator` for the fetch client: every generated operation sends
  * its request through the function this returns, with the client it was
  * called with and its own name. Everything about the request comes from that
  * client and nowhere else, so two clients never share a setting:
  *
- * - the destructive guard — a destructive operation is refused with a
- *   {@link DestructiveOperationError} unless the client allows it, before
- *   anything is sent;
  * - the URL — the client's base URL, then the API prefix (ADR 077), then the
  *   operation's path;
  * - bearer auth and the `User-Agent`, from the client;
+ * - the client's `onRequest`, before anything is sent: what it throws stops
+ *   the request;
  * - the client's signal and deadline, combined with any signal on the call;
  * - the client's `fetch`, which sends the request;
  * - non-2xx → throw {@link ApiError}, so failures interrupt control flow; a
@@ -129,14 +105,12 @@ const DESTRUCTIVE: ReadonlySet<string> = new Set(destructiveOperations);
  *   caller cancelled (see {@link request}).
  *
  * @param client - The client the operation was called with.
- * @param operation - The generated function's name, such as `getProject`.
+ * @param operation - The generated function's name, such as `getProject`, for
+ *   the client's `onRequest`.
  * @returns The fetch the generated function calls with its path and request.
  */
 export function customFetch(client: ZitadelClient, operation: string) {
   return async <T>(path: string, options: RequestInit): Promise<T> => {
-    if (DESTRUCTIVE.has(operation) && !client.allowDestructive) {
-      throw new DestructiveOperationError(operation);
-    }
     const url = `${apiBaseUrl(client.baseUrl)}${path}`;
     const policy = { signal: client.signal, timeoutMs: client.timeoutMs, fetch: client.fetch };
     const headers = new Headers(options.headers);
@@ -147,7 +121,9 @@ export function customFetch(client: ZitadelClient, operation: string) {
       headers.set("authorization", `Bearer ${client.token}`);
     }
 
-    const { res, rawBody: parsed } = await request(url, { ...options, headers }, policy, readBody);
+    const init = { ...options, headers };
+    await client.onRequest?.({ operation, url, init });
+    const { res, rawBody: parsed } = await request(url, init, policy, readBody);
 
     if (!res.ok) {
       const message =

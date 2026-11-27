@@ -12,20 +12,14 @@ import {
   type ZitadelApiHooks,
   type ZitadelClientSettings,
 } from "./api-factory";
-import { DestructiveOperationError } from "./fetch";
 
 type Paging = typeof paging;
 
 /**
- * A convenience client over a client made from `settings`, which may not run
- * destructive operations, with `hooks`.
+ * A convenience client over a client made from `settings`, with `hooks`.
  */
-function apiFor({
-  onResponse,
-  onError,
-  ...settings
-}: Omit<ZitadelClientSettings, "allowDestructive"> & ZitadelApiHooks) {
-  return createZitadelApi(new ZitadelClient({ ...settings, allowDestructive: false }), {
+function apiFor({ onResponse, onError, ...settings }: ZitadelClientSettings & ZitadelApiHooks) {
+  return createZitadelApi(new ZitadelClient(settings), {
     onResponse,
     onError,
   });
@@ -339,18 +333,9 @@ describe("createZitadelClient", () => {
   });
 
   it("runs every operation against the client it was made with", () => {
-    const client = new ZitadelClient({ baseUrl: "http://127.0.0.1:1", allowDestructive: false });
+    const client = new ZitadelClient({ baseUrl: "http://127.0.0.1:1" });
 
     expect(createZitadelApi(client).client).toBe(client);
-  });
-
-  it("refuses a destructive operation its client does not allow", async () => {
-    const { base, requests } = await deployments();
-
-    const deleted = apiFor({ baseUrl: base }).deleteUser("usr_1");
-
-    await expect(deleted).rejects.toBeInstanceOf(DestructiveOperationError);
-    expect(requests).toEqual([]);
   });
 
   it("cannot be changed", () => {

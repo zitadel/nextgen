@@ -5,8 +5,6 @@ import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
 
-import { allowDestructive } from "@/lib/backend";
-
 import type { ZitadelClient } from "@/lib/backend";
 import { ConflictError } from "@/lib/backend/errors";
 import { ReleaseService } from "@/lib/backend/services/release";
@@ -23,7 +21,7 @@ describe("ReleaseService.get", () => {
   it("reads the release of the project it is bound to", async ({ server, client }) => {
     const read = answering(server, "getRelease", { id: "rel_1" });
 
-    await new ReleaseService(allowDestructive(client), "proj_1").get("rel_1");
+    await new ReleaseService(client, "proj_1").get("rel_1");
 
     expect(
       read.map(({ params, url }) => [params.release_id, url.searchParams.get("project_id")]),
@@ -35,7 +33,7 @@ describe("ReleaseService.create", () => {
   it("sends the input as given, with nothing filled in", async ({ server, client }) => {
     const built = answering(server, "buildRelease", { id: "rel_1" });
 
-    await new ReleaseService(allowDestructive(client), "proj_1").create(INPUT);
+    await new ReleaseService(client, "proj_1").create(INPUT);
 
     expect(built.map(({ url, body }) => [url.searchParams.get("project_id"), body])).toEqual([
       ["proj_1", INPUT],
@@ -45,9 +43,7 @@ describe("ReleaseService.create", () => {
   it("answers the release the server built", async ({ server, client }) => {
     answering(server, "buildRelease", { id: "rel_1", content_hash: "sha256:abc" });
 
-    await expect(
-      new ReleaseService(allowDestructive(client), "proj_1").create(INPUT),
-    ).resolves.toMatchObject({
+    await expect(new ReleaseService(client, "proj_1").create(INPUT)).resolves.toMatchObject({
       id: "rel_1",
     });
   });
@@ -62,9 +58,7 @@ describe("ReleaseService.create", () => {
       revoked_at: "2026-01-01T00:00:00Z",
     });
 
-    const error = await rejectionOf(() =>
-      new ReleaseService(allowDestructive(client), "proj_1").create(INPUT),
-    );
+    const error = await rejectionOf(() => new ReleaseService(client, "proj_1").create(INPUT));
 
     expect(error).toBeInstanceOf(ConflictError);
     expect(error).toMatchObject({
@@ -78,7 +72,7 @@ describe("ReleaseService.revoke", () => {
   it("revokes the release of the project it is bound to", async ({ server, client }) => {
     const revoked = answering(server, "revokeRelease", { id: "rel_1" });
 
-    await new ReleaseService(allowDestructive(client), "proj_1").revoke("rel_1");
+    await new ReleaseService(client, "proj_1").revoke("rel_1");
 
     expect(
       revoked.map(({ params, url }) => [params.release_id, url.searchParams.get("project_id")]),
@@ -88,9 +82,7 @@ describe("ReleaseService.revoke", () => {
   it("answers revoked with the release the server revoked", async ({ server, client }) => {
     answering(server, "revokeRelease", { id: "rel_1" });
 
-    await expect(
-      new ReleaseService(allowDestructive(client), "proj_1").revoke("rel_1"),
-    ).resolves.toEqual({
+    await expect(new ReleaseService(client, "proj_1").revoke("rel_1")).resolves.toEqual({
       outcome: "revoked",
       release: { id: "rel_1" },
     });
@@ -136,7 +128,7 @@ describe("ReleaseService.revoke", () => {
     ): ReleaseService {
       answering(server, "revokeRelease", HttpResponse.json(body, { status: 409 }));
 
-      return new ReleaseService(allowDestructive(client), "proj_1");
+      return new ReleaseService(client, "proj_1");
     }
 
     it("answers in-use with every origin that serves it, in the order the server named them", async ({

@@ -101,8 +101,8 @@ export abstract class DeleteOperation<Ctx> extends Destructive(Previewable(Resou
       prepare: () => {
         return this.context<Ctx>();
       },
-      apply: async (consent, context) => {
-        await spec.call(context, id, consent);
+      apply: async (_consent, context) => {
+        await spec.call(context, id);
 
         return {
           status: "ok",

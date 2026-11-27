@@ -23,9 +23,7 @@ export async function exchangeLinkHandoff(handoffToken: string): Promise<void> {
   // The console's shared client was configured before the runtime document
   // resolved, so it carries no key; this one carries the publishable key the
   // exchange requires.
-  await createZitadelApi(
-    new ZitadelClient({ baseUrl: apiBase, token: getPublishableKey(), allowDestructive: false }),
-  )
+  await createZitadelApi(new ZitadelClient({ baseUrl: apiBase, token: getPublishableKey() }))
     .exchangeHandoff(
       { handoff_token: handoffToken },
       { project_id: projectId },

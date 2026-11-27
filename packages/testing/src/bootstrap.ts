@@ -46,7 +46,7 @@ export async function bootstrapProject(
   options: BootstrapProjectOptions,
 ): Promise<BootstrappedProject> {
   const { baseUrl } = options;
-  const unauthenticated = createZitadelApi(new ZitadelClient({ baseUrl, allowDestructive: true }));
+  const unauthenticated = createZitadelApi(new ZitadelClient({ baseUrl }));
   const project = await unauthenticated.createProject({
     name: options.projectName ?? DEFAULT_PROJECT_NAME,
     origins: (options.appOrigins?.length ? options.appOrigins : [FALLBACK_APP_ORIGIN]).map(
@@ -57,9 +57,7 @@ export async function bootstrapProject(
     ),
     seed_defaults: false,
   });
-  const client = createZitadelApi(
-    new ZitadelClient({ baseUrl, token: project.project_secret, allowDestructive: true }),
-  );
+  const client = createZitadelApi(new ZitadelClient({ baseUrl, token: project.project_secret }));
 
   const schemaBody = getDefaultHumanUserSchemaBody({
     preset: options.preset,

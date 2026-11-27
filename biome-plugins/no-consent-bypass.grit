@@ -80,16 +80,7 @@ or {
     $filename <: r".*/apps/cli/src/.*",
     $filename <: not r".*/apps/cli/src/lib/backend/client\.ts$",
     $filename <: not r".*/apps/cli/src/lib/consent/consent\.ts$",
-    register_diagnostic(span=$bypass, message="Use the client from lib/backend/client, whose destructive operations only Consent.unlock reaches.", severity="error")
-  },
-  or {
-    `allowDestructive`,
-    `allowDestructive($_)`
-  } as $bypass where {
-    $filename <: r".*/apps/cli/src/.*",
-    $filename <: not r".*/apps/cli/src/lib/backend/client\.ts$",
-    $filename <: not r".*/apps/cli/src/lib/consent/consent\.ts$",
-    register_diagnostic(span=$bypass, message="Reach the destructive operations through Consent.unlock, which is the only caller of allowDestructive.", severity="error")
+    register_diagnostic(span=$bypass, message="Use the client from lib/backend/client, which the run's consent guards.", severity="error")
   },
   `kind: "confirm"` as $bypass where {
     $filename <: r".*/apps/cli/src/.*",

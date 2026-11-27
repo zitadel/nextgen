@@ -6,7 +6,6 @@ import { it } from "@tests/fixtures";
 import { ApiCall } from "@/cli/core/crud/api-call";
 import { createZitadelClient, Operation, OperationService } from "@/lib/backend";
 import { toZitadelError } from "@/lib/errors";
-import { forcedConsent } from "@tests/helpers/consent";
 
 const signal = new AbortController().signal;
 
@@ -14,18 +13,15 @@ const SERVER = "http://localhost:8080";
 
 const OPERATIONS = Operation.all();
 
-/** Sends a request the way a command does: through a client, unlocked when consent was given. */
+/** Sends a request the way a command does: through a client. */
 const send = async (
   server: string,
   token: string | undefined,
   request: Parameters<OperationService["call"]>[0],
   abort: AbortSignal,
-  consent?: Awaited<ReturnType<typeof forcedConsent>>,
 ) => {
   const client = createZitadelClient({ baseUrl: server, token, signal: abort });
-  return new OperationService(consent === undefined ? client : consent.unlock(client)).call(
-    request,
-  );
+  return new OperationService(client).call(request);
 };
 
 const sendAll = async (
@@ -107,44 +103,14 @@ describe("OperationService.call", () => {
     );
 
     await expect(
-      send(
-        SERVER,
-        "s",
-        requestFor("deactivateTeam", [], ["team_1"]),
-        signal,
-        await forcedConsent(),
-      ),
+      send(SERVER, "s", requestFor("deactivateTeam", [], ["team_1"]), signal),
     ).resolves.toEqual({
       status: 204,
       body: undefined,
     });
   });
 
-  it("refuses a destructive operation without consent", async () => {
-    await expect(
-      send(SERVER, "s", requestFor("deactivateTeam", [], ["team_1"]), signal),
-    ).rejects.toThrow("deactivateTeam is destructive: reach it through allowDestructive");
-  });
-
-  it("sends nothing for a destructive operation without consent", async ({ server }) => {
-    const sent: string[] = [];
-    server.use(
-      http.delete(`${SERVER}/api/v1/teams/team_1`, ({ request }) => {
-        sent.push(request.url);
-        return new HttpResponse(null, { status: 204 });
-      }),
-    );
-
-    await send(SERVER, "s", requestFor("deactivateTeam", [], ["team_1"]), signal).catch(
-      () => undefined,
-    );
-
-    expect(sent).toEqual([]);
-  });
-
-  it("sends a merge patch with a null without consent: updates are not guarded", async ({
-    server,
-  }) => {
+  it("sends a merge patch with a null", async ({ server }) => {
     server.use(
       http.patch(`${SERVER}/api/v1/variables`, () => HttpResponse.json({ variables: [] })),
     );

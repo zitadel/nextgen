@@ -1,7 +1,6 @@
 import type { Interfaces } from "@oclif/core";
 import type { ZodType } from "zod";
 
-import type { Consent } from "@/lib/consent";
 import type { Connection } from "@/cli/core/environment-command";
 import type { Tabulate } from "@/cli/core/tabulatable";
 
@@ -245,8 +244,11 @@ export type DeleteSpec<Ctx> = Readonly<{
    * to the verb's own past tense (`deleted`, `revoked`, `deactivated`).
    */
   outcome?: string;
-  /** The deletion, which reaches the client's destructive operations through `consent`. */
-  call: (ctx: Ctx, id: string, consent: Consent) => Promise<void>;
+  /**
+   * The deletion, which the factory runs only once the person agreed or passed
+   * `--force`.
+   */
+  call: (ctx: Ctx, id: string) => Promise<void>;
 }>;
 
 /** One CLI topic. The factory turns it into up to five command classes. */

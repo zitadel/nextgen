@@ -10,7 +10,6 @@
  */
 export type { Page, PageOptions } from "./api-service";
 export {
-  allowDestructive,
   createZitadelClient,
   isCancelled,
   type OperationName,

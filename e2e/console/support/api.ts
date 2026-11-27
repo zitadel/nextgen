@@ -56,7 +56,7 @@ export async function claimProject(zitadel: ConnectedZitadel, page: Page): Promi
     throw new Error("the page holds no session cookie to claim with");
   }
   // No bearer on this client: claim/complete authenticates by the cookie.
-  const browser = createZitadelApi(new ZitadelClient({ baseUrl, allowDestructive: true }));
+  const browser = createZitadelApi(new ZitadelClient({ baseUrl }));
   const headers = { origin, cookie: `${session.name}=${session.value}` };
   const { csrf_token } = await withErrorBody(browser.getMySessionCsrfToken(undefined, { headers }));
   await withErrorBody(

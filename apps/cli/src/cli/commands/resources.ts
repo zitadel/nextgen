@@ -581,8 +581,8 @@ export const RESOURCES = {
       },
     ),
     delete: {
-      call: ({ client }, id, consent) => {
-        return consent.unlock(client).deleteUser(id);
+      call: ({ client }, id) => {
+        return client.deleteUser(id);
       },
     },
   }),
@@ -634,8 +634,8 @@ export const RESOURCES = {
     }),
     delete: {
       verb: "deactivate",
-      call: ({ client }, id, consent) => {
-        return consent.unlock(client).deactivateTeam(id);
+      call: ({ client }, id) => {
+        return client.deactivateTeam(id);
       },
     },
   }),
@@ -685,8 +685,8 @@ export const RESOURCES = {
     }),
     delete: {
       verb: "revoke",
-      call: ({ client }, id, consent) => {
-        return consent.unlock(client).revokeSession(id);
+      call: ({ client }, id) => {
+        return client.revokeSession(id);
       },
     },
   }),
@@ -858,8 +858,8 @@ export const RESOURCES = {
       },
     ),
     delete: {
-      call: ({ client, projectId }, id, consent) => {
-        return consent.unlock(client).deleteGrant(id, { project_id: projectId });
+      call: ({ client, projectId }, id) => {
+        return client.deleteGrant(id, { project_id: projectId });
       },
     },
   }),

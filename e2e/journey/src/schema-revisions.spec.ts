@@ -88,7 +88,6 @@ test.beforeAll(async () => {
     new ZitadelClient({
       baseUrl: metadata.localRuntimeUrl,
       token: secret.project_secret,
-      allowDestructive: true,
     }),
   );
 });

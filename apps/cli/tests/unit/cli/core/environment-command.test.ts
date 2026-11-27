@@ -9,7 +9,6 @@ import { it } from "@tests/fixtures";
 
 import { connectionOf, REQUEST_TIMEOUT_MS } from "@/lib/backend/client";
 import type { ZitadelClient } from "@/lib/backend";
-import { Consent } from "@/lib/consent";
 import { CREDENTIALS } from "@/cli/core/credentials";
 import { EnvironmentCommand, PreviewCommand } from "@/cli/core/environment-command";
 import type { ConnectOptions } from "@/cli/core/types";
@@ -107,12 +106,11 @@ class ServiceProbe extends ServerCommand(EnvironmentCommand) {
   }
 
   /**
-   * Builds a service plainly and with a consent, and names the project.
+   * Builds a service and names the project.
    *
-   * @param consent - The consent that unlocks the client for the second service.
    * @returns What was built and the connection it was built on.
    */
-  async probe(consent: Consent) {
+  async probe() {
     const { flags } = await this.parse(ServiceProbe);
     await this.toMeta(flags);
     const connection = await this.connect();
@@ -120,8 +118,6 @@ class ServiceProbe extends ServerCommand(EnvironmentCommand) {
     return {
       connection,
       plain: await this.service(Built),
-      consented: await this.service(Built, consent),
-      unlocked: consent.unlock(connection.client),
       phrase: await this.projectOnServer(),
     };
   }
@@ -205,57 +201,22 @@ describe("the credentials", () => {
 describe("EnvironmentCommand.service", () => {
   it("builds the service from the connection's client and the project's id", async ({ dir }) => {
     const file = await envFile(dir, `${URL_AND_PROJECT}ZITADEL_PROJECT_SECRET=sk_staging\n`);
-    const consent = await Consent.request(
-      { verb: "remove", name: "remove it", message: "Remove it?" },
-      { interactive: false, force: true, dryRun: false },
-    );
-    if (consent === undefined) {
-      throw new Error("consent was not given");
-    }
 
     const { connection, plain } = await new ServiceProbe(
       ["--cwd", dir, "--env-file", file],
       config,
-    ).probe(consent);
+    ).probe();
 
     expect(plain.client).toBe(connection.client);
     expect(plain.projectId).toBe("proj_staging");
-  });
-
-  it("builds it from the unlocked client when a consent is given", async ({ dir }) => {
-    const file = await envFile(dir, `${URL_AND_PROJECT}ZITADEL_PROJECT_SECRET=sk_staging\n`);
-    const consent = await Consent.request(
-      { verb: "remove", name: "remove it", message: "Remove it?" },
-      { interactive: false, force: true, dryRun: false },
-    );
-    if (consent === undefined) {
-      throw new Error("consent was not given");
-    }
-
-    const { connection, consented, unlocked } = await new ServiceProbe(
-      ["--cwd", dir, "--env-file", file],
-      config,
-    ).probe(consent);
-
-    expect(Object.is(consented.client, unlocked)).toBe(true);
-    expect(Object.is(consented.client, connection.client)).toBe(false);
   });
 });
 
 describe("EnvironmentCommand.projectOnServer", () => {
   it("names the project and the server without its scheme", async ({ dir }) => {
     const file = await envFile(dir, `${URL_AND_PROJECT}ZITADEL_PROJECT_SECRET=sk_staging\n`);
-    const consent = await Consent.request(
-      { verb: "remove", name: "remove it", message: "Remove it?" },
-      { interactive: false, force: true, dryRun: false },
-    );
-    if (consent === undefined) {
-      throw new Error("consent was not given");
-    }
 
-    const { phrase } = await new ServiceProbe(["--cwd", dir, "--env-file", file], config).probe(
-      consent,
-    );
+    const { phrase } = await new ServiceProbe(["--cwd", dir, "--env-file", file], config).probe();
 
     expect(phrase).toBe("project proj_staging on staging.example");
   });

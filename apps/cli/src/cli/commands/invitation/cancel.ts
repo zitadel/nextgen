@@ -184,9 +184,8 @@ export default class InvitationCancel extends Telemetered(
 
         return { invitation };
       },
-      apply: async (consent, { invitation }) => {
-        const unlocked = await this.service(InvitationService, consent);
-        await unlocked.cancel(invitation.id);
+      apply: async (_consent, { invitation }) => {
+        await (await this.service(InvitationService)).cancel(invitation.id);
         if (invitation.status === "pending") {
           this.trackEvent(INVITATION_CANCELLED, {
             role: invitationGrant(invitation),

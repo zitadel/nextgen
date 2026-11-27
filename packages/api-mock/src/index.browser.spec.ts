@@ -15,7 +15,7 @@ import { test } from "./msw-test.js";
 
 const PROJECT_ID = "proj_demo";
 
-const client = new ZitadelClient({ baseUrl: window.location.origin, allowDestructive: false });
+const client = new ZitadelClient({ baseUrl: window.location.origin });
 
 beforeEach(() => {
   resetFlow();

@@ -128,9 +128,8 @@ export function configureZitadel(config: ZitadelConfig): ZitadelProject {
 /**
  * Returns the {@link ZitadelClient} for the given project: its proxy path as
  * the base URL and its publishable key (when the handle carries one) as the
- * bearer, the ADR 036 public-plane credential. The app's own client may run
- * destructive operations, since signing out is a `DELETE`. Cached per project
- * handle — safe to call multiple times.
+ * bearer, the ADR 036 public-plane credential. Cached per project handle —
+ * safe to call multiple times.
  *
  * Call the generated operations with it to bundle only those you use:
  *
@@ -145,7 +144,6 @@ export function getClient(project: ZitadelProject): ZitadelClient {
     client = new ZitadelClient({
       baseUrl: project.proxyPath,
       token: project.publishableKey,
-      allowDestructive: true,
     });
     clientCache.set(project, client);
   }

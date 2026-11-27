@@ -3,8 +3,6 @@ import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
 
-import { allowDestructive } from "@/lib/backend";
-
 import { InvitationService, invitationRole } from "@/lib/backend/services/invitation";
 import { answering, answeringPages } from "@tests/helpers/api-answers";
 
@@ -62,7 +60,7 @@ describe("InvitationService.create", () => {
     async ({ input, expected }, { server, client }) => {
       const sent = answering(server, "createInvitation", created());
 
-      await new InvitationService(allowDestructive(client), PROJECT).create(input);
+      await new InvitationService(client, PROJECT).create(input);
 
       expect(sent.map(({ url, body }) => [url.searchParams.get("project_id"), body])).toEqual([
         [PROJECT, expected],
@@ -73,9 +71,7 @@ describe("InvitationService.create", () => {
   it("answers the link the create returned", async ({ server, client }) => {
     answering(server, "createInvitation", created());
 
-    const invitation = await new InvitationService(allowDestructive(client), PROJECT).create({
-      relation: "viewer",
-    });
+    const invitation = await new InvitationService(client, PROJECT).create({ relation: "viewer" });
 
     expect(invitation.link).toBe("https://console.example.com/invitations#token=t");
   });
@@ -90,7 +86,7 @@ describe("InvitationService.cancellable", () => {
       invitations: [projectInvitation()],
     });
 
-    await new InvitationService(allowDestructive(client), PROJECT).cancellable();
+    await new InvitationService(client, PROJECT).cancellable();
 
     expect(
       listed.map(({ url }) => [
@@ -105,7 +101,7 @@ describe("InvitationService.get", () => {
   it("reads the invitation in the service's project", async ({ server, client }) => {
     const read = answering(server, "getInvitation", projectInvitation());
 
-    await new InvitationService(allowDestructive(client), PROJECT).get(INVITATION);
+    await new InvitationService(client, PROJECT).get(INVITATION);
 
     expect(
       read.map(({ params, url }) => [params.invitation_id, url.searchParams.get("project_id")]),
@@ -117,7 +113,7 @@ describe("InvitationService.cancel", () => {
   it("cancels the invitation in the service's project", async ({ server, client }) => {
     const cancelled = answering(server, "cancelInvitation", undefined);
 
-    await new InvitationService(allowDestructive(client), PROJECT).cancel(INVITATION);
+    await new InvitationService(client, PROJECT).cancel(INVITATION);
 
     expect(
       cancelled.map(({ params, url }) => [
