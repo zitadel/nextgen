@@ -140,7 +140,7 @@
     "check-advisories": "vitest run --config vitest.advisories.config.ts",
     "readme": "oclif readme",
     "prepack": "publint --strict",
-    "lint": "biome check . && knip --directory ../.. --workspace @zitadel/cli"
+    "lint": "biome check . && knip --directory ../.. --workspace @zitadel/cli --reporter symbols --reporter ../../scripts/knip-annotations.mjs"
   },
   "dependencies": {
     "@clack/prompts": "catalog:",

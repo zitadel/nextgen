@@ -102,6 +102,7 @@
         "$TURBO_ROOT$/biome.json",
         "$TURBO_ROOT$/biome-plugins/*.grit",
         "$TURBO_ROOT$/knip.config.js",
+        "$TURBO_ROOT$/scripts/knip-annotations.mjs",
         "package.json",
         "knip.config.js",
         "bin/**"

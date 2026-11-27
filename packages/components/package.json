@@ -88,7 +88,7 @@
     "test": "node ../../scripts/task-guard.mjs --retries 3 -- vitest run",
     "test:browser": "vitest run --project browser",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
-    "lint": "biome check . && knip --directory ../.. --workspace @zitadel/components",
+    "lint": "biome check . && knip --directory ../.. --workspace @zitadel/components --reporter symbols --reporter ../../scripts/knip-annotations.mjs",
     "test:unit": "vitest run --project unit",
     "install-browsers": "playwright install chromium",
     "prepack": "publint --strict"

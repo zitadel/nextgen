@@ -27,7 +27,7 @@
   ],
   "scripts": {
     "prepack": "publint --strict",
-    "lint": "knip --directory ../.. --workspace @zitadel/server-win32-x64"
+    "lint": "knip --directory ../.. --workspace @zitadel/server-win32-x64 --reporter symbols --reporter ../../scripts/knip-annotations.mjs"
   },
   "publishConfig": {
     "access": "public"
