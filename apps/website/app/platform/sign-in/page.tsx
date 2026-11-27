@@ -1,4 +1,4 @@
-import { CodeFile, NumberedCommands } from "../../blocks";
+import { NumberedCommands } from "../../blocks";
 import {
   appPath,
   deployCommand,
@@ -7,26 +7,9 @@ import {
   passkeyEnableCommand,
 } from "../../commands";
 import { FeaturePage, featureMetadata } from "../../feature-page";
+import { HOODS } from "../../hoods";
 
 export const metadata = featureMetadata("sign-in");
-
-// The sign-in step of the default login flow with passkeys on, as the docs
-// give it (apps/docs/content/docs/guides/sign-in-methods.mdx, Enable passkeys).
-const STEP = `{
-  "name": "identifier",
-  "fields": ["email"],
-  "actions": [
-    { "name": "submit", "kind": "submit", "primary": true, "text_key": "identifier.action.continue" },
-    { "name": "passkey", "kind": "passkey", "primary": false, "text_key": "identifier.action.passkey" },
-    { "name": "register", "kind": "navigate", "primary": false, "text_key": "identifier.action.register.link" }
-  ],
-  "transitions": {
-    "submit": { "target": "password" },
-    "passkey": { "target": "done" },
-    "user_not_found": { "target": "register" },
-    "register": { "purpose": "register" }
-  }
-}`;
 
 export default function SignInPage() {
   return (
@@ -55,10 +38,7 @@ export default function SignInPage() {
               "The password policy asks for at least 12 characters. New passwords are checked once you deploy; passwords already set stay as they are.",
           },
         ],
-        hood: {
-          line: "A step of your login flow offers a passkey through an action. This is the sign-in step once passkeys are on, as the docs give it: email and Continue, or a passkey that signs the user straight in.",
-          artifact: <CodeFile title=".zitadel/flows/default-login.json" code={STEP} />,
-        },
+        hood: HOODS["sign-in"],
         tryIt: {
           line: "Run them in your app's folder, once setup has run.",
           content: (

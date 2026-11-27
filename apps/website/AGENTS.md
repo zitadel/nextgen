@@ -6,18 +6,23 @@ changelog at `/changelog`, with a page per entry and a feed under it, and the
 guide to choosing it or Zitadel v4 at `/choose-version`.
 Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
-- The front page explains, proves, then starts, and nothing else: the hero
-  (title, line, Start in our cloud, Run it yourself, the skills command),
-  What your agent runs (a row per phase with its first ask), You decide, and
-  a closing band with both ways to start and Talk to us.
-- Keep setup commands, logos, badges and star counts off the front page: the
-  quickstart's walkthrough is `/get-started`; roadmaps belong on the docs and
+- The front page leads with the quickstart, then shows what is in it, and
+  nothing else: the hero (title, line, the quickstart's numbered commands, the
+  skills command, Start in our cloud and Run it yourself), What you get (the
+  features by group, each with a window), What your agent runs (a row per
+  phase with its first ask), You decide (beside the change history), and a
+  closing band with both ways to start and Talk to us.
+- A front-page window renders what another page shows, from the same data or
+  component, never a copy: a feature's is its Under the hood
+  (`app/hoods.tsx`), Sign-in's the live login.
+- Keep the showcase's walkthrough, logos, badges and star counts off the front
+  page: the walkthrough is `/get-started`; roadmaps belong on the docs and
   zitadel.com.
 - Every phase page (`app/phases.ts`, which holds its asks) has the same parts
   (`app/phase-page.tsx`): the title with the phases' stepper and what your
   agent does, Ask it, Under the hood, You decide, Try it, Questions, and the
-  phase after it. `/get-started` shows the quickstart's walkthrough, its
-  commands then the showcase, in place of Under the hood and Try it.
+  phase after it. `/get-started` shows the quickstart's walkthrough, the
+  hero's commands then the showcase, in place of Under the hood and Try it.
 - Every feature page (`app/platform.ts`) has the same seven parts
   (`app/feature-page.tsx`): its group, title and line, What you get, Ask your
   agent, Under the hood, Try it, Questions, and Related.
@@ -94,13 +99,12 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 - `layout.tsx` imports the share image (`app/og.jpg`) and sets no
   `metadataBase`: on Vercel, Next makes its URL absolute with the deployment's
   host. Render it from `scripts/og.html` at 1200×630 as a JPEG (quality 88),
-  and change both when the hero's title or line, or a phase's first ask,
-  changes.
+  and change both when the hero's title, line or commands change.
 
 ## The commands and the showcase
 
-- `app/commands.ts` holds every command the site shows. The commands of
-  `/get-started`'s walkthrough follow the README's quick start; never add
+- `app/commands.ts` holds every command the site shows. Its `quickstart`, in
+  the hero and on `/get-started`, follows the README's quick start; never add
   `--force`. When that journey changes, change the commands and the
   showcase, and run them once against the published CLI.
 - Steps 1 to 4 replay a recorded session (`app/showcase/sessions.ts`).

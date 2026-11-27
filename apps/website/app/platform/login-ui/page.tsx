@@ -1,22 +1,9 @@
-import { CodeFile, NumberedCommands } from "../../blocks";
+import { NumberedCommands } from "../../blocks";
 import { appPath, deployCommand, dryRunCommand, setupCommand } from "../../commands";
 import { FeaturePage, featureMetadata } from "../../feature-page";
+import { HOODS } from "../../hoods";
 
 export const metadata = featureMetadata("login-ui");
-
-// The default login flow's password step, as the docs give it
-// (apps/docs/content/docs/guides/sign-in-methods.mdx, How a step offers each
-// method).
-const STEP = `{
-  "name": "password",
-  "fields": ["x-auth-methods#password"],
-  "actions": [
-    { "name": "submit", "kind": "submit", "primary": true, "text_key": "password.action.signin" }
-  ],
-  "transitions": {
-    "submit": { "target": "done" }
-  }
-}`;
 
 export default function LoginUiPage() {
   return (
@@ -45,10 +32,7 @@ export default function LoginUiPage() {
               "The sign-in step asks for email and password together and goes straight to signed in. The change is ready for your review.",
           },
         ],
-        hood: {
-          line: "The login flow is a file in your repo. This is the default flow's password step, as the docs give it: what it asks for, its button, and where it leads.",
-          artifact: <CodeFile title=".zitadel/flows/default-login.json" code={STEP} />,
-        },
+        hood: HOODS["login-ui"],
         tryIt: {
           line: "Run them in an empty folder for a new app.",
           content: (

@@ -46,8 +46,8 @@ const signInWithPassword: Screen = { ...signIn, fields: [email, password] };
 const done: Screen = { title: "You're signed in", fields: [], action: "Sign out" };
 
 // The default login flow, identifier → password → done, at the URL setup's
-// login page serves it.
-const login: Page = { url: "localhost:3000/login", screens: [signIn, enterPassword, done] };
+// login page serves it; the front page's Sign-in shows it too.
+export const login: Page = { url: "localhost:3000/login", screens: [signIn, enterPassword, done] };
 
 const registration: Page = { url: "localhost:3000/register", screens: [register] };
 

@@ -1,4 +1,4 @@
-import { CodeFile, NumberedCommands } from "../../blocks";
+import { NumberedCommands } from "../../blocks";
 import {
   appPath,
   deployCommand,
@@ -7,24 +7,9 @@ import {
   userListCommand,
 } from "../../commands";
 import { FeaturePage, featureMetadata } from "../../feature-page";
+import { HOODS } from "../../hoods";
 
 export const metadata = featureMetadata("users");
-
-// The user schema's properties once the company is added: the default schema
-// (packages/config/defaults/default-human-user.json) with the property the
-// front page's recorded session added (showcase/sessions.ts, Add a field).
-const PROPERTIES = `"properties": {
-  "email": {
-    "type": "string",
-    "format": "email",
-    "x-unique": "project",
-    "description": "The user's email address."
-  },
-  "company": {
-    "type": "string",
-    "description": "The user's company."
-  }
-}`;
 
 export default function UsersPage() {
   return (
@@ -53,10 +38,7 @@ export default function UsersPage() {
               "I imported your users from Zitadel v4 into this project. They keep their email addresses and sign in as before.",
           },
         ],
-        hood: {
-          line: "Your user model is a JSON Schema in your repo. These are its properties once your agent adds the company, as the recorded session on the front page wrote it.",
-          artifact: <CodeFile title=".zitadel/schemas/default-human-user.json" code={PROPERTIES} />,
-        },
+        hood: HOODS.users,
         tryIt: {
           line: "Run them in your app's folder, once setup has run.",
           content: (

@@ -1,4 +1,4 @@
-import { NumberedCommands, RowList } from "../../blocks";
+import { NumberedCommands } from "../../blocks";
 import {
   appPath,
   customSsoCommand,
@@ -7,6 +7,7 @@ import {
   idpListCommand,
 } from "../../commands";
 import { FeaturePage, featureMetadata } from "../../feature-page";
+import { HOODS } from "../../hoods";
 
 export const metadata = featureMetadata("single-sign-on");
 
@@ -37,34 +38,7 @@ export default function SingleSignOnPage() {
               "Done. People at this customer sign in through their provider only; everyone else keeps their password.",
           },
         ],
-        hood: {
-          line: "One command adds a connection and wires it into your sign-in. This is what the docs list it writing, under .zitadel/ and on the project.",
-          artifact: (
-            // apps/docs/content/docs/guides/social-sign-in.mdx, What the
-            // command writes.
-            <RowList
-              title="What auth-method sso enable writes"
-              rows={[
-                {
-                  term: "idps/<slug>.json",
-                  text: "The connection: protocol, issuer, scopes, claim mapping, and the credentials as references.",
-                },
-                {
-                  term: "schemas/<schema>.json",
-                  text: "The connection added to the user schema's single sign-on providers.",
-                },
-                {
-                  term: "flows/<flow>.json",
-                  text: "The connection offered on the steps that sign in, and steps for a first sign-in and for an email that has an account.",
-                },
-                {
-                  term: "Project variables",
-                  text: "The client ID and the client secret, the secret encrypted.",
-                },
-              ]}
-            />
-          ),
-        },
+        hood: HOODS["single-sign-on"],
         tryIt: {
           line: "Run them in your app's folder. The first asks for the provider's issuer and client.",
           content: (

@@ -1,4 +1,4 @@
-import { CodeFile, NumberedCommands } from "../../blocks";
+import { NumberedCommands } from "../../blocks";
 import {
   appPath,
   deployCommand,
@@ -7,30 +7,9 @@ import {
   idpListCommand,
 } from "../../commands";
 import { FeaturePage, featureMetadata } from "../../feature-page";
+import { HOODS } from "../../hoods";
 
 export const metadata = featureMetadata("identity-providers");
-
-// The JSON result of `auth-method sso enable --provider google`, as the docs
-// give it (apps/docs/content/docs/guides/social-sign-in.mdx, Enable Google).
-const RESULT = `{
-  "provider": "google",
-  "schema": "default-human-user",
-  "connection": {
-    "action": "create",
-    "slug": "google",
-    "file": ".zitadel/idps/google.json",
-    "claim_mapping": { "email": "email" },
-    "verified_claims": { "email": "email_verified" },
-    "scopes": ["openid", "profile", "email"],
-    "unmapped": [],
-    "used_by": ["default-human-user"]
-  },
-  "callback_uri": "http://localhost:3000/__nextgen/idp/google/callback",
-  "changed": [".zitadel/schemas/default-human-user.json", ".zitadel/flows/default-login.json"],
-  "client_id": { "variable": "GOOGLE_CLIENT_ID", "published": "stored" },
-  "secret": { "variable": "GOOGLE_CLIENT_SECRET", "published": "stored" },
-  "next_commands": ["npx @zitadel/cli@latest deploy --dry-run", "npx @zitadel/cli@latest deploy"]
-}`;
 
 export default function IdentityProvidersPage() {
   return (
@@ -59,10 +38,7 @@ export default function IdentityProvidersPage() {
               "I took Google off the sign-in steps and the user schema. Deploy warns first if that leaves anyone without a way in.",
           },
         ],
-        hood: {
-          line: "One command connects Google, and its JSON result names what it did: the connection's file, the files it changed, and where the credentials went. This is the result the docs give.",
-          artifact: <CodeFile title="auth-method sso enable --provider google" code={RESULT} />,
-        },
+        hood: HOODS["identity-providers"],
         tryIt: {
           line: "Run them in your app's folder, once setup has run and Google's OAuth client exists.",
           content: (

@@ -1,6 +1,8 @@
 import type { CSSProperties } from "react";
-import { SkillsLine } from "./blocks";
+import { ChangeHistory, QuickstartCommands, SkillsLine } from "./blocks";
+import { Capabilities } from "./capabilities";
 import { StartButtons } from "./cta";
+import { HISTORY } from "./get-started/history";
 import { PHASES, phasePath } from "./phases";
 import { PLATFORM } from "./platform";
 import { Part, PointList, TitleRows, TopLight } from "./sections";
@@ -25,9 +27,36 @@ const TITLE_COLORS = {
   "--title-to": "var(--color-step-end)",
 } as CSSProperties;
 
-// The front page explains, proves, then starts (AGENTS.md): what it is and
-// the two ways to start, what your agent runs in each phase, what you
-// decide, and the ways to start again at its end. The quickstart's
+/** A quiet link with an arrow, the way on from a section to a page. */
+function MoreLink({ href, children }: { href: string; children: string }) {
+  return (
+    <a
+      href={href}
+      className="group inline-flex items-center gap-2 text-sm text-text-secondary transition-colors hover:text-text-primary"
+    >
+      {children}
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 16 16"
+        fill="none"
+        className="size-4 transition-transform group-hover:translate-x-0.5"
+      >
+        <path
+          d="M3 8h10M9 4l4 4-4 4"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </a>
+  );
+}
+
+// The front page leads with the quickstart, then shows what is in it
+// (AGENTS.md): what it is and its commands with the ways to start, the
+// features with what each looks like, what your agent runs in each phase,
+// what you decide, and the ways to start again at its end. The quickstart's
 // walkthrough is /get-started.
 export default function Home() {
   return (
@@ -52,50 +81,41 @@ export default function Home() {
               {LINE}
             </p>
           </div>
-          <div className="teaser mt-9 flex flex-col items-center gap-6">
-            <StartButtons placement="hero" />
+          <div className="teaser mt-10 flex w-full flex-col items-center gap-6">
+            <div className="w-full max-w-[42rem]">
+              <QuickstartCommands placement="hero" />
+            </div>
             <SkillsLine placement="hero" className="text-balance text-center text-sm" />
+            <StartButtons placement="hero" />
           </div>
         </section>
 
-        <Part id="what-your-agent-runs" title="What your agent runs">
-          <div className="flex flex-col items-start gap-6">
+        <Part id="what-you-get" title="What you get">
+          <div className="flex flex-col items-start gap-8">
             <div className="w-full">
-              <TitleRows
-                rows={PHASES.map(({ slug, short, title, line, asks }) => ({
-                  label: short,
-                  title,
-                  line,
-                  ask: asks[0].ask,
-                  href: phasePath(slug),
-                }))}
-              />
+              <Capabilities />
             </div>
-            <a
-              href={PLATFORM.path}
-              className="group inline-flex items-center gap-2 text-sm text-text-secondary transition-colors hover:text-text-primary"
-            >
-              All of the platform
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 16 16"
-                fill="none"
-                className="size-4 transition-transform group-hover:translate-x-0.5"
-              >
-                <path
-                  d="M3 8h10M9 4l4 4-4 4"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </a>
+            <MoreLink href={PLATFORM.path}>All of the platform</MoreLink>
           </div>
         </Part>
 
+        <Part id="what-your-agent-runs" title="What your agent runs">
+          <TitleRows
+            rows={PHASES.map(({ slug, short, title, line, asks }) => ({
+              label: short,
+              title,
+              line,
+              ask: asks[0].ask,
+              href: phasePath(slug),
+            }))}
+          />
+        </Part>
+
         <Part id="you-decide" title="You decide">
-          <PointList points={DECIDE} />
+          <div className="grid items-start gap-8 lg:grid-cols-2 lg:gap-14">
+            <PointList points={DECIDE} />
+            <ChangeHistory changes={HISTORY} />
+          </div>
         </Part>
 
         <section

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { Placement } from "./analytics";
 import { CommandLine, Words } from "./command-line";
-import { skillsCommand } from "./commands";
+import { appPath, quickstart, skillsCommand } from "./commands";
 import { CopyButton } from "./copy-button";
 import type { Exchange } from "./phases";
 import { WINDOW_FOOTER, WINDOW_INSET, Window } from "./window";
@@ -188,6 +188,31 @@ export function NumberedCommands({
       </List>
       {footer && <div className={`${WINDOW_FOOTER} px-5 py-2.5`}>{footer}</div>}
     </Window>
+  );
+}
+
+/**
+ * The quickstart's commands as numbered steps (commands.ts), in the app's
+ * folder, with the one prerequisite and a button that copies them all: the
+ * front page's hero and /get-started's walkthrough, where `footer` adds the
+ * line for coding agents. `placement` is where it sits (analytics.ts).
+ */
+export function QuickstartCommands({
+  placement,
+  footer,
+}: {
+  placement: Placement;
+  footer?: ReactNode;
+}) {
+  return (
+    <NumberedCommands
+      title={appPath}
+      note="Node 24+"
+      steps={quickstart}
+      placement={placement}
+      copyAll
+      footer={footer}
+    />
   );
 }
 

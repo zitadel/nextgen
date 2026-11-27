@@ -2,10 +2,11 @@
 // it and the docs' quickstart without its optional `doctor` (AGENTS.md), in a
 // new folder for the app: start, setup for a Next.js app, the app's dev
 // server. The session the showcase was recorded from (showcase/sessions.ts)
-// ran the same, with `doctor` first. /get-started's walkthrough shows them,
-// with the folder as its terminal's title, and the showcase's first two steps
-// start and setup; /llms.txt hands them to agents after the folder's command;
-// the footer offers start.
+// ran the same, with `doctor` first. The front page's hero and /get-started's
+// walkthrough show them as numbered steps (`quickstart`), with the folder as
+// their terminal's title, and the showcase's first two steps start and setup;
+// /llms.txt hands them to agents after the folder's command; the footer
+// offers start.
 export const appFolder = "myapp";
 // The folder as the windows' title bars show it.
 export const appPath = `~/${appFolder}`;
@@ -16,6 +17,13 @@ export const setupCommand = "npx @zitadel/cli@latest setup --framework next --se
 export const devCommand = "npm run dev";
 
 export const commands = [startCommand, setupCommand, devCommand];
+
+// The same commands, each with what it does.
+export const quickstart = [
+  { label: "Start Zitadel on your machine", command: startCommand },
+  { label: "Add sign-in to your app", command: setupCommand },
+  { label: "Run your app", command: devCommand },
+] as const;
 
 // What publishes a change to the user model or the login flow, as steps 3
 // and 4 run it and /llms.txt tells agents.

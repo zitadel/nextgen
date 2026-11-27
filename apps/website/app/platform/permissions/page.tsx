@@ -1,4 +1,4 @@
-import { NumberedCommands, RowList } from "../../blocks";
+import { NumberedCommands } from "../../blocks";
 import {
   appPath,
   grantCreateCommand,
@@ -7,6 +7,7 @@ import {
   membersCommand,
 } from "../../commands";
 import { FeaturePage, featureMetadata } from "../../feature-page";
+import { HOODS } from "../../hoods";
 
 export const metadata = featureMetadata("permissions");
 
@@ -37,30 +38,7 @@ export default function PermissionsPage() {
               "I revoked Alex's admin grant, and the events record that you did. If Alex is in the team that owns the project, that access stays until Alex leaves the team.",
           },
         ],
-        hood: {
-          line: "Every call is checked against the caller's role on the project. These are the permissions on users, as the server's permission catalog describes them.",
-          artifact: (
-            // docs/design/api/system-permission-catalog.md, the user rows,
-            // cut to the role each asks for.
-            <RowList
-              title="Permissions on users"
-              rows={[
-                {
-                  term: "user.write",
-                  text: "Profile and attribute edits. Needs editor access on the user's project.",
-                },
-                {
-                  term: "user.set_password",
-                  text: "Sets another user's password. Held apart from user.write.",
-                },
-                {
-                  term: "user.delete",
-                  text: "Deletes a user. Needs admin access on the user's project.",
-                },
-              ]}
-            />
-          ),
-        },
+        hood: HOODS.permissions,
         tryIt: {
           line: "Run them in your app's folder, once the project is claimed.",
           content: (

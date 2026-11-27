@@ -1,6 +1,7 @@
-import { NumberedCommands, RowList } from "../../blocks";
+import { NumberedCommands } from "../../blocks";
 import { actorEventsCommand, appPath, userEventsCommand } from "../../commands";
 import { FeaturePage, featureMetadata } from "../../feature-page";
+import { HOODS } from "../../hoods";
 
 export const metadata = featureMetadata("agents");
 
@@ -31,26 +32,7 @@ export default function AgentsPage() {
               "It signed in as itself and looked up orders for users who had agreed. Every event names the agent and the user.",
           },
         ],
-        hood: {
-          line: "Every event carries the fields that name who acted and for whom. These are their descriptions in the API.",
-          artifact: (
-            // The shared event fields' descriptions in the API
-            // (apps/api/api/openapi/endpoints/events/event-base.yaml), cut
-            // to their first sentence.
-            <RowList
-              title="Event fields"
-              rows={[
-                { term: "actor_id", text: "The ID of the actor that triggered the event." },
-                {
-                  term: "user_id",
-                  text: "The ID of the user the event concerns, whoever triggered it.",
-                },
-                { term: "client_id", text: "The application or agent that produced the event." },
-                { term: "delegation_type", text: "The kind of delegation. Absent when unset." },
-              ]}
-            />
-          ),
-        },
+        hood: HOODS.agents,
         tryIt: {
           line: "Run them in your app's folder. They read the events every caller writes.",
           content: (

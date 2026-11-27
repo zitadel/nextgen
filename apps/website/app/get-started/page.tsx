@@ -1,20 +1,14 @@
-import { ChangeHistory, NumberedCommands, SkillsLine } from "../blocks";
-import { appPath, devCommand, setupCommand, startCommand } from "../commands";
+import { ChangeHistory, QuickstartCommands, SkillsLine } from "../blocks";
 import { PhasePage, phaseMetadata } from "../phase-page";
 import { Showcase } from "../showcase/showcase";
+import { HISTORY } from "./history";
 
 export const metadata = phaseMetadata("get-started");
 
-// The commands of README.md's quick start (commands.ts), as numbered steps.
-const STEPS = [
-  { label: "Start Zitadel on your machine", command: startCommand },
-  { label: "Add sign-in to your app", command: setupCommand },
-  { label: "Run your app", command: devCommand },
-];
-
-// The quickstart's walkthrough: the commands to copy, then each step as it
-// runs (the showcase). It shows the files setup writes and the commands that
-// publish a change, so this page has no Under the hood or Try it of its own.
+// The quickstart's walkthrough: the commands to copy, as the front page's
+// hero shows them, then each step as it runs (the showcase). It shows the
+// files setup writes and the commands that publish a change, so this page
+// has no Under the hood or Try it of its own.
 export default function GetStartedPage() {
   return (
     <PhasePage
@@ -25,12 +19,8 @@ export default function GetStartedPage() {
           content: (
             <div className="flex flex-col gap-20 md:gap-28">
               <div className="max-w-[42rem]">
-                <NumberedCommands
-                  title={appPath}
-                  note="Node 24+"
-                  steps={STEPS}
+                <QuickstartCommands
                   placement="showcase"
-                  copyAll
                   footer={<SkillsLine placement="showcase" className="text-xs" />}
                 />
               </div>
@@ -40,16 +30,7 @@ export default function GetStartedPage() {
         },
         decide: {
           line: "What setup writes lands in your repo as files: the pages, the user model and the login flow. You read the diff and commit it, and each deploy records who made it, from which commit and why.",
-          block: (
-            <ChangeHistory
-              changes={[
-                { change: "Add sign-in", agent: true },
-                { change: "Add passkeys", agent: true },
-                { change: "Use our brand on the login screen", agent: true },
-                { change: "Update the logo", agent: false },
-              ]}
-            />
-          ),
+          block: <ChangeHistory changes={HISTORY} />,
         },
         questions: [
           {

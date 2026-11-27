@@ -180,7 +180,8 @@
       animation: caption-in 1.4s var(--ease) both;
     }
 
-    /* The hero's line and its ways to start (page.tsx), soon after. */
+    /* The hero's line, its commands and its ways to start (page.tsx), soon
+       after: the commands are what a visitor came to copy. */
     .teaser {
       animation: teaser-in 1s var(--ease) 0.25s both;
     }
@@ -462,8 +463,7 @@
   }
 }
 
-/* The words come into focus, and the line and the ways to start rise into
-   place under them. */
+/* The words come into focus, and the commands rise into place under them. */
 @keyframes caption-in {
   from {
     opacity: 0;
