@@ -1591,8 +1591,8 @@ type ApplicationClient struct {
 	// declared in a release must set it.
 	ClientID OptString `json:"client_id"`
 	// A `confidential` client runs where a secret can be kept, such as a web app's backend, and
-	// authenticates with one at the token endpoint. Public clients, which hold no secret, are not
-	// available yet.
+	// authenticates with one at the token endpoint. A `public` client holds no secret: a browser-only or
+	// installed app that signs in with authorization code and PKCE (`S256`) only.
 	Type ApplicationClientType `json:"type"`
 	// The grant types the client may use, named as in RFC 7591. `authorization_code` signs a user in and
 	// needs `redirect_uris`. `refresh_token` lets the client renew its access tokens without a new
@@ -1600,11 +1600,18 @@ type ApplicationClient struct {
 	// `authorization_code`.
 	GrantTypes []ApplicationClientGrantTypesItem `json:"grant_types"`
 	// Where the authorization endpoint may send the user back. Required with `authorization_code`; omit it
-	// otherwise, an empty list is refused. Each is an `https` URL, or an `http` URL on a loopback host for
-	// local development: `localhost`, a name under `.localhost`, or a loopback IP such as `127.0.0.1` or
-	// `[::1]`. A URI is written as the client will send it, with a lowercase host and no fragment, since
-	// it is matched exactly; a loopback URI matches on any port (RFC 8252 §7.3).
+	// otherwise, an empty list is refused. Each is an `https` URL, an `http` URL on a loopback host for
+	// local development (`localhost`, a name under `.localhost`, or a loopback IP such as `127.0.0.1` or
+	// `[::1]`), or a private-use URI scheme for an installed app (`com.example.app:/callback`, RFC 8252
+	// §7.1). A URI is written as the client will send it, with a lowercase host where it has one and no
+	// fragment, since it is matched exactly; a loopback URI matches on any port (RFC 8252 §7.3).
 	RedirectUris []string `json:"redirect_uris"`
+	// Browser origins a public SPA may declare for later CORS enforcement and console display. Scheme and
+	// host only (optional port), no path, query, fragment or credentials. Omit for confidential clients
+	// and installed apps that do not call from a browser origin; an empty list is the same as omit. The
+	// authorization server currently answers CORS with `*` for all public-client traffic (ADR 081 §6) and
+	// does not filter by this field yet.
+	AllowedOrigins []string `json:"allowed_origins"`
 	// A reference to the project variable holding the client's secret, never the secret itself, for a
 	// confidential client declared in a release. Required there. A variable stays the client's that first
 	// named it, so no other client in the project can name it. The server reads the value the deployment
@@ -1651,6 +1658,11 @@ func (s *ApplicationClient) GetRedirectUris() []string {
 	return s.RedirectUris
 }
 
+// GetAllowedOrigins returns the value of AllowedOrigins.
+func (s *ApplicationClient) GetAllowedOrigins() []string {
+	return s.AllowedOrigins
+}
+
 // GetSecret returns the value of Secret.
 func (s *ApplicationClient) GetSecret() OptString {
 	return s.Secret
@@ -1689,6 +1701,11 @@ func (s *ApplicationClient) SetGrantTypes(val []ApplicationClientGrantTypesItem)
 // SetRedirectUris sets the value of RedirectUris.
 func (s *ApplicationClient) SetRedirectUris(val []string) {
 	s.RedirectUris = val
+}
+
+// SetAllowedOrigins sets the value of AllowedOrigins.
+func (s *ApplicationClient) SetAllowedOrigins(val []string) {
+	s.AllowedOrigins = val
 }
 
 // SetSecret sets the value of Secret.
@@ -2261,18 +2278,20 @@ func (s *ApplicationClientSecretRotatedEventDelegationType) UnmarshalText(data [
 }
 
 // A `confidential` client runs where a secret can be kept, such as a web app's backend, and
-// authenticates with one at the token endpoint. Public clients, which hold no secret, are not
-// available yet.
+// authenticates with one at the token endpoint. A `public` client holds no secret: a browser-only or
+// installed app that signs in with authorization code and PKCE (`S256`) only.
 type ApplicationClientType string
 
 const (
 	ApplicationClientTypeConfidential ApplicationClientType = "confidential"
+	ApplicationClientTypePublic       ApplicationClientType = "public"
 )
 
 // AllValues returns all ApplicationClientType values.
 func (ApplicationClientType) AllValues() []ApplicationClientType {
 	return []ApplicationClientType{
 		ApplicationClientTypeConfidential,
+		ApplicationClientTypePublic,
 	}
 }
 
@@ -2280,6 +2299,8 @@ func (ApplicationClientType) AllValues() []ApplicationClientType {
 func (s ApplicationClientType) MarshalText() ([]byte, error) {
 	switch s {
 	case ApplicationClientTypeConfidential:
+		return []byte(s), nil
+	case ApplicationClientTypePublic:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -2291,6 +2312,9 @@ func (s *ApplicationClientType) UnmarshalText(data []byte) error {
 	switch ApplicationClientType(data) {
 	case ApplicationClientTypeConfidential:
 		*s = ApplicationClientTypeConfidential
+		return nil
+	case ApplicationClientTypePublic:
+		*s = ApplicationClientTypePublic
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -17210,8 +17234,9 @@ type CreateApplicationResponse struct {
 	UpdatedAt time.Time `json:"updated_at"`
 	// The stored application document, with each client's `client_id`.
 	Definition Application `json:"definition"`
-	// The secrets this write generated, one for each client it created, each with the client's
-	// `client_id`. Absent when the write created no client. Each secret is shown only once.
+	// The secrets this write generated, one for each confidential client it created, each with the
+	// client's `client_id`. A public client has none. Absent or empty when the write created no
+	// confidential client. Each secret is shown only once.
 	ClientSecrets []ApplicationClientSecret `json:"client_secrets"`
 }
 

@@ -32,13 +32,13 @@ type ClientResolver interface {
 }
 
 // client is a client as the library reads it, for one request.
-// Phase 1 has only confidential web clients on the authorization code grant.
 type client struct {
 	id string
 	// projectID is the project a token request authenticated the client in.
 	projectID    string
 	redirectURIs []string
 	grantTypes   []oidc.GrantType
+	public       bool
 	// settings are the issuer's, read when the client was resolved, so
 	// Authorize stores the deployment the client came from.
 	settings Settings
@@ -46,18 +46,35 @@ type client struct {
 
 // newClient wraps doc, the client holding clientID.
 func newClient(clientID string, doc domain.ApplicationClientDocument) *client {
-	c := &client{id: clientID, redirectURIs: doc.RedirectURIs}
+	c := &client{id: clientID, redirectURIs: doc.RedirectURIs, public: doc.IsPublic()}
 	for _, grant := range doc.GrantTypes {
 		c.grantTypes = append(c.grantTypes, oidc.GrantType(grant))
 	}
 	return c
 }
 
-func (c *client) GetID() string                       { return c.id }
-func (c *client) RedirectURIs() []string              { return c.redirectURIs }
-func (c *client) PostLogoutRedirectURIs() []string    { return nil }
-func (c *client) ApplicationType() op.ApplicationType { return op.ApplicationTypeWeb }
-func (c *client) AuthMethod() oidc.AuthMethod         { return oidc.AuthMethodBasic }
+func (c *client) GetID() string                    { return c.id }
+func (c *client) RedirectURIs() []string           { return c.redirectURIs }
+func (c *client) PostLogoutRedirectURIs() []string { return nil }
+
+// ApplicationType picks the library's redirect policy. Confidential clients
+// are web. Public clients use native so custom schemes and loopback http
+// (including any port, RFC 8252 §7.3) are accepted; SPA local-dev redirects
+// are loopback too.
+func (c *client) ApplicationType() op.ApplicationType {
+	if c.public {
+		return op.ApplicationTypeNative
+	}
+	return op.ApplicationTypeWeb
+}
+
+func (c *client) AuthMethod() oidc.AuthMethod {
+	if c.public {
+		return oidc.AuthMethodNone
+	}
+	return oidc.AuthMethodBasic
+}
+
 func (c *client) ResponseTypes() []oidc.ResponseType {
 	return []oidc.ResponseType{oidc.ResponseTypeCode}
 }

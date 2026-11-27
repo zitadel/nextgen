@@ -404,6 +404,57 @@ func (s *ApplicationClient) Validate() error {
 		})
 	}
 	if err := func() error {
+		if s.AllowedOrigins == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    50,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.AllowedOrigins)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		if err := validate.UniqueItems(s.AllowedOrigins); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		var failures []validate.FieldError
+		for i, elem := range s.AllowedOrigins {
+			if err := func() error {
+				if err := (validate.String{
+					MinLength:     1,
+					MinLengthSet:  true,
+					MaxLength:     2048,
+					MaxLengthSet:  true,
+					Email:         false,
+					Hostname:      false,
+					Regex:         nil,
+					MinNumeric:    0,
+					MinNumericSet: false,
+					MaxNumeric:    0,
+					MaxNumericSet: false,
+				}).Validate(string(elem)); err != nil {
+					return errors.Wrap(err, "string")
+				}
+				return nil
+			}(); err != nil {
+				failures = append(failures, validate.FieldError{
+					Name:  fmt.Sprintf("[%d]", i),
+					Error: err,
+				})
+			}
+		}
+		if len(failures) > 0 {
+			return &validate.Error{Fields: failures}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "allowed_origins",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if value, ok := s.Secret.Get(); ok {
 			if err := func() error {
 				if err := (validate.String{
@@ -590,6 +641,8 @@ func (s ApplicationClientSecretRotatedEventDelegationType) Validate() error {
 func (s ApplicationClientType) Validate() error {
 	switch s {
 	case "confidential":
+		return nil
+	case "public":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)

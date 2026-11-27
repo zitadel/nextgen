@@ -384,9 +384,12 @@ func (s *applicationService) reviseRegistered(ctx context.Context, projectID str
 
 // storeClientSecrets stores the hash of plain[i] as the secret of clients[i].
 // It runs after the write that gave the clients their ids, in the same
-// transaction.
+// transaction. An empty plain[i] is a public client: no secret is stored.
 func storeClientSecrets(ctx context.Context, stmts AllStatements, clients []*domain.ApplicationClient, plain []string) error {
 	for i, client := range clients {
+		if plain[i] == "" {
+			continue
+		}
 		secret := &domain.ApplicationClientSecret{ProjectID: client.ProjectID, ApplicationClientID: client.ID, SecretHash: domain.HashSecret(plain[i])}
 		if err := stmts.CreateApplicationClientSecret(ctx, secret); err != nil {
 			return err
@@ -447,9 +450,12 @@ func applicationBy(projectID string, field domain.ApplicationField, value string
 }
 
 func clientSecrets(clients []*domain.ApplicationClient, plain []string) []ApplicationClientSecret {
-	out := make([]ApplicationClientSecret, len(clients))
+	out := make([]ApplicationClientSecret, 0, len(clients))
 	for i, client := range clients {
-		out[i] = ApplicationClientSecret{Slug: client.Slug, ClientID: client.ClientID, Secret: plain[i]}
+		if plain[i] == "" {
+			continue
+		}
+		out = append(out, ApplicationClientSecret{Slug: client.Slug, ClientID: client.ClientID, Secret: plain[i]})
 	}
 	return out
 }

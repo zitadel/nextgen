@@ -85,9 +85,10 @@
         "type": {
           "type": "string",
           "enum": [
-            "confidential"
+            "confidential",
+            "public"
           ],
-          "description": "A `confidential` client runs where a secret can be kept, such as a web\napp's backend, and authenticates with one at the token endpoint. Public\nclients, which hold no secret, are not available yet.\n"
+          "description": "A `confidential` client runs where a secret can be kept, such as a web\napp's backend, and authenticates with one at the token endpoint. A\n`public` client holds no secret: a browser-only or installed app that\nsigns in with authorization code and PKCE (`S256`) only.\n"
         },
         "grant_types": {
           "type": "array",
@@ -112,10 +113,26 @@
             "minLength": 1,
             "maxLength": 2048
           },
-          "description": "Where the authorization endpoint may send the user back. Required with\n`authorization_code`; omit it otherwise, an empty list is refused. Each\nis an `https` URL, or an `http` URL on a loopback host for local\ndevelopment: `localhost`, a name under `.localhost`, or a loopback IP\nsuch as `127.0.0.1` or `[::1]`. A URI is written as the client will\nsend it, with a lowercase host and no fragment, since it is matched\nexactly; a loopback URI matches on any port (RFC 8252 §7.3).\n",
+          "description": "Where the authorization endpoint may send the user back. Required with\n`authorization_code`; omit it otherwise, an empty list is refused. Each\nis an `https` URL, an `http` URL on a loopback host for local\ndevelopment (`localhost`, a name under `.localhost`, or a loopback IP\nsuch as `127.0.0.1` or `[::1]`), or a private-use URI scheme for an\ninstalled app (`com.example.app:/callback`, RFC 8252 §7.1). A URI is\nwritten as the client will send it, with a lowercase host where it has\none and no fragment, since it is matched exactly; a loopback URI\nmatches on any port (RFC 8252 §7.3).\n",
           "examples": [
             [
               "https://shop.example.com/callback"
+            ]
+          ]
+        },
+        "allowed_origins": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 50,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "description": "Browser origins a public SPA may declare for later CORS enforcement and\nconsole display. Scheme and host only (optional port), no path, query,\nfragment or credentials. Omit for confidential clients and installed\napps that do not call from a browser origin; an empty list is the same\nas omit. The authorization server currently answers CORS with `*` for\nall public-client traffic (ADR 081 §6) and does not filter by this field\nyet.\n",
+          "examples": [
+            [
+              "http://localhost:5173"
             ]
           ]
         },

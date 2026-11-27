@@ -357,7 +357,7 @@ func TestTokenRefusesTheClient(t *testing.T) {
 			name:       "client_assertion",
 			set:        map[string]string{"client_id": "shop", "client_assertion": "a.b.c", "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"},
 			wantStatus: http.StatusUnauthorized,
-			want:       tokenError{Error: "invalid_client", Description: "the client must authenticate with its client secret"},
+			want:       tokenError{Error: "invalid_client", Description: "client assertions are not supported"},
 		},
 		{
 			// The client ID is never looked up: a NUL byte is text no

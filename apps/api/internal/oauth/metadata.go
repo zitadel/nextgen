@@ -59,7 +59,7 @@ func (m metadataServer) AuthorizationServerMetadata(ctx context.Context, _ *op.R
 		ResponseTypesSupported:            []oidc.ResponseType{oidc.ResponseTypeCode},
 		ResponseModesSupported:            []oidc.ResponseMode{oidc.ResponseModeQuery},
 		GrantTypesSupported:               []oidc.GrantType{oidc.GrantTypeCode},
-		TokenEndpointAuthMethodsSupported: []oidc.AuthMethod{oidc.AuthMethodBasic, oidc.AuthMethodPost},
+		TokenEndpointAuthMethodsSupported: []oidc.AuthMethod{oidc.AuthMethodBasic, oidc.AuthMethodPost, oidc.AuthMethodNone},
 		CodeChallengeMethodsSupported:     []oidc.CodeChallengeMethod{oidc.CodeChallengeMethodS256},
 	}), nil
 }
