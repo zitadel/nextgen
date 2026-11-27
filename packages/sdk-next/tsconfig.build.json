@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.lib.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    // The dist build resolves workspace dependencies through their built
+    // dist types (like a real consumer), not the "@zitadel/source" condition:
+    // source resolution would pull dependency .ts files into this program and
+    // violate rootDir. Requires dependency dist/ to exist — the build's task
+    // dependencies in turbo.json guarantee that.
+    "customConditions": []
+  }
+}
