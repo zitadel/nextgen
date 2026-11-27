@@ -66,7 +66,7 @@ class Servers {
  * - `serve` starts an HTTP server on a free port, answers with the handler, and gives back its
  *   base URL; every server it started is closed when the test ends.
  * - `client` is a real CLI client on `TEST_SERVER` (`helpers/api-answers.ts`), for code that takes
- *   one; the test answers what it sends on `server`.
+ *   one. It starts `server`, so a request the test did not answer there fails the test.
  * - `port` is a port from this worker's own block (see `ports.ts`). A test that needs a second one
  *   calls `nextPort()`. It is here, not in `ports.ts`, because `vitest.config.ts` reads that file's
  *   allocator while the config loads, where a Vitest `test` cannot be extended.
@@ -93,8 +93,8 @@ export const test = base.extend<{
     });
     await servers.dispose();
   },
-  // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
-  async client({}, use) {
+  // biome-ignore lint/correctness/noUnusedFunctionParameters: naming `server` makes Vitest start it first.
+  async client({ server }, use) {
     await use(testClient());
   },
   // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.

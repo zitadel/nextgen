@@ -93,16 +93,6 @@ async function aProjectWithAnEmailSubject(cwd: string): Promise<void> {
 }
 
 /**
- * A publisher of {@link PROJECT_ID} on a test client.
- *
- * @param client - The client it sends through.
- * @returns The publisher.
- */
-function aPublisher(client: ZitadelClient): Publisher {
-  return new Publisher(client, PROJECT_ID);
-}
-
-/**
  * A publisher whose project holds the connection's secret and answers the
  * connection listing with `queryIdps`.
  *
@@ -118,7 +108,7 @@ function aPublisherListing(
 ): Publisher {
   answeringVariables(server, ACME_SECRET_HELD);
   answering(server, "queryIdps", queryIdps);
-  return aPublisher(client);
+  return new Publisher(client, PROJECT_ID);
 }
 
 /**
@@ -177,7 +167,7 @@ describe("Publisher.landing", () => {
       ],
     });
 
-    const origins = await aPublisher(client).fetchLanding();
+    const origins = await new Publisher(client, PROJECT_ID).fetchLanding();
 
     expect(origins.primary).toEqual([PRIMARY_ORIGIN]);
   });
@@ -187,7 +177,10 @@ describe("Publisher.createRelease", () => {
   it("sends the bundle with the git provenance the build recorded", async ({ server, client }) => {
     const built = answering(server, "buildRelease", { id: "rel_1" });
 
-    await aPublisher(client).createRelease({ prepared: PREPARED, message: "ship it" });
+    await new Publisher(client, PROJECT_ID).createRelease({
+      prepared: PREPARED,
+      message: "ship it",
+    });
 
     expect(bodiesAndScopes(built)).toEqual([
       [
@@ -211,7 +204,7 @@ describe("Publisher.deploy", () => {
       buildingRelease(server);
       answeringPages(server, "listDeployments", { deployments: [] });
       answering(server, "createDeployment", aDeployment());
-      return aPublisher(client);
+      return new Publisher(client, PROJECT_ID);
     };
 
     it("tells which stage it enters, release creation then deployment", async ({
@@ -255,7 +248,7 @@ describe("Publisher.deploy", () => {
       buildingRelease(server);
       answeringPages(server, "listDeployments", { deployments: [] });
       answering(server, "createDeployment", refusal(409, "dep.conflict"));
-      return aPublisher(client);
+      return new Publisher(client, PROJECT_ID);
     };
 
     it("answers the release it had built", async ({ server, client }) => {
@@ -276,7 +269,7 @@ describe("Publisher.deploy", () => {
       buildingRelease(server, "2026-01-01T00:00:00Z");
 
       const error = await rejectionOf(() => {
-        return aPublisher(client).deploy({ prepared: PREPARED });
+        return new Publisher(client, PROJECT_ID).deploy({ prepared: PREPARED });
       });
 
       expect(error).toBeInstanceOf(ConflictError);
@@ -287,7 +280,7 @@ describe("Publisher.deploy", () => {
       const deployed = answering(server, "createDeployment", aDeployment());
 
       await rejectionOf(() => {
-        return aPublisher(client).deploy({ prepared: PREPARED });
+        return new Publisher(client, PROJECT_ID).deploy({ prepared: PREPARED });
       });
 
       expect(deployed).toEqual([]);
@@ -303,7 +296,7 @@ describe("Publisher.preview", () => {
     buildingRelease(server);
     const deployed = answering(server, "createDeployment", aDeployment());
 
-    await aPublisher(client).preview({
+    await new Publisher(client, PROJECT_ID).preview({
       prepared: PREPARED,
       urls: [PREVIEW_URL],
       ttl: "PT2H",
@@ -319,7 +312,7 @@ describe("Publisher.preview", () => {
     buildingRelease(server);
     const deployed = answering(server, "createDeployment", aDeployment());
 
-    await aPublisher(client).preview({ prepared: PREPARED, urls: [PREVIEW_URL] });
+    await new Publisher(client, PROJECT_ID).preview({ prepared: PREPARED, urls: [PREVIEW_URL] });
 
     expect(bodiesAndScopes(deployed)).toEqual([
       [expect.not.objectContaining({ ttl: expect.anything() }), SCOPE],
@@ -332,7 +325,7 @@ describe("Publisher.deployInitial", () => {
     buildingRelease(server);
     const deployed = answering(server, "createDeployment", aDeployment());
 
-    await aPublisher(client).deployInitial({ prepared: PREPARED, message: "first" });
+    await new Publisher(client, PROJECT_ID).deployInitial({ prepared: PREPARED, message: "first" });
 
     expect(bodiesAndScopes(deployed)).toEqual([
       [{ release_id: "rel_1", targets: "primary", message: "first" }, SCOPE],
@@ -343,7 +336,7 @@ describe("Publisher.deployInitial", () => {
     buildingRelease(server);
     answering(server, "createDeployment", aDeployment());
 
-    const outcome = await aPublisher(client).deployInitial({
+    const outcome = await new Publisher(client, PROJECT_ID).deployInitial({
       prepared: PREPARED,
       message: "first",
     });
@@ -356,7 +349,7 @@ describe("Publisher.deployInitial", () => {
     answering(server, "createDeployment", aDeployment());
     const read = answeringPages(server, "listDeployments", { deployments: [] });
 
-    await aPublisher(client).deployInitial({ prepared: PREPARED });
+    await new Publisher(client, PROJECT_ID).deployInitial({ prepared: PREPARED });
 
     expect(read).toEqual([]);
   });
@@ -462,7 +455,7 @@ describe("Publisher.prepare", () => {
         answeringVariables(server, ACME_SECRET_HELD);
         const listed = answering(server, "queryIdps", listing("acme"));
 
-        await aPublisher(client).prepare(aDryRunOf(dir));
+        await new Publisher(client, PROJECT_ID).prepare(aDryRunOf(dir));
 
         expect(listed).toEqual([]);
       });
