@@ -45,6 +45,8 @@ A value that belongs to the design system goes into Figma and is re-synced.
   halves under `[data-theme="light"]`.
 - Themed groups (`--zl-syntax-*`, `--zl-gradient-*`) theme the same way but
   stay out of `css/shadcn.css`, which owns the unprefixed shadcn contract.
+- The brand palette (`--zl-brand-<hue>-<step>`) has one value in both themes
+  and stays out of `css/shadcn.css`; screens and atoms paint with the roles.
 - Composed gradients (`--zl-gradient-red`) are built in `build.ts` from the
   exported colours, at the angles and stops in `overrides.ts`, until Figma
   publishes those as variables.

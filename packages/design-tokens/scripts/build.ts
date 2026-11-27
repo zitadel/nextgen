@@ -65,6 +65,11 @@ interface ShadcnTokensFile {
    */
   themed: Record<string, Record<string, { dark: Hex; light: Hex }>>;
   typography: Record<string, Record<string, unknown>>;
+  /**
+   * Single-mode colour ramps — the brand palette — keyed `"<hue>.<step>"` per
+   * group. Emitted as `--zl-<group>-<hue>-<step>`, the same in both themes.
+   */
+  palette: Record<string, Record<string, Hex>>;
 }
 
 const shadcn = shadcnTokens as unknown as ShadcnTokensFile;
@@ -321,11 +326,24 @@ function build(): BuildResult {
     ]);
   }
 
+  // ---- palettes (the brand ramps): one value in both themes, so no light
+  // override. Like the themed groups, aliased as Tailwind colours and kept out
+  // of `shadcn.css`: screens paint with the semantic roles, not a ramp step.
+  const paletteColorVars: string[] = [];
+  for (const [group, members] of Object.entries(shadcn.palette ?? {})) {
+    for (const [key, hex] of Object.entries(members)) {
+      const segments = key.split(".");
+      const cssVar = cssVarName(group, ...segments);
+      paletteColorVars.push(cssVar);
+      push(cssVar, hex, [group, ...segments]);
+    }
+  }
+
   const css = emitCss(cssVars, lightVars);
   return {
     css,
     ts: emitTs(tsTree, refTree, css),
-    tailwind: emitTailwind(cssVars, [...shadcnColorVars, ...themedColorVars]),
+    tailwind: emitTailwind(cssVars, [...shadcnColorVars, ...themedColorVars, ...paletteColorVars]),
     shadcn: emitShadcn(shadcnColorVars),
   };
 }

@@ -28,9 +28,8 @@ export const metadata: Metadata = {
 };
 
 // The hosted cloud's favicons, which the website serves at /favicons/
-// (apps/website/AGENTS.md), declared as the website declares them: a dark
-// mark for a light browser, a light one for a dark browser. Outside the
-// cloud nothing serves them.
+// (apps/website/AGENTS.md), declared as the website declares them. Outside
+// the cloud nothing serves them.
 function favicons(): Metadata["icons"] {
   const schemes = ["light", "dark"].map((scheme) => ({
     dir: `/favicons/${scheme}`,

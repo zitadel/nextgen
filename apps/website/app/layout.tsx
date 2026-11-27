@@ -56,10 +56,9 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title, description, images: [og.src] },
 };
 
-// The website's favicons (packages/theme/assets/favicons in
-// zitadel/new-website), served from public/favicons/ and declared as it does:
-// a dark mark for a light browser, a light one for a dark browser. The
-// console, the login UI and the docs link this same set (AGENTS.md).
+// The brand guide's orange mark, served from public/favicons/: the same files
+// under light/ and dark/, declared per scheme because the console, the login
+// UI, the docs and the server's error page link those URLs (AGENTS.md).
 function favicons(): Metadata["icons"] {
   const schemes = ["light", "dark"].map((scheme) => ({
     dir: `/favicons/${scheme}`,

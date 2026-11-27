@@ -24,6 +24,7 @@ block) so it never collides with consumer tokens.
 | --- | --- | --- |
 | shadcn | `--zl-background`, `--zl-foreground`, `--zl-primary`, `--zl-card`, `--zl-border`, `--zl-sidebar-*`, `--zl-chart-*` | designer DTCG export (`figma-export/`) |
 | Themed groups | `--zl-syntax-*`, `--zl-gradient-*` | designer DTCG export (`figma-export/`) |
+| Brand palette | `--zl-brand-<hue>-<step>`: `orange`, `purple`, `pink`, `gray` | designer DTCG export (`figma-export/`) |
 
 Themed groups are the designer's Light/Dark collections beyond the shadcn
 roles — syntax highlighting colours and gradient stops. They live under
@@ -38,8 +39,13 @@ rather than a colour, so it has no `bg-zl-*` alias: read it as
 `var(--zl-gradient-red)` (in Tailwind, `bg-(image:--zl-gradient-red)`) or
 `cssVars.gradient.red`.
 
-All are themed: dark values live on `:root` / `[data-theme="dark"]`, light
-overrides on `[data-theme="light"]`. In the typed export the shadcn colours
+The brand palette is the brand guide's colour ramps, one value in both modes:
+`tokens.brand.orange["400"]`, aliased for Tailwind as `bg-zl-brand-orange-400`
+and kept out of `css/shadcn.css` too. Screens paint with the semantic roles;
+the ramps are for brand surfaces such as gradients and illustrations.
+
+All but the brand palette are themed: dark values live on `:root` /
+`[data-theme="dark"]`, light overrides on `[data-theme="light"]`. In the typed export the shadcn colours
 live under `tokens.theme.*`.
 
 ## Why a separate package?
@@ -104,7 +110,7 @@ Sync **never** commits to `main` directly.
   an empty colour surface, so a broken designer push stops the workflow before
   it can open a PR with silently-dropped tokens.
 - **Declared roles.** `src/collections.ts` says what each Figma collection is
-  (`semantic`, `themed`, `viewport`, `primitives`, `registry-only`), so adding
+  (`semantic`, `themed`, `viewport`, `primitives`, `palette`, `registry-only`), so adding
   or renaming a collection in Figma is a decision someone makes rather than one
   the resolver guesses. An unclassified export defaults to `registry-only` and
   is reported in `$source.unclassifiedCollections`, where the resolver spec
@@ -151,8 +157,8 @@ brand palette, gradient stops, heading typography, and syntax colours), but the
 resolver does not care about their file names — add, rename, or split export
 files freely. What each one *is* is declared in `src/collections.ts`; see the
 role table in [AGENTS.md](AGENTS.md). A collection can be `registry-only`:
-`brand` exists purely to be referenced by `{brand.*}` aliases and surfaces no
-variables of its own.
+`1--tailwindcss` exists purely to be referenced by `{tailwind colors.*}` aliases
+and surfaces no colours of its own.
 
 ## Adding a new token
 
