@@ -4069,20 +4069,37 @@ describe("api-mock invitations", () => {
 });
 
 describe("api-mock teams, users and grants", () => {
-  async function newProject(name: string): Promise<{ id: string; auth: Record<string, string> }> {
+  type Project = { id: string; schemaId: string; auth: Record<string, string> };
+
+  async function newProject(name: string): Promise<Project> {
     const res = await fetch(`${API}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name }),
     });
     const body = (await res.json()) as { id: string; project_secret: string };
-    return { id: body.id, auth: { authorization: `Bearer ${body.project_secret}` } };
-  }
-
-  async function created(path: string, body: Record<string, unknown>): Promise<string> {
-    const res = await fetch(`${API}${path}`, {
+    const schema = await fetch(`${API}/schemas?project_id=${body.id}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "user-schema",
+        metaSchema: "https://zitadel.com/schemas/v1/user-schema.json",
+        objectType: name,
+        "x-auth-methods": { password: { enabled: true } },
+      }),
+    });
+    const { id: schemaId } = (await schema.json()) as { id: string };
+    return { id: body.id, schemaId, auth: { authorization: `Bearer ${body.project_secret}` } };
+  }
+
+  async function created(
+    project: Project,
+    path: string,
+    body: Record<string, unknown>,
+  ): Promise<string> {
+    const res = await fetch(`${API}${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...project.auth },
       body: JSON.stringify(body),
     });
     expect(res.status).toBe(201);
@@ -4091,7 +4108,7 @@ describe("api-mock teams, users and grants", () => {
 
   test("keeps a deactivated team readable, as deactivated", async () => {
     const project = await newProject("teams-deactivate");
-    const teamId = await created(`/teams?project_id=${project.id}`, { name: "Support" });
+    const teamId = await created(project, `/teams?project_id=${project.id}`, { name: "Support" });
 
     const deactivated = await fetch(`${API}/teams/${teamId}`, {
       method: "DELETE",
@@ -4109,8 +4126,8 @@ describe("api-mock teams, users and grants", () => {
 
   test("removes a deleted user", async () => {
     const project = await newProject("users-delete");
-    const userId = await created(`/users?project_id=${project.id}`, {
-      schema: "schema_default",
+    const userId = await created(project, `/users?project_id=${project.id}`, {
+      schema: project.schemaId,
       attributes: { email: "ada@example.com" },
     });
     const read = await fetch(`${API}/users/${userId}`, { headers: project.auth });
@@ -4129,8 +4146,8 @@ describe("api-mock teams, users and grants", () => {
 
   test("lists the users the project created", async () => {
     const project = await newProject("users-query");
-    const userId = await created(`/users?project_id=${project.id}`, {
-      schema: "schema_default",
+    const userId = await created(project, `/users?project_id=${project.id}`, {
+      schema: project.schemaId,
       attributes: { email: "ada@example.com" },
     });
 
@@ -4148,9 +4165,9 @@ describe("api-mock teams, users and grants", () => {
   test("answers 404 for another project's team and user", async () => {
     const owner = await newProject("scoped-owner");
     const other = await newProject("scoped-other");
-    const teamId = await created(`/teams?project_id=${owner.id}`, { name: "Support" });
-    const userId = await created(`/users?project_id=${owner.id}`, {
-      schema: "schema_default",
+    const teamId = await created(owner, `/teams?project_id=${owner.id}`, { name: "Support" });
+    const userId = await created(owner, `/users?project_id=${owner.id}`, {
+      schema: owner.schemaId,
       attributes: { email: "ada@example.com" },
     });
 
@@ -4165,9 +4182,9 @@ describe("api-mock teams, users and grants", () => {
   test("leaves another project's team and user as they were on a delete", async () => {
     const owner = await newProject("idempotent-owner");
     const other = await newProject("idempotent-other");
-    const teamId = await created(`/teams?project_id=${owner.id}`, { name: "Support" });
-    const userId = await created(`/users?project_id=${owner.id}`, {
-      schema: "schema_default",
+    const teamId = await created(owner, `/teams?project_id=${owner.id}`, { name: "Support" });
+    const userId = await created(owner, `/users?project_id=${owner.id}`, {
+      schema: owner.schemaId,
       attributes: { email: "ada@example.com" },
     });
 
@@ -4189,11 +4206,11 @@ describe("api-mock teams, users and grants", () => {
 
   test("refuses a second active team with the same name", async () => {
     const project = await newProject("teams-duplicate");
-    await created(`/teams?project_id=${project.id}`, { name: "Support" });
+    await created(project, `/teams?project_id=${project.id}`, { name: "Support" });
 
     const res = await fetch(`${API}/teams?project_id=${project.id}`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...project.auth },
       body: JSON.stringify({ name: "support" }),
     });
 
@@ -4205,12 +4222,84 @@ describe("api-mock teams, users and grants", () => {
 
     const res = await fetch(`${API}/users?project_id=${project.id}`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...project.auth },
       body: JSON.stringify({}),
     });
 
     expect(res.status).toBe(400);
   });
+
+  test("keeps a deactivated team's name taken", async () => {
+    const project = await newProject("teams-deactivated-name");
+    const teamId = await created(project, `/teams?project_id=${project.id}`, { name: "Support" });
+    await fetch(`${API}/teams/${teamId}`, { method: "DELETE", headers: project.auth });
+
+    const res = await fetch(`${API}/teams?project_id=${project.id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...project.auth },
+      body: JSON.stringify({ name: "Support" }),
+    });
+
+    expect(res.status).toBe(409);
+  });
+
+  test("refuses a second user with the same email", async () => {
+    const project = await newProject("users-duplicate");
+    await created(project, `/users?project_id=${project.id}`, {
+      schema: project.schemaId,
+      attributes: { email: "ada@example.com" },
+    });
+
+    const res = await fetch(`${API}/users?project_id=${project.id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...project.auth },
+      body: JSON.stringify({ schema: project.schemaId, attributes: { email: "ADA@example.com" } }),
+    });
+
+    expect(res.status).toBe(409);
+  });
+
+  test("refuses a user on a schema the project does not hold", async () => {
+    const project = await newProject("users-unknown-schema");
+
+    const res = await fetch(`${API}/users?project_id=${project.id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...project.auth },
+      body: JSON.stringify({ schema: "sch_missing", attributes: { email: "ada@example.com" } }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  test.each(["teams", "users", "grants"])(
+    "refuses a %s create without the project's secret",
+    async (path) => {
+      const project = await newProject(`unauthenticated-${path}`);
+
+      const res = await fetch(`${API}/${path}?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Support" }),
+      });
+
+      expect(res.status).toBe(401);
+    },
+  );
+
+  test.each(["teams", "users", "grants"])(
+    "refuses a %s create for a project that does not exist",
+    async (path) => {
+      const project = await newProject(`missing-${path}`);
+
+      const res = await fetch(`${API}/${path}?project_id=proj_missing`, {
+        method: "POST",
+        headers: { "content-type": "application/json", ...project.auth },
+        body: JSON.stringify({ name: "Support" }),
+      });
+
+      expect(res.status).toBe(404);
+    },
+  );
 
   test("refuses a user list without a project secret", async () => {
     const res = await fetch(`${API}/users/query`, {
@@ -4224,12 +4313,12 @@ describe("api-mock teams, users and grants", () => {
 
   test("pages the user list", async () => {
     const project = await newProject("users-paging");
-    const first = await created(`/users?project_id=${project.id}`, {
-      schema: "schema_default",
+    const first = await created(project, `/users?project_id=${project.id}`, {
+      schema: project.schemaId,
       attributes: { email: "ada@example.com" },
     });
-    const second = await created(`/users?project_id=${project.id}`, {
-      schema: "schema_default",
+    const second = await created(project, `/users?project_id=${project.id}`, {
+      schema: project.schemaId,
       attributes: { email: "bob@example.com" },
     });
     const page = async (token: string | null) =>
@@ -4251,14 +4340,14 @@ describe("api-mock teams, users and grants", () => {
 
   test("grants a user named by an identifier, answering 202", async () => {
     const project = await newProject("grants-identifier");
-    const userId = await created(`/users?project_id=${project.id}`, {
-      schema: "schema_default",
+    const userId = await created(project, `/users?project_id=${project.id}`, {
+      schema: project.schemaId,
       attributes: { email: "ada@example.com" },
     });
 
     const res = await fetch(`${API}/grants?project_id=${project.id}`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...project.auth },
       body: JSON.stringify({ relation: "viewer", user: { identifier: "ADA@example.com" } }),
     });
     const listed = (await (
@@ -4278,11 +4367,11 @@ describe("api-mock teams, users and grants", () => {
   test("answers 404 for a grant on another project's team", async () => {
     const owner = await newProject("grants-owner");
     const other = await newProject("grants-other");
-    const teamId = await created(`/teams?project_id=${owner.id}`, { name: "Support" });
+    const teamId = await created(owner, `/teams?project_id=${owner.id}`, { name: "Support" });
 
     const res = await fetch(`${API}/grants?project_id=${other.id}`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...other.auth },
       body: JSON.stringify({ relation: "viewer", team: { team_id: teamId } }),
     });
 
@@ -4291,15 +4380,15 @@ describe("api-mock teams, users and grants", () => {
 
   test("refuses a grant the principal already holds", async () => {
     const project = await newProject("grants-duplicate");
-    const teamId = await created(`/teams?project_id=${project.id}`, { name: "Support" });
-    await created(`/grants?project_id=${project.id}`, {
+    const teamId = await created(project, `/teams?project_id=${project.id}`, { name: "Support" });
+    await created(project, `/grants?project_id=${project.id}`, {
       relation: "viewer",
       team: { team_id: teamId },
     });
 
     const res = await fetch(`${API}/grants?project_id=${project.id}`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...project.auth },
       body: JSON.stringify({ relation: "viewer", team: { team_id: teamId } }),
     });
 
@@ -4318,11 +4407,11 @@ describe("api-mock teams, users and grants", () => {
 
   test("revokes a deleted user's grants", async () => {
     const project = await newProject("grants-user-deleted");
-    const userId = await created(`/users?project_id=${project.id}`, {
-      schema: "schema_default",
+    const userId = await created(project, `/users?project_id=${project.id}`, {
+      schema: project.schemaId,
       attributes: { email: "ada@example.com" },
     });
-    await created(`/grants?project_id=${project.id}`, {
+    await created(project, `/grants?project_id=${project.id}`, {
       relation: "viewer",
       user: { user_id: userId },
     });
@@ -4341,8 +4430,8 @@ describe("api-mock teams, users and grants", () => {
 
   test("lists a team's grant until it is deleted", async () => {
     const project = await newProject("grants-delete");
-    const teamId = await created(`/teams?project_id=${project.id}`, { name: "Support" });
-    const grantId = await created(`/grants?project_id=${project.id}`, {
+    const teamId = await created(project, `/teams?project_id=${project.id}`, { name: "Support" });
+    const grantId = await created(project, `/grants?project_id=${project.id}`, {
       relation: "viewer",
       team: { team_id: teamId },
     });

@@ -348,16 +348,16 @@ describe("release revoke", () => {
 
         await app.run(["release", "revoke", releaseId, "--force", "--non-interactive", "--json"]);
 
-        expect(
-          await app.run([
-            "deployment",
-            "create",
-            "--release",
-            releaseId,
-            "--non-interactive",
-            "--json",
-          ]),
-        ).toFailWith("E_CONFLICT");
+        const result = await app.run([
+          "deployment",
+          "create",
+          "--release",
+          releaseId,
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf(result).message).toBe("release: revoked");
       });
 
       it("refuses a release the server does not hold", async () => {

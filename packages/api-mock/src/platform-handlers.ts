@@ -2225,16 +2225,34 @@ function bearerProjectId(request: Request): string | undefined {
 }
 
 /**
- * Whether a string attribute of the user is `identifier`, compared without case.
+ * Why a create for `projectId` is refused before its body is read: the
+ * project does not exist, or the bearer is not that project's secret.
+ *
+ * @param request - The request.
+ * @param projectId - The project the create names.
+ * @returns The refusal, or undefined when the create may go on.
+ */
+function createRefusal(request: Request, projectId: string): HttpResponse<ErrorBody> | undefined {
+  if (!store.projects.has(projectId)) {
+    return HttpResponse.json(errorBody("proj.not_found", "resource not found"), { status: 404 });
+  }
+  if (bearerProjectId(request) !== projectId) {
+    return HttpResponse.json(errorBody("auth.unauthorized", "missing or invalid credentials"), {
+      status: 401,
+    });
+  }
+  return undefined;
+}
+
+/**
+ * A user's identifier: its `email`, which the default schema designates.
  *
  * @param user - The user.
- * @param identifier - The identifier a request names.
- * @returns True when one of the user's attributes is it.
+ * @returns The identifier, or undefined when the user has none.
  */
-function hasIdentifier(user: UserRecord, identifier: string): boolean {
-  return Object.values(user.attributes).some((value) => {
-    return typeof value === "string" && value.toLowerCase() === identifier.toLowerCase();
-  });
+function identifierOf(user: UserRecord): string | undefined {
+  const email = user.attributes.email;
+  return typeof email === "string" ? email.toLowerCase() : undefined;
 }
 
 /**
@@ -2252,15 +2270,16 @@ function grantPrincipal(
   },
 ): { user_id: string } | { team_id: string } | undefined {
   const { user: userRef, team: teamRef } = body;
-  const user = [...store.users.values()].find((candidate) => {
+  const users = [...store.users.values()].filter((candidate) => {
     return (
       candidate.projectId === projectId &&
       (candidate.id === userRef?.user_id ||
-        (userRef?.identifier !== undefined && hasIdentifier(candidate, userRef.identifier)))
+        (userRef?.identifier !== undefined &&
+          identifierOf(candidate) === userRef.identifier.toLowerCase()))
     );
   });
-  if (user !== undefined) {
-    return { user_id: user.id };
+  if (users.length === 1 && users[0] !== undefined) {
+    return { user_id: users[0].id };
   }
   const team = [...store.teams.values()].find(
     (candidate) =>
@@ -4084,13 +4103,16 @@ export function setupPlatformHandlers() {
       if (!query.ok) {
         return query.response;
       }
+      const refusal = createRefusal(request, query.data.project_id);
+      if (refusal !== undefined) {
+        return refusal;
+      }
       const body = parse(CreateTeamBody, await readJson(request));
       if (!body.ok) {
         return body.response;
       }
       const taken = [...store.teams.values()].some((candidate) => {
         return (
-          candidate.status === "active" &&
           candidate.projectId === query.data.project_id &&
           candidate.name.toLowerCase() === body.data.name.toLowerCase()
         );
@@ -4151,9 +4173,30 @@ export function setupPlatformHandlers() {
       if (!query.ok) {
         return query.response;
       }
+      const refusal = createRefusal(request, query.data.project_id);
+      if (refusal !== undefined) {
+        return refusal;
+      }
       const body = parse(CreateUserBody, await readJson(request));
       if (!body.ok) {
         return body.response;
+      }
+      const schema = store.schemas.get(body.data.schema);
+      if (schema === undefined || schema.projectId !== query.data.project_id) {
+        return HttpResponse.json(errorBody("req.invalid", "schema not found"), { status: 400 });
+      }
+      const email = body.data.attributes.email;
+      const taken = [...store.users.values()].some((candidate) => {
+        return (
+          candidate.projectId === query.data.project_id &&
+          typeof email === "string" &&
+          identifierOf(candidate) === email.toLowerCase()
+        );
+      });
+      if (taken) {
+        return HttpResponse.json(errorBody("user.already_exists", "user already exists"), {
+          status: 409,
+        });
       }
       const user: UserRecord = {
         id: `user_${shortId()}`,
@@ -4241,6 +4284,10 @@ export function setupPlatformHandlers() {
       const query = parse(CreateGrantQueryParams, queryRecord(request));
       if (!query.ok) {
         return query.response;
+      }
+      const refusal = createRefusal(request, query.data.project_id);
+      if (refusal !== undefined) {
+        return refusal;
       }
       const body = parse(CreateGrantBody, await readJson(request));
       if (!body.ok) {
