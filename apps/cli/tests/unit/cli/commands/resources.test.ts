@@ -9,6 +9,7 @@ import {
   type ListSchemas200,
   type ListSchemasParams,
   QueryGrantsBodyFilterItemOperation,
+  QueryApplicationsBodyFilterItemOperation,
   QueryIdpsBodyFilterItemOperation,
   QueryProjectsBodyFilterItemOperation,
   QuerySessionsBodyFilterItemOperation,
@@ -261,7 +262,7 @@ describe("resource registry", () => {
     }
     // Guard against this check quietly covering nothing, which is what it did
     // when the registry shape changed underneath it.
-    expect(checked.length).toBe(6);
+    expect(checked.length).toBe(7);
   });
 });
 
@@ -2433,6 +2434,7 @@ describe("the query resources' filters", () => {
     ["session", QuerySessionsBodyFilterItemOperation],
     ["grant", QueryGrantsBodyFilterItemOperation],
     ["idp", QueryIdpsBodyFilterItemOperation],
+    ["application", QueryApplicationsBodyFilterItemOperation],
     ["project", QueryProjectsBodyFilterItemOperation],
   ] as const)("offer the operations the %s query takes, and no other", (topic, operations) => {
     const offered = new Set<string>(
@@ -2879,6 +2881,7 @@ describe("the paged resources' lists", () => {
     ["event", pagedFunctions.listEvents],
     ["grant", pagedFunctions.queryGrants],
     ["idp", pagedFunctions.queryIdps],
+    ["application", pagedFunctions.queryApplications],
     ["project", pagedFunctions.queryProjects],
     ["release", pagedFunctions.listReleases],
   ] as const)("read %s's pages with the readers the client generates", (topic, readers) => {

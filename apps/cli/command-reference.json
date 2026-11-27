@@ -3148,6 +3148,128 @@
       ]
     },
     {
+      "id": "application get",
+      "group": "Sign-in",
+      "description": "Get one application by id.",
+      "args": [
+        {
+          "name": "id",
+          "description": "application id",
+          "required": true
+        }
+      ],
+      "flags": [
+        {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "application get <id>"
+        },
+        {
+          "command": "application get <id> --json"
+        }
+      ]
+    },
+    {
+      "id": "application list",
+      "group": "Sign-in",
+      "description": "List applications.",
+      "args": [],
+      "flags": [
+        {
+          "name": "limit",
+          "description": "Page size (server default 20, max 100).",
+          "type": "option",
+          "min": 1,
+          "max": 100
+        },
+        {
+          "name": "page-token",
+          "description": "Continue from a previous page's next_page_token.",
+          "type": "option"
+        },
+        {
+          "name": "all",
+          "char": "a",
+          "description": "Fetch every page instead of one.",
+          "type": "boolean",
+          "exclusive": [
+            "page-token"
+          ]
+        },
+        {
+          "name": "fields",
+          "description": "Fields to show and to return under --json, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the command's own columns.",
+          "type": "option"
+        },
+        {
+          "name": "filter",
+          "description": "Filter as field=operation:value (operation defaults to equals). Fields: slug (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
+          "type": "option",
+          "multiple": true
+        },
+        {
+          "name": "sort",
+          "description": "Sort as field:direction (asc|desc). Fields: slug, created_at.",
+          "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "application list --json"
+        },
+        {
+          "command": "application list --all --json"
+        },
+        {
+          "command": "application list --filter slug=equals:<value> --sort slug:desc"
+        }
+      ]
+    },
+    {
       "id": "project get",
       "group": "Project settings",
       "description": "Get one project by id.",

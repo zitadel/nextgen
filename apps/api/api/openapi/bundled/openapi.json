@@ -7464,6 +7464,7 @@
     "/applications/{application_id}": {
       "get": {
         "operationId": "getApplication",
+        "x-zitadel-cli": "application get",
         "summary": "Get an application by ID",
         "description": "Returns an application that authenticates its users via Zitadel, by ID\nat its newest revision, with each client's `client_id` in `definition`. It\nnever returns a client secret: `publishApplication` (`POST /applications`)\nshows one once, when it creates the client.\n\nThe lookup is scoped to the project in `project_id`.\n",
         "tags": [

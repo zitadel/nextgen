@@ -55,6 +55,7 @@ Sign-in
   branding         Manage the login branding
   flow-definition  View login flows
   policy           View and test policies
+  application      View applications
 
 Project settings
   project          View and update projects

@@ -135,6 +135,8 @@ which ships in this package.
 <!-- commands -->
 * [`zitadel api [OPERATION]`](#zitadel-api-operation)
 * [`zitadel api ls [FILTER]`](#zitadel-api-ls-filter)
+* [`zitadel application get ID`](#zitadel-application-get-id)
+* [`zitadel application list`](#zitadel-application-list)
 * [`zitadel auth-method passkey disable`](#zitadel-auth-method-passkey-disable)
 * [`zitadel auth-method passkey enable`](#zitadel-auth-method-passkey-enable)
 * [`zitadel auth-method password disable`](#zitadel-auth-method-password-disable)
@@ -331,6 +333,97 @@ EXAMPLES
   $ zitadel api ls --tag Users --json
 
   $ zitadel api ls --json | jq -r '.data.operations[] | select(.command == null) | .id'
+```
+
+## `zitadel application get ID`
+
+Get one application by id.
+
+```
+USAGE
+  $ zitadel application get ID [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [-v] [--debug] [--color] [-e
+    <value>] [--env-file <value>] [--telemetry] [--fields <value>]
+
+ARGUMENTS
+  ID  application id
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting
+                          platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
+      --fields=<value>    Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                          id,attributes.email). Defaults to the command's own columns.
+      --input=<value>     The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                          positional arguments go under "args". Only the global flags may stand beside it.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Get one application by id.
+
+EXAMPLES
+  $ zitadel application get <id>
+
+  $ zitadel application get <id> --json
+```
+
+## `zitadel application list`
+
+List applications.
+
+```
+USAGE
+  $ zitadel application list [--json] [-c <value>] [-s <value>] [--input <value>] [-n] [-v] [--debug] [--color] [-e
+    <value>] [--env-file <value>] [--telemetry] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
+    [--filter <value>...] [--sort <value>] [--plain]
+
+FLAGS
+  -a, --all                 Fetch every page instead of one.
+  -c, --cwd=<value>         Project directory to operate on.
+  -e, --env=<value>         Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting
+                            platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -n, --non-interactive     Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>      Override the resolved server URL.
+  -v, --verbose             Verbose logging.
+      --[no-]color          Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
+      --debug               Debug logging.
+      --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. A relative path is
+                            read from the current directory, not from --cwd. Cannot be combined with --env.
+      --fields=<value>      Fields to show and to return under --json, comma-separated dot-paths (e.g.
+                            id,attributes.email). Defaults to the command's own columns.
+      --filter=<value>...   Filter as field=operation:value (operation defaults to equals). Fields: slug (equals|not_equ
+                            als|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal),
+                            created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_tha
+                            n|greater_than_or_equal).
+      --input=<value>       The whole invocation as JSON: inline, '@file.json' or '-' for stdin. Keys are flag names;
+                            positional arguments go under "args". Only the global flags may stand beside it.
+      --limit=<value>       Page size (server default 20, max 100).
+      --page-token=<value>  Continue from a previous page's next_page_token.
+      --plain               Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
+      --sort=<value>        Sort as field:direction (asc|desc). Fields: slug, created_at.
+      --[no-]telemetry      Send anonymous usage analytics. Disable with --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List applications.
+
+EXAMPLES
+  $ zitadel application list --json
+
+  $ zitadel application list --all --json
+
+  $ zitadel application list --filter slug=equals:<value> --sort slug:desc
 ```
 
 ## `zitadel auth-method passkey disable`
