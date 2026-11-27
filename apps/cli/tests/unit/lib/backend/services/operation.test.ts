@@ -117,13 +117,14 @@ describe("OperationService.call", () => {
 
     await expect(
       send(SERVER, "s", requestFor("setVariables", ["FOO:=null", "project_id=proj_1"]), signal),
-    ).resolves.toMatchObject({ status: 200 });
+    ).resolves.toEqual({ status: 200, body: { variables: [] } });
   });
 
   it("answers text for a response that is not JSON", async ({ server }) => {
     server.use(http.get(`${SERVER}/api/v1/livez`, () => HttpResponse.text("alive")));
 
-    await expect(send(SERVER, undefined, requestFor("getLive"), signal)).resolves.toMatchObject({
+    await expect(send(SERVER, undefined, requestFor("getLive"), signal)).resolves.toEqual({
+      status: 200,
       body: "alive",
     });
   });
@@ -151,11 +152,12 @@ describe("OperationService.call", () => {
       ),
     );
 
-    await expect(
-      send(SERVER, "s", requestFor("getTeam", [], ["team_1"]), signal),
-    ).resolves.toMatchObject({
-      body: { name: "\u001b[2Jwiped" },
-    });
+    await expect(send(SERVER, "s", requestFor("getTeam", [], ["team_1"]), signal)).resolves.toEqual(
+      {
+        status: 200,
+        body: { name: "\u001b[2Jwiped" },
+      },
+    );
   });
 
   it("fails a refusal as the error the CLI maps to an exit code", async ({ server }) => {
@@ -242,7 +244,7 @@ describe("OperationService.callAll", () => {
       signal,
     );
 
-    expect(response.body).toMatchObject({ passkeys: ["d", "e", "f", "g"] });
+    expect(response.body).toEqual({ passkeys: ["d", "e", "f", "g"], next_page_token: "" });
   });
 
   it("starts from the page the caller named in the body", async ({ server }) => {
@@ -264,7 +266,7 @@ describe("OperationService.callAll", () => {
       signal,
     );
 
-    expect(response.body).toMatchObject({ users: ["d", "e", "f", "g"] });
+    expect(response.body).toEqual({ users: ["d", "e", "f", "g"], next_page_token: "" });
   });
 
   it("sends a cursor back as the server wrote it, and gathers the items as they came", async ({

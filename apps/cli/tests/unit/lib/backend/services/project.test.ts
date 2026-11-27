@@ -21,8 +21,9 @@ describe("ProjectService.get", () => {
       origins: [{ pattern: PRIMARY_ORIGIN, kind: "primary" }],
     });
 
-    await expect(new ProjectService(client).get("proj_1")).resolves.toMatchObject({
-      origins: [{ pattern: PRIMARY_ORIGIN }],
+    await expect(new ProjectService(client).get("proj_1")).resolves.toEqual({
+      id: "proj_1",
+      origins: [{ pattern: PRIMARY_ORIGIN, kind: "primary" }],
     });
   });
 });
@@ -44,7 +45,8 @@ describe("ProjectService.create", () => {
       preview_secret: "pk_proj_1",
     });
 
-    await expect(new ProjectService(client).create({ name: "acme" })).resolves.toMatchObject({
+    await expect(new ProjectService(client).create({ name: "acme" })).resolves.toEqual({
+      id: "proj_1",
       project_secret: "sk_proj_1",
       preview_secret: "pk_proj_1",
     });

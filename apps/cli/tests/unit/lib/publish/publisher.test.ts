@@ -1,8 +1,10 @@
+import type { ListDeployments200DeploymentsItem } from "@zitadel/api/generated/model";
 import type { SetupServer } from "msw/node";
 import { afterEach, describe, expect, vi } from "vitest";
 
 import { createZitadelClient, type ZitadelClient } from "@/lib/backend";
 import { ConflictError } from "@/lib/backend/errors";
+import { Deployment } from "@/lib/backend/services/deployment";
 import { ZitadelError } from "@/lib/errors";
 import { type PreparedRelease, type PrepareRequest, Publisher } from "@/lib/publish/publisher";
 import { Output } from "@/lib/ui";
@@ -230,15 +232,25 @@ describe("Publisher.deploy", () => {
     it("answers the release it built", async ({ server, client }) => {
       const outcome = await landing(server, client).deploy({ prepared: PREPARED });
 
-      expect(outcome.release).toMatchObject({ id: "rel_1" });
+      expect(outcome.release).toEqual({ id: "rel_1" });
     });
 
     it("answers the deployment that made it live", async ({ server, client }) => {
       const outcome = await landing(server, client).deploy({ prepared: PREPARED });
 
-      expect(outcome.publication).toMatchObject({
+      const deployed: ListDeployments200DeploymentsItem = {
+        id: "dep_1",
+        project_id: PROJECT_ID,
+        release_id: "rel_1",
+        kind: "primary",
+        status: "live",
+        deployed_at: "2026-01-01T00:00:00Z",
+        targets: [{ origin: PRIMARY_ORIGIN }],
+        metadata: { reason: "deploy" },
+      };
+      expect(outcome.publication).toEqual({
         outcome: "deployed",
-        deployment: { id: "dep_1" },
+        deployment: Deployment.of(deployed),
       });
     });
   });
@@ -261,13 +273,13 @@ describe("Publisher.deploy", () => {
     it("answers the release it had built", async ({ server, client }) => {
       const outcome = await racing(server, client).deploy({ prepared: PREPARED });
 
-      expect(outcome.release).toMatchObject({ id: "rel_1" });
+      expect(outcome.release).toEqual({ id: "rel_1" });
     });
 
     it("answers the race it lost", async ({ server, client }) => {
       const outcome = await racing(server, client).deploy({ prepared: PREPARED });
 
-      expect(outcome.publication).toMatchObject({ outcome: "raced" });
+      expect(outcome.publication).toEqual({ outcome: "raced", current: undefined });
     });
   });
 
@@ -322,7 +334,7 @@ describe("Publisher.preview", () => {
     await aPublisher(client).preview({ prepared: PREPARED, urls: [PREVIEW_URL] });
 
     expect(bodiesAndScopes(deployed)).toEqual([
-      [expect.not.objectContaining({ ttl: expect.anything() }), SCOPE],
+      [{ release_id: "rel_1", targets: [PREVIEW_URL] }, SCOPE],
     ]);
   });
 });

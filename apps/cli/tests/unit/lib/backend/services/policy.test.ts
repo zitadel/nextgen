@@ -134,7 +134,7 @@ describe("PolicyService.evaluate", () => {
         config: {},
         input: { password: "hunter2" },
       }),
-    ).resolves.toMatchObject({ allowed: true });
+    ).resolves.toEqual({ allowed: true });
     expect(
       evaluated.map(({ body, url }) => {
         return [body, Object.fromEntries(url.searchParams)];
