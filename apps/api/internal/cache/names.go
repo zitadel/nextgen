@@ -5,6 +5,7 @@ package cache
 // is generic and cannot name itself, and two caches built under the same name
 // sum into one series.
 const (
-	NameCrypter    = "crypter"
-	NameSigningKey = "signing_key"
+	NameCrypter          = "crypter"
+	NameSigningKey       = "signing_key"
+	NamePublicSigningKey = "public_signing_key"
 )

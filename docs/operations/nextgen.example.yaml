@@ -141,3 +141,6 @@ session:
 # deployed to that origin enables OAuth. Env: NEXTGEN_OAUTH_ENABLED.
 oauth:
   enabled: false
+  # How long a verifier may cache a project's JWKS (Cache-Control max-age).
+  # Env: NEXTGEN_OAUTH_JWKS_MAX_AGE.
+  jwks_max_age: 5m
