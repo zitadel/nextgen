@@ -1,4 +1,5 @@
-import { resolve as resolvePath } from "node:path";
+import { readFile } from "node:fs/promises";
+import { join, resolve as resolvePath } from "node:path";
 
 import { Flags } from "@oclif/core";
 import { webApplication } from "@zitadel/config/application-presets";
@@ -17,10 +18,18 @@ import { ApplicationService, ConflictError } from "@/lib/backend";
 import { Project } from "@/lib/project";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
-/** Client kinds a person may pick; `help` arrives in Slice 2. */
+/** Client kinds a person may pick on the wire (`--preset`). */
 const PRESETS = ["web", "spa", "native"] as const;
 
 type Preset = (typeof PRESETS)[number];
+
+/** Kind-menu choice that opens the Help me choose wizard; never a `--preset`. */
+const HELP = "help" as const;
+
+type KindChoice = Preset | typeof HELP;
+
+/** Sentinel for “Custom…” in a redirect or origin choice list. */
+const CUSTOM = "__custom__" as const;
 
 /** What each preset is called in the kind menu. */
 const PRESET_LABELS: Readonly<Record<Preset, string>> = {
@@ -35,6 +44,59 @@ const PRESET_HINTS: Readonly<Record<Preset, string>> = {
   spa: "Sign-in runs in browser code only, e.g. a React, Vue or Angular SPA.",
   native: "An installed iOS, Android or desktop app that signs in via the system browser.",
 };
+
+/** Suggested redirect URIs for each preset, before Custom…. */
+const REDIRECT_SUGGESTIONS: Readonly<Record<Preset, readonly string[]>> = {
+  web: ["http://localhost:3000/auth/callback", "http://localhost:3000/api/auth/callback/zitadel"],
+  spa: ["http://localhost:5173/callback"],
+  native: ["com.acme.tunes:/callback", "http://127.0.0.1/callback"],
+};
+
+/**
+ * A lightweight sniff of `package.json` for a preset highlight. Never skips
+ * the kind question; never selects Help me choose.
+ *
+ * @param cwd - The project directory.
+ * @returns The suggested preset, or `web` when nothing matches.
+ */
+async function sniffPreset(cwd: string): Promise<Preset> {
+  try {
+    const raw = await readFile(join(cwd, "package.json"), "utf8");
+    const pkg = JSON.parse(raw) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+      scripts?: Record<string, string>;
+    };
+    const names = new Set([
+      ...Object.keys(pkg.dependencies ?? {}),
+      ...Object.keys(pkg.devDependencies ?? {}),
+    ]);
+    const scripts = Object.values(pkg.scripts ?? {}).join(" ");
+    if (
+      names.has("next") ||
+      names.has("nuxt") ||
+      names.has("@remix-run/react") ||
+      names.has("@remix-run/node") ||
+      /\brails\b/.test(scripts)
+    ) {
+      return "web";
+    }
+    if (
+      names.has("electron") ||
+      names.has("@tauri-apps/api") ||
+      names.has("react-native") ||
+      names.has("expo")
+    ) {
+      return "native";
+    }
+    if (names.has("vite") || names.has("react") || names.has("vue") || names.has("@angular/core")) {
+      return "spa";
+    }
+  } catch {
+    // No package.json or unreadable — keep the default highlight.
+  }
+  return "web";
+}
 
 /** The longest product name the API stores. */
 const NAME_MAX = 256;
@@ -518,25 +580,7 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
       throw refusalError(EMPTY_SLUG_REFUSAL, {});
     }
 
-    const preset =
-      flags.preset ??
-      (await this.ask.select({
-        name: "preset",
-        message: "What are you connecting first?",
-        flag: "--preset",
-        retry: this.suggest({
-          id: "application:create",
-          flags: { preset: "web" },
-        }),
-        initialValue: "web",
-        options: PRESETS.map((value) => {
-          return {
-            value,
-            label: PRESET_LABELS[value],
-            hint: PRESET_HINTS[value],
-          };
-        }),
-      }));
+    const preset = flags.preset ?? (await this.askPreset());
 
     if (originsGiven.length > 0 && preset !== "spa") {
       throw refusalError(ORIGIN_PRESET_REFUSAL, { preset });
@@ -552,7 +596,7 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
         ? []
         : originsGiven.length > 0
           ? this.validatedOrigins(originsGiven)
-          : await this.askOrigins();
+          : await this.askOrigins(redirectUris[0]);
 
     return {
       name,
@@ -613,27 +657,100 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
   }
 
   /**
-   * Asks for at least one redirect URI, then optional more.
+   * Asks which client kind to register, including Help me choose.
    *
-   * @param preset - The client kind, for validation.
+   * @returns The resolved preset (never `help`).
+   */
+  private async askPreset(): Promise<Preset> {
+    const sniffed = await sniffPreset(this.cwd);
+    const choice = await this.ask.select({
+      name: "preset",
+      message: "What are you connecting first?",
+      flag: "--preset",
+      retry: this.suggest({
+        id: "application:create",
+        flags: { preset: "web" },
+      }),
+      initialValue: sniffed,
+      options: [
+        ...PRESETS.map((value) => {
+          return {
+            value: value as KindChoice,
+            label: PRESET_LABELS[value],
+            hint: PRESET_HINTS[value],
+          };
+        }),
+        {
+          value: HELP,
+          label: "Help me choose",
+          hint: "Answer two quick questions",
+        },
+      ],
+    });
+    if (choice !== HELP) {
+      return choice;
+    }
+    const preset = await this.helpMeChoose();
+    this.ui.say(`Using preset: ${PRESET_LABELS[preset]} (--preset ${preset})`);
+    return preset;
+  }
+
+  /**
+   * Taxonomy B: browser vs installed, then whether a server keeps a secret.
+   *
+   * @returns The preset the answers map to.
+   */
+  private async helpMeChoose(): Promise<Preset> {
+    const where = await this.ask.select({
+      name: "sign-in surface",
+      message: "Does sign-in run in a browser, or as an installed app?",
+      options: [
+        {
+          value: "browser" as const,
+          label: "Browser",
+          hint: "Users open it at a web address",
+        },
+        {
+          value: "installed" as const,
+          label: "Installed app",
+          hint: "Users download and install it",
+        },
+      ],
+    });
+    if (where === "installed") {
+      return "native";
+    }
+    this.ui.say(
+      "The sign-in callback is the URL users return to after signing in. Choose Yes if server code receives it, e.g. a Next.js route handler or Express route. Choose No if browser code receives it, even if you also have a separate API.",
+    );
+    const keepsSecret = await this.ask.select({
+      name: "client secret",
+      message: "Does your server keep a client secret?",
+      options: [
+        {
+          value: "yes" as const,
+          label: "Yes",
+          hint: "Server code receives the callback and stores a secret",
+        },
+        {
+          value: "no" as const,
+          label: "No",
+          hint: "Browser code receives the callback",
+        },
+      ],
+    });
+    return keepsSecret === "yes" ? "web" : "spa";
+  }
+
+  /**
+   * Asks for at least one redirect URI from a kind-based choice list, then
+   * optional more.
+   *
+   * @param preset - The client kind, for suggestions and validation.
    * @returns The URIs.
    */
   private async askRedirects(preset: Preset): Promise<readonly [string, ...string[]]> {
-    const first = await this.ask.text({
-      name: "redirect URI",
-      message: "Sign-in callback URL",
-      flag: "--redirect-uri",
-      placeholder:
-        preset === "spa"
-          ? "http://localhost:5173/callback"
-          : preset === "native"
-            ? "com.acme.tunes:/callback"
-            : "http://localhost:3000/auth/callback",
-      parse: (raw) => {
-        const problem = redirectUriProblem(raw, preset);
-        return problem === undefined ? { ok: true, value: raw.trim() } : { ok: false, problem };
-      },
-    });
+    const first = await this.askOneRedirect(preset, []);
     const uris = [first];
     while (
       await this.ask.yesNo({
@@ -642,25 +759,70 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
         initialValue: false,
       })
     ) {
-      const next = await this.ask.text({
-        name: "redirect URI",
-        message: "Sign-in callback URL",
-        flag: "--redirect-uri",
-        parse: (raw) => {
-          const problem = redirectUriProblem(raw, preset);
-          if (problem !== undefined) {
-            return { ok: false, problem };
-          }
-          const trimmed = raw.trim();
-          if (uris.includes(trimmed)) {
-            return { ok: false, problem: "That redirect URI is already listed" };
-          }
-          return { ok: true, value: trimmed };
-        },
-      });
-      uris.push(next);
+      uris.push(await this.askOneRedirect(preset, uris));
     }
     return uris as [string, ...string[]];
+  }
+
+  /**
+   * One redirect URI: kind-based suggestions plus Custom….
+   *
+   * @param preset - The client kind.
+   * @param already - URIs already chosen, for duplicate checks.
+   * @returns The URI.
+   */
+  private async askOneRedirect(preset: Preset, already: readonly string[]): Promise<string> {
+    const picked = await this.ask.select({
+      name: "redirect URI",
+      message: "Sign-in callback URL",
+      flag: "--redirect-uri",
+      options: [
+        ...REDIRECT_SUGGESTIONS[preset].map((uri) => {
+          return { value: uri, label: uri };
+        }),
+        { value: CUSTOM, label: "Custom…" },
+      ],
+    });
+    const raw =
+      picked === CUSTOM
+        ? await this.ask.text({
+            name: "redirect URI",
+            message: "Sign-in callback URL",
+            flag: "--redirect-uri",
+            placeholder: REDIRECT_SUGGESTIONS[preset][0],
+            parse: (value) => {
+              const problem = redirectUriProblem(value, preset);
+              if (problem !== undefined) {
+                return { ok: false, problem };
+              }
+              const trimmed = value.trim();
+              if (already.includes(trimmed)) {
+                return { ok: false, problem: "That redirect URI is already listed" };
+              }
+              return { ok: true, value: trimmed };
+            },
+          })
+        : picked;
+    if (already.includes(raw)) {
+      throw refusalError(
+        {
+          message: "That redirect URI is already listed",
+          hint: "Pick a different callback URL.",
+        },
+        {},
+      );
+    }
+    const problem = redirectUriProblem(raw, preset);
+    if (problem !== undefined) {
+      throw refusalError(
+        {
+          message: problem,
+          hint: "Pick a different callback URL.",
+        },
+        {},
+      );
+    }
+    return raw;
   }
 
   /**
@@ -688,23 +850,21 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
   }
 
   /**
-   * Asks for at least one allowed origin, then optional more.
+   * Asks for at least one allowed origin, suggesting the first redirect's
+   * origin, then optional more.
    *
+   * @param firstRedirect - The first redirect URI, for a default suggestion.
    * @returns The origins.
    */
-  private async askOrigins(): Promise<readonly string[]> {
-    const first = await this.ask.text({
-      name: "allowed origin",
-      message: "Allowed origin",
-      flag: "--origin",
-      placeholder: "http://localhost:5173",
-      parse: (raw) => {
-        const problem = originProblem(raw);
-        return problem === undefined
-          ? { ok: true, value: new URL(raw.trim()).origin }
-          : { ok: false, problem };
-      },
-    });
+  private async askOrigins(firstRedirect: string): Promise<readonly string[]> {
+    const suggested = (() => {
+      try {
+        return new URL(firstRedirect).origin;
+      } catch {
+        return "http://localhost:5173";
+      }
+    })();
+    const first = await this.askOneOrigin(suggested, []);
     const origins = [first];
     while (
       await this.ask.yesNo({
@@ -713,24 +873,68 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
         initialValue: false,
       })
     ) {
-      const next = await this.ask.text({
-        name: "allowed origin",
-        message: "Allowed origin",
-        flag: "--origin",
-        parse: (raw) => {
-          const problem = originProblem(raw);
-          if (problem !== undefined) {
-            return { ok: false, problem };
-          }
-          const origin = new URL(raw.trim()).origin;
-          if (origins.includes(origin)) {
-            return { ok: false, problem: "That origin is already listed" };
-          }
-          return { ok: true, value: origin };
-        },
-      });
-      origins.push(next);
+      origins.push(await this.askOneOrigin(suggested, origins));
     }
     return origins;
+  }
+
+  /**
+   * One allowed origin: suggested origin plus Custom….
+   *
+   * @param suggested - The default origin suggestion.
+   * @param already - Origins already chosen.
+   * @returns The origin.
+   */
+  private async askOneOrigin(suggested: string, already: readonly string[]): Promise<string> {
+    const picked = await this.ask.select({
+      name: "allowed origin",
+      message: "Allowed origin",
+      flag: "--origin",
+      options: [
+        { value: suggested, label: suggested },
+        { value: CUSTOM, label: "Custom…" },
+      ],
+    });
+    const raw =
+      picked === CUSTOM
+        ? await this.ask.text({
+            name: "allowed origin",
+            message: "Allowed origin",
+            flag: "--origin",
+            placeholder: suggested,
+            parse: (value) => {
+              const problem = originProblem(value);
+              if (problem !== undefined) {
+                return { ok: false, problem };
+              }
+              const origin = new URL(value.trim()).origin;
+              if (already.includes(origin)) {
+                return { ok: false, problem: "That origin is already listed" };
+              }
+              return { ok: true, value: origin };
+            },
+          })
+        : picked;
+    const problem = originProblem(raw);
+    if (problem !== undefined) {
+      throw refusalError(
+        {
+          message: problem,
+          hint: "Pick a different origin.",
+        },
+        {},
+      );
+    }
+    const origin = new URL(raw.trim()).origin;
+    if (already.includes(origin)) {
+      throw refusalError(
+        {
+          message: "That origin is already listed",
+          hint: "Pick a different origin.",
+        },
+        {},
+      );
+    }
+    return origin;
   }
 }

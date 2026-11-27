@@ -344,6 +344,72 @@ describe("application create, run by a person", () => {
     expect(posted).toHaveLength(1);
   });
 
+  it("maps Help me choose (browser + secret) to web", async ({ server }) => {
+    answeringCreates(server);
+    const cwd = await anApp(dirs);
+    const talk = answering(
+      "Acme Dashboard",
+      "Help me choose",
+      "Browser",
+      "Yes",
+      "http://localhost:3000/auth/callback",
+      false,
+      false,
+    );
+
+    await asTerminal(() => {
+      return runCommand(ApplicationCreate, "application:create", [
+        "--cwd",
+        cwd,
+        "--server",
+        SERVER,
+      ]);
+    });
+
+    expect(talk.asked()).toEqual([
+      "What's your product called?",
+      "What are you connecting first?",
+      "Does sign-in run in a browser, or as an installed app?",
+      "Does your server keep a client secret?",
+      "Sign-in callback URL",
+      "Add another redirect URI?",
+      "Write credentials to a .env file?",
+    ]);
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toMatchObject({
+      application: { clients: [{ slug: "web", type: "confidential" }] },
+    });
+  });
+
+  it("maps Help me choose (browser, no secret) to spa and refuses", async ({ server }) => {
+    answeringCreates(server);
+    const cwd = await anApp(dirs);
+    answering(
+      "Acme SPA",
+      "Help me choose",
+      "Browser",
+      "No",
+      "http://localhost:5173/callback",
+      false,
+      "http://localhost:5173",
+      false,
+    );
+
+    const refused = await rejectionOf(() => {
+      return asTerminal(() => {
+        return runCommand(ApplicationCreate, "application:create", [
+          "--cwd",
+          cwd,
+          "--server",
+          SERVER,
+        ]);
+      });
+    });
+
+    expect(refused).toMatchObject({ oclif: { exit: 3 } });
+    expect(posted).toEqual([]);
+  });
+
   it("refuses spa after the kind is chosen", async ({ server }) => {
     answeringCreates(server);
     const cwd = await anApp(dirs);

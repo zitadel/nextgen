@@ -219,9 +219,12 @@ nothing; `data.skills` and `data.directories` say what it added where.
   `.zitadel/applications/`). Needs `--name`, `--preset web|spa|native`, and at
   least one `--redirect-uri` (repeat for more). `--preset spa` also needs at
   least one `--origin` (scheme+host only). Non-interactive, every required flag
-  must be present; missing ones are listed in one `E_VALIDATION`. Today only
-  `--preset web` succeeds: spa and native refuse with a clear message until the
-  server supports public clients. Success always prints a pasteable `.env`
+  must be present; missing ones are listed in one `E_VALIDATION`. Interactively,
+  the kind menu includes Help me choose (two questions → web/spa/native); a
+  `package.json` sniff may highlight a preset but never skips the question.
+  Redirect and origin prompts offer kind-based suggestions plus Custom…. Today
+  only `--preset web` succeeds: spa and native refuse with a clear message until
+  the server supports public clients. Success always prints a pasteable `.env`
   block (`ZITADEL_ISSUER=<ZITADEL_ISSUER>/__nextgen/oauth/<project_id>`,
   `ZITADEL_CLIENT_ID`, `ZITADEL_CLIENT_SECRET` for web, `ZITADEL_CALLBACK_URL`);
   `--application-env-file <path>` writes those variables (distinct from the
