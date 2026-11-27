@@ -44627,10 +44627,6 @@ type GetProjectClaimStatusUnauthorized ErrorDetails
 
 func (*GetProjectClaimStatusUnauthorized) getProjectClaimStatusRes() {}
 
-type GetProjectClaimTooManyRequests ErrorDetails
-
-func (*GetProjectClaimTooManyRequests) getProjectClaimRes() {}
-
 type GetProjectClaimUnauthorized ErrorDetails
 
 func (*GetProjectClaimUnauthorized) getProjectClaimRes() {}

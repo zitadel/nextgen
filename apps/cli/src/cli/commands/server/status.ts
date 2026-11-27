@@ -85,7 +85,8 @@ type ProjectStatus =
  * development one, or a file: its project is whatever it resolves, never
  * setup's.
  * @param signal - Cancels the claim check with the server.
- * @returns The project's lifecycle and what the status shows for it.
+ * @returns The project's lifecycle and what the status shows for it, with its
+ * claim still being asked of the server.
  */
 async function projectStatus(
   cwd: string,
@@ -93,55 +94,95 @@ async function projectStatus(
   resolvedProjectId: string | undefined,
   named: { name: string; envFile?: string } | undefined,
   signal: AbortSignal,
-): Promise<ProjectStatus> {
+): Promise<ReadProject> {
   if (!(await Project.at(cwd).hasConfig())) {
-    return {
+    return withoutClaim({
       lifecycle: "not-configured",
       message: "zitadel.json has not been created yet.",
-    };
+    });
   }
   if (resolvedProjectId === undefined && named !== undefined) {
-    return named.envFile === undefined
-      ? {
-          lifecycle: "not-configured",
-          environment: named.name,
-          message: `The ${named.name} environment names no project.`,
-        }
-      : {
-          lifecycle: "not-configured",
-          env_file: named.envFile,
-          message: `${named.envFile} sets no ZITADEL_PROJECT_ID.`,
-        };
+    return withoutClaim(
+      named.envFile === undefined
+        ? {
+            lifecycle: "not-configured",
+            environment: named.name,
+            message: `The ${named.name} environment names no project.`,
+          }
+        : {
+            lifecycle: "not-configured",
+            env_file: named.envFile,
+            message: `${named.envFile} sets no ZITADEL_PROJECT_ID.`,
+          },
+    );
   }
 
   const config = await Project.at(cwd).config();
   const secret = (await Project.at(cwd).hasSecret()) ? await Project.at(cwd).secret() : undefined;
   if (secret === undefined && resolvedProjectId === undefined) {
-    return {
+    return withoutClaim({
       lifecycle: "orphaned-config",
       project_id: typeof config.data.project === "string" ? config.data.project : undefined,
       message: "zitadel.json exists but .zitadel/secret is missing.",
-    };
+    });
   }
 
   const projectId =
     resolvedProjectId ?? String(config.data.project ?? secret?.data.project_id ?? "");
   const server = config.server ?? ZitadelRuntime.DEFAULT;
-  const claim =
-    secret !== undefined && projectId === secret.data.project_id
-      ? await Claim.confirmed({
-          secret: secret.data,
-          server,
-          cloud: ZitadelRuntime.fromUrl(server).isCloud(),
-          signal,
-        })
-      : ({ kind: "not-applicable" } as const);
   return {
-    lifecycle: "configured",
-    project_id: projectId,
-    issuer,
-    ...(claim.kind === "not-applicable" ? {} : { claim }),
+    status: {
+      lifecycle: "configured",
+      project_id: projectId,
+      issuer,
+    },
+    claim:
+      secret !== undefined && projectId === secret.data.project_id
+        ? Claim.confirmed({
+            secret: secret.data,
+            server,
+            cloud: ZitadelRuntime.fromUrl(server).isCloud(),
+            signal,
+          })
+        : Promise.resolve({ kind: "not-applicable" }),
   };
+}
+
+/**
+ * The project a run is about, with its claim still being asked of the server,
+ * so the claim check and the user-presence probe wait side by side rather than
+ * one after the other.
+ */
+type ReadProject = Readonly<{
+  /** The project's lifecycle and what the status shows for it, claim aside. */
+  status: ProjectStatus;
+  /** The project's claim, settled once the server answers or the check gives up. */
+  claim: Promise<ClaimState>;
+}>;
+
+/**
+ * A project read with nothing to attach, so there is no claim to ask about.
+ *
+ * @param status - The project's status.
+ * @returns The status, with a claim that is not applicable.
+ */
+function withoutClaim(status: ProjectStatus): ReadProject {
+  return { status, claim: Promise.resolve({ kind: "not-applicable" }) };
+}
+
+/**
+ * A project's status with its settled claim, omitted where nothing can be
+ * attached.
+ *
+ * @param status - The project's status, claim aside.
+ * @param claim - The project's settled claim.
+ * @returns The status the run reports.
+ */
+function withClaim(status: ProjectStatus, claim: ClaimState): ProjectStatus {
+  if (status.lifecycle !== "configured" || claim.kind === "not-applicable") {
+    return status;
+  }
+  return { ...status, claim };
 }
 
 type UserPresence = "none" | "some" | "unknown";
@@ -394,7 +435,7 @@ export default class Status extends Telemetered(ProjectCommand) {
     }).status();
     const serverLifecycle = server.lifecycle;
 
-    const project = await projectStatus(
+    const read = await projectStatus(
       this.cwd,
       this.environment.values.ZITADEL_ISSUER?.value,
       this.environment.values.ZITADEL_PROJECT_ID?.value,
@@ -407,18 +448,21 @@ export default class Status extends Telemetered(ProjectCommand) {
       this.signal,
     );
     this.ui.ranAgainst(
-      project.lifecycle === "configured" ? project.project_id : undefined,
+      read.status.lifecycle === "configured" ? read.status.project_id : undefined,
       this.environment.values.ZITADEL_URL?.value ?? this.meta.source,
     );
-    const users =
-      project.lifecycle === "configured"
-        ? await detectUserPresence(() => {
+    const [claim, users] = await Promise.all([
+      read.claim,
+      read.status.lifecycle === "configured"
+        ? detectUserPresence(() => {
             return this.connect({
               prompt: false,
               timeoutMs: PRESENCE_PROBE_TIMEOUT_MS,
             });
           })
-        : "unknown";
+        : Promise.resolve<UserPresence>("unknown"),
+    ]);
+    const project = withClaim(read.status, claim);
     const serverUrl =
       server.runtime === undefined ? undefined : escapeControlCharacters(server.runtime.server_url);
     const backend = server.runtime?.backend;

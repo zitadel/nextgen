@@ -49,11 +49,5 @@ get:
         application/json:
           schema:
             $ref: ../../../../components/error-details.yaml
-    '429':
-      description: Too many requests. Wait and retry.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../../components/error-details.yaml
     default:
       $ref: getProjectClaim-error-response.yaml

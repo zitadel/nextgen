@@ -1,6 +1,7 @@
 import pTimeout from "p-timeout";
 
 import { ClaimService, createZitadelClient } from "@/lib/backend";
+import { SERVER } from "@/constants";
 import { isCancellation } from "@/lib/errors";
 import type { ProjectSecretData } from "@/lib/project";
 import { Runtime } from "@/lib/runtime";
@@ -19,10 +20,11 @@ export type ClaimState =
   /**
    * `claimable` classifies the claim window from the locally recorded
    * creation time: once it has passed, nudges switch to reconciliation
-   * wording (Claim.windowClosedNudge). Never proof of anything: the local
-   * record can be stale (a project claimed from another machine still reads
-   * detached), so the claim command stays advertised as the safe check —
-   * the server resolves the grant before the window. Lenient on an unknown
+   * wording (Claim.windowClosedNudge). Never proof of anything offline: the
+   * local record can be stale (a project claimed from another machine reads
+   * detached until Claim.confirmed reaches the server), so the claim command
+   * stays advertised as the safe check — the server resolves the grant
+   * before the window. Lenient on an unknown
    * or unparsable creation time (claimable, no deadline) because the server
    * is the enforcer and the CLI only advises. `deadline` is the ISO date
    * the window closes, when the creation time is known.
@@ -116,7 +118,7 @@ export class Claim {
    */
   static async confirmed(input: ConfirmInput): Promise<ClaimState> {
     const local = Claim.classify(input);
-    if (local.kind !== "detached") {
+    if (local.kind !== "detached" || !Claim.isCloudOrigin(input.server)) {
       return local;
     }
     const service = new ClaimService(
@@ -143,6 +145,19 @@ export class Claim {
       }
       return local;
     }
+  }
+
+  /**
+   * Whether `server` is exactly the hosted cloud's origin, scheme and port
+   * included. The cloud check that gates the nudges reads the hostname alone,
+   * which a hand-edited `zitadel.json` naming `http://` or another port would
+   * pass; the project secret goes only to the real origin, never in clear text.
+   *
+   * @param server - The server `zitadel.json` names.
+   * @returns Whether it is the hosted cloud's origin.
+   */
+  private static isCloudOrigin(server: string): boolean {
+    return URL.canParse(server) && new URL(server).origin === new URL(SERVER).origin;
   }
 
   /**
@@ -272,13 +287,11 @@ export class Claim {
   /**
    * Decides the attachment state from local state alone.
    *
-   * **Why no network call.** The contract exposes no ambient claim-state read:
-   * `getProjectClaimStatus` answers for one live challenge and rejects a secret that did
-   * not mint it, and claim attributes were deliberately kept off
-   * `GET /projects/{id}` because they belong to the grant, not the project. So
-   * `.zitadel/secret` is the only source, which is also why `status` and `doctor`
-   * stay fast and work offline. `zitadel claim` reaches the same conclusion the
-   * same way before it decides to skip.
+   * **Why no network call.** This is the offline half: it reads
+   * `.zitadel/secret` alone, so it is instant and works without a network.
+   * {@link Claim.confirmed} wraps it for `status` and `doctor`, asking the
+   * server (`getProjectClaim`) only when the record names no team. `zitadel
+   * claim` reads the record the same way before it decides to skip.
    *
    * **Why cloud only.** Claiming attaches a project to a team on the platform
    * that hosts it. The cloud always has one. A local or self-hosted server has
@@ -292,9 +305,9 @@ export class Claim {
    *
    * The local record can be stale in one direction: a project claimed from
    * another machine, or a `.zitadel/secret` restored from a backup, reads as
-   * `detached` here. That is tolerable because everything downstream is
-   * advisory, and `zitadel claim` itself turns the resulting `409` into a clean
-   * skip rather than an error.
+   * `detached` here. {@link Claim.confirmed} corrects it when the server
+   * answers, `doctor --fix` writes the answer into the record, and `zitadel
+   * claim` turns the resulting `409` into a clean skip rather than an error.
    *
    * @param input - The project's secret, and whether it lives on the cloud.
    * @returns The state.

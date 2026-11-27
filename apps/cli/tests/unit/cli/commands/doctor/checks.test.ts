@@ -2740,24 +2740,64 @@ describe("ClaimCheck", () => {
 
   // The local record is written only where the claim ran, so a project claimed
   // from another machine reads detached until the server is asked.
-  it("passes and names the team a project was claimed by from another machine", async ({
-    dir,
-    server,
-  }) => {
-    await aNextProject(dir);
-    server.use(
-      http.get(`*/projects/${PROJECT_ID}/claim`, () => {
-        return HttpResponse.json({
-          status: "claimed",
-          team_id: "team-002",
-          claimed_at: "2026-01-03T00:00:00Z",
-        });
-      }),
-    );
+  describe("for a project claimed from another machine", () => {
+    // The local record is written only where the claim ran, so the server is
+    // asked; it names a team the record does not.
+    it.beforeEach(({ server }) => {
+      server.use(
+        http.get(`*/projects/${PROJECT_ID}/claim`, () => {
+          return HttpResponse.json({
+            status: "claimed",
+            team_id: "team-002",
+            claimed_at: "2026-01-03T00:00:00Z",
+          });
+        }),
+      );
+    });
 
-    const outcome = await new ClaimCheck().run(aCheckContext(dir));
+    it("warns that the record does not name the team", async ({ dir }) => {
+      await aNextProject(dir);
 
-    expect(outcome).toMatchObject({ status: "pass", message: expect.stringContaining("team-002") });
+      const outcome = await new ClaimCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "warn",
+        message: expect.stringContaining("team-002"),
+        details: { recorded: false },
+      });
+    });
+
+    it("records the team under --fix", async ({ dir }) => {
+      await aNextProject(dir);
+
+      await new ClaimCheck().fix(aCheckContext(dir));
+
+      expect(await readJson(dir, SECRET_FILE)).toMatchObject({
+        team_id: "team-002",
+        claimed_at: "2026-01-03T00:00:00Z",
+      });
+    });
+
+    it("passes once --fix has recorded it", async ({ dir }) => {
+      await aNextProject(dir);
+
+      await new ClaimCheck().fix(aCheckContext(dir));
+      const outcome = await new ClaimCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "pass",
+        message: expect.stringContaining("team-002"),
+      });
+    });
+
+    it("writes nothing on a dry run", async ({ dir }) => {
+      await aNextProject(dir);
+      const before = await textOf(dir, SECRET_FILE);
+
+      await new ClaimCheck().fix(aCheckContext(dir, { dryRun: true }));
+
+      expect(await textOf(dir, SECRET_FILE)).toBe(before);
+    });
   });
 
   it("warns from the local record when the server cannot say", async ({ dir, server }) => {

@@ -3,7 +3,7 @@ import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
 
-import { ConflictError, UnavailableError } from "@/lib/backend/errors";
+import { ConflictError, UnauthorizedError, UnavailableError } from "@/lib/backend/errors";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { ClaimService } from "@/lib/backend/services/claim";
@@ -150,5 +150,42 @@ describe("ClaimService.status", () => {
 
     expect(error).toBeInstanceOf(UnavailableError);
     expect(error).toMatchObject({ status: 500 });
+  });
+});
+
+describe("ClaimService.current", () => {
+  it("answers the team that owns a claimed project", async ({ server, client }) => {
+    const asked = answering(server, "getProjectClaim", {
+      status: "claimed",
+      team_id: "team_1",
+      claimed_at: "2026-01-03T00:00:00Z",
+    });
+
+    await expect(new ClaimService(client, "proj_1").current()).resolves.toEqual({
+      status: "claimed",
+      team_id: "team_1",
+      claimed_at: "2026-01-03T00:00:00Z",
+    });
+    expect(
+      asked.map(({ params }) => {
+        return params.project_id;
+      }),
+    ).toEqual(["proj_1"]);
+  });
+
+  it("answers a project no team has claimed", async ({ server, client }) => {
+    answering(server, "getProjectClaim", { status: "unclaimed" });
+
+    await expect(new ClaimService(client, "proj_1").current()).resolves.toEqual({
+      status: "unclaimed",
+    });
+  });
+
+  it("raises a refused secret", async ({ server, client }) => {
+    answering(server, "getProjectClaim", refusal(401, "auth.unauthorized"));
+
+    expect(await rejectionOf(() => new ClaimService(client, "proj_1").current())).toBeInstanceOf(
+      UnauthorizedError,
+    );
   });
 });

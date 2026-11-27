@@ -3011,16 +3011,6 @@
               }
             }
           },
-          "429": {
-            "description": "Too many requests. Wait and retry.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/error-details"
-                }
-              }
-            }
-          },
           "default": {
             "$ref": "#/components/responses/getProjectClaim-error-response"
           }

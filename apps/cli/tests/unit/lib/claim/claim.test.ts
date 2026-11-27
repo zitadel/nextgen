@@ -177,6 +177,28 @@ describe("confirmed claim state", () => {
     expect(state).toEqual({ kind: "not-applicable" });
   });
 
+  // The cloud check reads the hostname alone; the secret goes only to the
+  // exact origin, so a hand-edited scheme or port sends nothing.
+  it.for(["http://preview.zitadel.com", "https://preview.zitadel.com:8443"])(
+    "asks nothing of %s, keeping the record",
+    async (server, { server: msw }) => {
+      msw.use(
+        http.get("*/projects/proj-001/claim", () => {
+          return HttpResponse.json(CLAIMED);
+        }),
+      );
+
+      const state = await Claim.confirmed({
+        ...REMOTE,
+        server,
+        cloud: true,
+        signal: new AbortController().signal,
+      });
+
+      expect(state).toEqual({ kind: "detached", claimable: true });
+    },
+  );
+
   it("stops when the run is cancelled, rather than guessing", async () => {
     const cancelled = new AbortController();
     cancelled.abort(new ZitadelError("E_CANCELLED", "cancelled"));

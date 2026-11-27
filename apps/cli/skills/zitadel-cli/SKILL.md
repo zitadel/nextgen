@@ -1305,10 +1305,13 @@ new `--no-wait` link. A project that already has a team is `skipped` with
 `reason: "already-claimed"` and carries `data.console_url`, the link to the
 project's console; one past its 14 days fails with `E_VALIDATION` and no
 `next_commands`, since a new link cannot reopen it.
-`status` and `doctor` read the owning team from `.zitadel/secret`, and ask the
-server when it names none, so a project claimed from another machine reads as
-claimed (`data.project.claim.kind: "attached"`) and is not nudged again. When
-the server cannot be reached they report the local record.
+For a project on the hosted cloud, `status` and `doctor` read the owning team
+from `.zitadel/secret` and ask the server when it names none, so a project
+claimed from another machine reads as claimed
+(`data.project.claim.kind: "attached"`) and is not nudged again. `doctor` then
+warns that the record does not name the team (`details.recorded: false`), and
+`doctor --fix` writes it in. When the server cannot be reached they report the
+local record.
 
 To get a person to the console of a project on a hosted or self-hosted server,
 run `console --no-open --json`: with no local server started in the directory it

@@ -4,6 +4,7 @@ package integration_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -717,11 +718,17 @@ func TestGetProjectClaim(t *testing.T) {
 	require.IsType(t, &api.ClaimResponse{}, unclaimed, helpers.MustMarshal(t, unclaimed))
 	assert.True(t, unclaimed.(*api.ClaimResponse).IsClaimUnclaimed(), helpers.MustMarshal(t, unclaimed))
 
+	platform := harness.EnsurePlatformProject(t)
 	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
-		ProjectID: harness.EnsurePlatformProject(t).ID,
+		ProjectID: platform.ID,
 		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
+	// The team lives in the platform project, which no test deletes.
+	t.Cleanup(func() {
+		_, err := harness.EnsureServiceDB(t).Statements().DeactivateTeam(context.Background(), platform.ID, team.ID)
+		assert.NoError(t, err)
+	})
 	harness.SeedOwningTeam(t, project.ID, team.ID)
 
 	claimed, err := client.GetProjectClaim(t.Context(), params)
