@@ -250,9 +250,9 @@ describe("resources", () => {
 
         const result = await app.run(["resources", "--fields", "topic", "--json"]);
 
-        expect(app.envelopeOf(result).data).toMatchObject({
-          items: expect.arrayContaining([{ topic: expect.any(String) }]),
-        });
+        const { items } = app.envelopeOf<{ items: object[] }>(result).data;
+
+        expect(new Set(items.flatMap((item) => Object.keys(item)))).toEqual(new Set(["topic"]));
       });
 
       it("refuses a field the records do not carry", async () => {
@@ -441,6 +441,15 @@ describe("resources", () => {
       });
 
       describe("leaving what it would change as it was", () => {
+        it.each(READ_BACK)("refuses %s %s without --force", async (topic, verb, arrange) => {
+          const app = await aSetUpApp();
+          const id = await arrange(app);
+
+          expect(await app.run([topic, verb, id, "--non-interactive", "--json"])).toFailWith(
+            "E_CONFIRMATION_REQUIRED",
+          );
+        });
+
         it.each(READ_BACK)(
           "changes nothing on %s %s without --force",
           async (topic, verb, arrange, read) => {
@@ -448,7 +457,7 @@ describe("resources", () => {
             const id = await arrange(app);
             const before = await readBack(app, read(id));
 
-            await app.run([topic, verb, id, "--json"]);
+            await app.run([topic, verb, id, "--non-interactive", "--json"]);
 
             expect(await readBack(app, read(id))).toEqual(before);
           },

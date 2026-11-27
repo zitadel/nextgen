@@ -549,6 +549,7 @@ type TeamRecord = {
 /** A user as the server keeps it; deleting removes it. */
 type UserRecord = {
   id: string;
+  projectId: string;
   schema: string;
   attributes: Record<string, unknown>;
   createdAt: string;
@@ -2210,6 +2211,33 @@ function grantResponse(grant: GrantRecord): Record<string, unknown> {
 }
 
 /**
+ * The project whose secret the request carries as its bearer, the way the
+ * server scopes a team or a user read by id alone.
+ *
+ * @param request - The request.
+ * @returns The project's id, or undefined when the bearer names none.
+ */
+function bearerProjectId(request: Request): string | undefined {
+  const token = bearerToken(request);
+  return [...store.projects.values()].find((project) => {
+    return token !== "" && project.projectSecret === token;
+  })?.id;
+}
+
+/**
+ * Whether a string attribute of the user is `identifier`, compared without case.
+ *
+ * @param user - The user.
+ * @param identifier - The identifier a request names.
+ * @returns True when one of the user's attributes is it.
+ */
+function hasIdentifier(user: UserRecord, identifier: string): boolean {
+  return Object.values(user.attributes).some((value) => {
+    return typeof value === "string" && value.toLowerCase() === identifier.toLowerCase();
+  });
+}
+
+/**
  * The active user or team a grant request names, by id or by team name.
  *
  * @param projectId - The project the grant is for, which a team name is looked up in.
@@ -2223,15 +2251,23 @@ function grantPrincipal(
     team?: { team_id?: string; name?: string };
   },
 ): { user_id: string } | { team_id: string } | undefined {
-  if (body.user?.user_id !== undefined && store.users.has(body.user.user_id)) {
-    return { user_id: body.user.user_id };
+  const { user: userRef, team: teamRef } = body;
+  const user = [...store.users.values()].find((candidate) => {
+    return (
+      candidate.projectId === projectId &&
+      (candidate.id === userRef?.user_id ||
+        (userRef?.identifier !== undefined && hasIdentifier(candidate, userRef.identifier)))
+    );
+  });
+  if (user !== undefined) {
+    return { user_id: user.id };
   }
   const team = [...store.teams.values()].find(
     (candidate) =>
       candidate.status === "active" &&
-      (candidate.id === body.team?.team_id ||
-        (candidate.projectId === projectId &&
-          candidate.name.toLowerCase() === body.team?.name?.toLowerCase())),
+      candidate.projectId === projectId &&
+      (candidate.id === teamRef?.team_id ||
+        candidate.name.toLowerCase() === teamRef?.name?.toLowerCase()),
   );
   return team === undefined ? undefined : { team_id: team.id };
 }
@@ -3200,11 +3236,8 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data);
     }),
 
-    // Users exist only through real sign-ups, which the platform mock has no
-    // endpoint for — the list is always empty. That is exactly the state a
-    // freshly set-up project is in, and what `status` keys its journey-staged
-    // guidance on. Auth mirrors the real server: the project secret is the
-    // bearer and scopes the (empty) result.
+    // Auth mirrors the real server: the project secret is the bearer and
+    // scopes the result to the project's own users.
     http.post("*/users/query", async ({ request }) => {
       // The query body is JSON, so `limit` arrives already numeric — unlike the
       // query string this endpoint replaced, which needed it coerced by hand.
@@ -3219,7 +3252,13 @@ export function setupPlatformHandlers() {
           status: 401,
         });
       }
-      return HttpResponse.json({ users: [] });
+      const users = [...store.users.values()]
+        .filter((user) => {
+          return user.projectId === project.id;
+        })
+        .slice(0, body.data.limit)
+        .map(userResponse);
+      return HttpResponse.json({ users });
     }),
 
     http.post("*/schemas", async ({ request }) => {
@@ -4058,13 +4097,13 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data, { status: 201 });
     }),
 
-    http.get("*/teams/:team_id", ({ params }) => {
+    http.get("*/teams/:team_id", ({ params, request }) => {
       const path = parse(GetTeamParams, params);
       if (!path.ok) {
         return path.response;
       }
       const team = store.teams.get(path.data.team_id);
-      if (team === undefined) {
+      if (team === undefined || team.projectId !== bearerProjectId(request)) {
         return HttpResponse.json(TEAM_NOT_FOUND, { status: 404 });
       }
       const out = parseOut(GetTeamResponse, teamResponse(team));
@@ -4074,13 +4113,13 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data);
     }),
 
-    http.delete("*/teams/:team_id", ({ params }) => {
+    http.delete("*/teams/:team_id", ({ params, request }) => {
       const path = parse(DeactivateTeamParams, params);
       if (!path.ok) {
         return path.response;
       }
       const team = store.teams.get(path.data.team_id);
-      if (team === undefined) {
+      if (team === undefined || team.projectId !== bearerProjectId(request)) {
         return HttpResponse.json(TEAM_NOT_FOUND, { status: 404 });
       }
       store.teams.set(team.id, { ...team, status: "deactivated", updatedAt: nowIso() });
@@ -4098,6 +4137,7 @@ export function setupPlatformHandlers() {
       }
       const user: UserRecord = {
         id: `user_${shortId()}`,
+        projectId: query.data.project_id,
         schema: body.data.schema,
         attributes: body.data.attributes,
         createdAt: nowIso(),
@@ -4120,7 +4160,7 @@ export function setupPlatformHandlers() {
         return query.response;
       }
       const user = store.users.get(path.data.user_id);
-      if (user === undefined) {
+      if (user === undefined || user.projectId !== bearerProjectId(request)) {
         return HttpResponse.json(USER_NOT_FOUND, { status: 404 });
       }
       const out = parseOut(GetUserResponse, userResponse(user));
@@ -4130,14 +4170,16 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data);
     }),
 
-    http.delete("*/users/:user_id", ({ params }) => {
+    http.delete("*/users/:user_id", ({ params, request }) => {
       const path = parse(DeleteUserParams, params);
       if (!path.ok) {
         return path.response;
       }
-      if (!store.users.delete(path.data.user_id)) {
+      const user = store.users.get(path.data.user_id);
+      if (user === undefined || user.projectId !== bearerProjectId(request)) {
         return HttpResponse.json(USER_NOT_FOUND, { status: 404 });
       }
+      store.users.delete(user.id);
       return new HttpResponse(null, { status: 204 });
     }),
 

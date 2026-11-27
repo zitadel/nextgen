@@ -194,7 +194,12 @@ describe("api", () => {
           data: { FOO: { primary: "bar", preview: "bar" } },
           warnings: [],
         });
-        expect(app.envelopeOf(await app.getVariable("FOO")).data).toMatchObject({ value: "bar" });
+        expect(app.envelopeOf(await app.getVariable("FOO")).data).toEqual({
+          title: "Read FOO",
+          name: "FOO",
+          secret: false,
+          value: "bar",
+        });
       });
 
       it("writes the body piped in with --file -", async () => {
@@ -210,7 +215,12 @@ describe("api", () => {
           data: { FOO: { primary: "bar", preview: "bar" } },
           warnings: [],
         });
-        expect(app.envelopeOf(await app.getVariable("FOO")).data).toMatchObject({ value: "bar" });
+        expect(app.envelopeOf(await app.getVariable("FOO")).data).toEqual({
+          title: "Read FOO",
+          name: "FOO",
+          secret: false,
+          value: "bar",
+        });
       });
 
       it("answers a dry run with the request it would send", async () => {
@@ -550,15 +560,6 @@ describe("api", () => {
           data: null,
           warnings: [],
         });
-        expect(await app.projectVariables()).toEqual([]);
-      });
-
-      it("leaves the variable it deleted with --force gone", async () => {
-        const app = await aSetUpApp();
-        expect(await app.setVariable("FOO", "bar")).toSucceed();
-
-        await app.api("deleteVariable", "FOO", "--force");
-
         expect(await app.projectVariables()).toEqual([]);
       });
 

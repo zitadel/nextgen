@@ -357,7 +357,7 @@ describe("release revoke", () => {
             "--non-interactive",
             "--json",
           ]),
-        ).toFail();
+        ).toFailWith("E_CONFLICT");
       });
 
       it("refuses a release the server does not hold", async () => {

@@ -4069,13 +4069,14 @@ describe("api-mock invitations", () => {
 });
 
 describe("api-mock teams, users and grants", () => {
-  async function newProject(name: string): Promise<string> {
+  async function newProject(name: string): Promise<{ id: string; auth: Record<string, string> }> {
     const res = await fetch(`${API}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name }),
     });
-    return ((await res.json()) as { id: string }).id;
+    const body = (await res.json()) as { id: string; project_secret: string };
+    return { id: body.id, auth: { authorization: `Bearer ${body.project_secret}` } };
   }
 
   async function created(path: string, body: Record<string, unknown>): Promise<string> {
@@ -4089,11 +4090,16 @@ describe("api-mock teams, users and grants", () => {
   }
 
   test("keeps a deactivated team readable, as deactivated", async () => {
-    const projectId = await newProject("teams-deactivate");
-    const teamId = await created(`/teams?project_id=${projectId}`, { name: "Support" });
+    const project = await newProject("teams-deactivate");
+    const teamId = await created(`/teams?project_id=${project.id}`, { name: "Support" });
 
-    const deactivated = await fetch(`${API}/teams/${teamId}`, { method: "DELETE" });
-    const read = (await (await fetch(`${API}/teams/${teamId}`)).json()) as { status: string };
+    const deactivated = await fetch(`${API}/teams/${teamId}`, {
+      method: "DELETE",
+      headers: project.auth,
+    });
+    const read = (await (
+      await fetch(`${API}/teams/${teamId}`, { headers: project.auth })
+    ).json()) as { status: string };
 
     expect({ deactivated: deactivated.status, status: read.status }).toEqual({
       deactivated: 204,
@@ -4102,33 +4108,105 @@ describe("api-mock teams, users and grants", () => {
   });
 
   test("removes a deleted user", async () => {
-    const projectId = await newProject("users-delete");
-    const userId = await created(`/users?project_id=${projectId}`, {
+    const project = await newProject("users-delete");
+    const userId = await created(`/users?project_id=${project.id}`, {
       schema: "schema_default",
       attributes: { email: "ada@example.com" },
     });
-    const read = await fetch(`${API}/users/${userId}`);
+    const read = await fetch(`${API}/users/${userId}`, { headers: project.auth });
 
-    const deleted = await fetch(`${API}/users/${userId}`, { method: "DELETE" });
+    const deleted = await fetch(`${API}/users/${userId}`, {
+      method: "DELETE",
+      headers: project.auth,
+    });
 
     expect({
       read: read.status,
       deleted: deleted.status,
-      after: (await fetch(`${API}/users/${userId}`)).status,
+      after: (await fetch(`${API}/users/${userId}`, { headers: project.auth })).status,
     }).toEqual({ read: 200, deleted: 204, after: 404 });
   });
 
+  test("lists the users the project created", async () => {
+    const project = await newProject("users-query");
+    const userId = await created(`/users?project_id=${project.id}`, {
+      schema: "schema_default",
+      attributes: { email: "ada@example.com" },
+    });
+
+    const res = await fetch(`${API}/users/query`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...project.auth },
+      body: JSON.stringify({}),
+    });
+
+    expect(
+      ((await res.json()) as { users: { id: string }[] }).users.map((user) => user.id),
+    ).toEqual([userId]);
+  });
+
+  test("answers 404 for another project's team and user", async () => {
+    const owner = await newProject("scoped-owner");
+    const other = await newProject("scoped-other");
+    const teamId = await created(`/teams?project_id=${owner.id}`, { name: "Support" });
+    const userId = await created(`/users?project_id=${owner.id}`, {
+      schema: "schema_default",
+      attributes: { email: "ada@example.com" },
+    });
+
+    const answers = await Promise.all([
+      fetch(`${API}/teams/${teamId}`, { headers: other.auth }),
+      fetch(`${API}/teams/${teamId}`, { method: "DELETE", headers: other.auth }),
+      fetch(`${API}/users/${userId}`, { headers: other.auth }),
+      fetch(`${API}/users/${userId}`, { method: "DELETE", headers: other.auth }),
+    ]);
+
+    expect(answers.map((answer) => answer.status)).toEqual([404, 404, 404, 404]);
+  });
+
+  test("grants a user named by an identifier", async () => {
+    const project = await newProject("grants-identifier");
+    const userId = await created(`/users?project_id=${project.id}`, {
+      schema: "schema_default",
+      attributes: { email: "ada@example.com" },
+    });
+
+    const res = await fetch(`${API}/grants?project_id=${project.id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ relation: "viewer", user: { identifier: "ADA@example.com" } }),
+    });
+
+    expect(((await res.json()) as { user: { user_id: string } }).user).toEqual({
+      user_id: userId,
+    });
+  });
+
+  test("refuses a grant for another project's team", async () => {
+    const owner = await newProject("grants-owner");
+    const other = await newProject("grants-other");
+    const teamId = await created(`/teams?project_id=${owner.id}`, { name: "Support" });
+
+    const res = await fetch(`${API}/grants?project_id=${other.id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ relation: "viewer", team: { team_id: teamId } }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
   test("lists a team's grant until it is deleted", async () => {
-    const projectId = await newProject("grants-delete");
-    const teamId = await created(`/teams?project_id=${projectId}`, { name: "Support" });
-    const grantId = await created(`/grants?project_id=${projectId}`, {
+    const project = await newProject("grants-delete");
+    const teamId = await created(`/teams?project_id=${project.id}`, { name: "Support" });
+    const grantId = await created(`/grants?project_id=${project.id}`, {
       relation: "viewer",
       team: { team_id: teamId },
     });
     const query = async () =>
       (
         (await (
-          await fetch(`${API}/grants/query?project_id=${projectId}`, {
+          await fetch(`${API}/grants/query?project_id=${project.id}`, {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({}),
@@ -4137,7 +4215,7 @@ describe("api-mock teams, users and grants", () => {
       ).grants.map((grant) => grant.id);
     const before = await query();
 
-    const deleted = await fetch(`${API}/grants/${grantId}?project_id=${projectId}`, {
+    const deleted = await fetch(`${API}/grants/${grantId}?project_id=${project.id}`, {
       method: "DELETE",
     });
 
