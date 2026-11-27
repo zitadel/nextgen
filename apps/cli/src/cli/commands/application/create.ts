@@ -17,9 +17,6 @@ import { ApplicationService, ConflictError } from "@/lib/backend";
 import { Project } from "@/lib/project";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
-/** The product event a create sends once the API confirms it. */
-const APPLICATION_CREATED = "application_created";
-
 /** Client kinds a person may pick; `help` arrives in Slice 2. */
 const PRESETS = ["web", "spa", "native"] as const;
 
@@ -309,9 +306,9 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
 
     const wrotePath = await this.writeEnv(intended, env);
 
-    this.trackEvent(APPLICATION_CREATED, {
+    this.annotate({
       preset: intended.preset,
-      application_id: published.id,
+      wrote_env_file: intended.applicationEnvFile !== undefined,
     });
 
     const title = `Created Application ${escapeControlCharacters(intended.name)} and its first Client`;

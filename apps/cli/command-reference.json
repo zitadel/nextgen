@@ -3148,6 +3148,76 @@
       ]
     },
     {
+      "id": "application create",
+      "group": "Sign-in",
+      "description": "Register an application and its first OIDC client on the project.",
+      "args": [],
+      "flags": [
+        {
+          "name": "name",
+          "description": "Product name for the Application.",
+          "type": "option"
+        },
+        {
+          "name": "preset",
+          "description": "Client kind (website backend, browser-only, or installed app).",
+          "type": "option",
+          "options": [
+            "web",
+            "spa",
+            "native"
+          ]
+        },
+        {
+          "name": "redirect-uri",
+          "description": "Sign-in callback URL (repeatable).",
+          "type": "option",
+          "multiple": true
+        },
+        {
+          "name": "origin",
+          "description": "Allowed browser origin; spa only (repeatable).",
+          "type": "option",
+          "multiple": true
+        },
+        {
+          "name": "application-env-file",
+          "description": "Write credentials to this file after create.",
+          "type": "option"
+        },
+        {
+          "name": "server",
+          "char": "s",
+          "description": "Override the resolved server URL.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        },
+        {
+          "name": "dry-run",
+          "description": "Preview without mutating files or the platform.",
+          "type": "boolean"
+        }
+      ],
+      "examples": [
+        {
+          "command": "application create --name \"Acme Dashboard\" --preset web --redirect-uri http://localhost:3000/auth/callback"
+        },
+        {
+          "command": "application create --name Acme --preset web --redirect-uri http://localhost:3000/callback --application-env-file .env.local"
+        }
+      ]
+    },
+    {
       "id": "project get",
       "group": "Project settings",
       "description": "Get one project by id.",

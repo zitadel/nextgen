@@ -370,7 +370,12 @@ properties:
     description: Whether `setup` was given a dev port.
   preset:
     type: string
-    description: The authentication preset chosen.
+    description: >-
+      A fixed choice the command settled: setup's authentication preset, or
+      `application create`'s client kind (`web`, `spa` or `native`).
+  wrote_env_file:
+    type: boolean
+    description: Whether `application create` wrote credentials to a file.
   use_case:
     type: string
     description: The use case chosen.
@@ -630,6 +635,7 @@ components:
       variable:resolve: [variable_count]
       api: [operation, is_paginated]
       claim: [claim_outcome, poll_count, browser_opened]
+      application:create: [preset, wrote_env_file]
     profile:
       trigger: >-
         An install's first run, then whenever what the profile says changes (a new
