@@ -7,4 +7,7 @@ Shared `jobs.Engine` above `service.JobStatements` (ADR 065).
 - Product handlers (e.g. `sessions.gc`) and server / Cron wiring live outside
   this package.
 - Guide: [`docs/design/jobs/`](../../../../docs/design/jobs/README.md).
-  Acceptance: [`docs/design/jobs/acceptance/engine.feature`](../../../../docs/design/jobs/acceptance/engine.feature).
+  Acceptance: [`e2e/acceptance/background-jobs/`](../../../../e2e/acceptance/background-jobs/README.md)
+  ([engine](../../../../e2e/acceptance/background-jobs/engine.feature),
+  [sessions-gc](../../../../e2e/acceptance/background-jobs/sessions-gc.feature),
+  [cron-wake](../../../../e2e/acceptance/background-jobs/cron-wake.feature)).
