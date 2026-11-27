@@ -41,13 +41,13 @@ var errResourceGone = errors.New("authz: resource gone")
 func projectRelation(op accessOp) string {
 	switch op {
 	case opRead:
-		return "viewer"
+		return domain.ProjectRoleViewer
 	case opWrite:
-		return "editor"
+		return domain.ProjectRoleEditor
 	case opDelete:
-		return "admin"
+		return domain.ProjectRoleAdmin
 	default:
-		return "admin"
+		return domain.ProjectRoleAdmin
 	}
 }
 

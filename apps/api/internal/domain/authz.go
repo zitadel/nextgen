@@ -335,7 +335,7 @@ func NewSKProjProjectSetupAssignment(projectID string) *AuthzAssignment {
 		PrincipalType: AuthzPrincipalTypeSKProj,
 		PrincipalID:   projectID,
 		ObjectType:    "project",
-		Relation:      "admin",
+		Relation:      ProjectRoleAdmin,
 	}
 	a.ApplyScope(NewProjectAssignmentScope())
 	return a
@@ -370,7 +370,7 @@ func NewPersonalTeamOwnerAssignment(projectID, teamID, userID string) *AuthzAssi
 		PrincipalType: AuthzPrincipalTypeUser,
 		PrincipalID:   userID,
 		ObjectType:    "project",
-		Relation:      "editor",
+		Relation:      ProjectRoleEditor,
 	}
 	a.ApplyScope(NewTeamAssignmentScope(teamID))
 	return a
