@@ -181,6 +181,7 @@ jobs:
       # a laptop and its tests time out; pnpm appends the flag to its
       # `turbo run`. `--summarize` writes the run's per-task timings and
       # cache results to .turbo/runs for the two steps after this one.
+      # Temporary: changes turbo's global hash so every task runs uncached once.
       - name: Run the ci script
         run: corepack pnpm run ci --concurrency=100% --summarize
         env:
