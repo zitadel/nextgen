@@ -43,6 +43,28 @@
 
 ## Decisions
 
+### D93 · Sidebar navigation visual states — 2026-11-02 · [design approved; implementation and QA tracked in #2384]
+Use the design system's `SidebarZitadelv2` component (the Console Profile screen is an example). This is a visual-state target only; preserve navigation architecture, routes, order, Projects list and project switcher (D27, D29, D40; [#2607](https://github.com/zitadel/nextgen/issues/2607)).
+
+| State | Label | Leading icon | Row |
+| --- | --- | --- | --- |
+| Default / inactive | `text-muted-foreground` | `text-muted-foreground` | No selected background |
+| Hover | `text-sidebar-accent-foreground` | Same as label | `bg-sidebar-accent` |
+| Active (current route) | `text-sidebar-accent-foreground` | `text-sidebar-foreground` or equivalent active foreground token | `bg-sidebar-accent`, selected appearance |
+| Keyboard focus | Readable foreground and visible focus | Same affordance as label | Existing `focus-visible:ring-2` / `sidebar-ring` behavior |
+| Disabled (where used) | Existing disabled styling | Existing disabled styling | No activation; no new variant |
+
+Use semantic tokens rather than hard-coded colors. Apply the rules to project, team and account/settings navigation, Search, Documentation and Back actions where non-active, and the collapsed icon-only rail. The active icon must not remain muted.
+
+Acceptance criteria (implementation and QA, tracked in [#2384](https://github.com/zitadel/nextgen/issues/2384)):
+- Inactive labels and icons use the muted foreground token in expanded and collapsed states.
+- The current route determines the applicable active item on initial load, refresh, deep links and client navigation; both label and icon are prominent, with the selected background.
+- Hover and visible keyboard focus work consistently without replacing the active state; preserve existing disabled affordances.
+- Verify light and dark themes, expanded and collapsed sidebars, settings navigation and footer items against the V2 master.
+- Check launch-relevant screens; do not bulk-migrate historical V1 mock screens or change routes.
+
+The design is approved, not evidence of implementation. Update `apps/console/docs/styling.md` alongside implementation as defined in D47.
+
 ### D92 · Enterprise SSO configuration must reach the customer's customer — 2026-09-09
 B2B / Enterprise SSO has a different configuration boundary from social login. The ZITADEL operator can configure or enable the capability, but a downstream customer's admin must be able to configure their own SAML/OIDC connection without using the ZITADEL CLI.
 
@@ -200,7 +222,7 @@ The login app has to run inside many different frameworks and is built as web/li
 ### D53 · Schema nested attributes show the whole schema — 2026-08-05
 Clicking a nested attribute (e.g. `address`) does not drill into a partial view or scroll to just that attribute — always display the full schema, because a schema is applied as a whole. Refines D14. Schemas stay view-only / apply-locally (D0b).
 
-### D52 · Tenant list & detail (renamed from teams) — 2026-08-05 · [not carried out: the console and the API still say "team"]
+### D52 · Tenant list & detail (renamed from teams) — 2026-08-05 · [tenant naming not adopted; list and detail design evolved separately]
 Tenants reuse the user-list pattern: name, status, creation date; searchable; toggle by active/inactive status; "add tenant" opens the right-side drawer (D15) and lands back on the list with a success toast. The three-dot context menu is minimal for now — "view resource" only (delete, turnkey, and other sub-actions come later, consistently everywhere). Tenant detail: tenant name (editable), tenant ID (renamed from "team ID"), primary domain, creation date. Generate an identicon-style icon for tenants (à la GitHub / Vercel) rather than picking a fixed org glyph.
 
 ### D51 · Projects: drop "owning team"; claiming ≠ new tenant — 2026-08-05
@@ -212,15 +234,15 @@ Same backend JSON model as today — only the words change. Hierarchy: a project
 ### D49 · Naming: "tenant" for the organization; "team" reserved for the account side — 2026-08-05 · [not carried out: the console and the API still say "team"]
 Resolves the parked "Team" naming question. The organization concept (the multi-tenant org living inside a project) is now called **tenant** everywhere in the UI — "organization" was the alternative, but "tenant" matches how we sell it (multi-tenancy) and how customers already think. "Team" stays reserved for the account / cloud-account side (account users: owner, admin, billing), shown bottom-left. Renaming teams → tenants in the UI does not touch the underlying model, only the labels (tenant ID, add tenant, etc.). Going with it now per the "if you're opinionated, ship it and we can change it later" guidance; will still surface it as a Slack mention/poll, but proceeding so MVP work isn't blocked. → Design updates the UI and this MD; flag if a root problem surfaces.
 
+### D48 · Users table exposes Columns and uses schema-resolved identity — 2026-11-23 · [standing]
+Amends **only** D23's right-click-only Columns affordance and its mandatory identifier-property chip. The Users table exposes a visible text-labelled **Columns** control at the right of its table toolbar, while existing optional-property pinning remains available; the reviewed primary identity is the server-resolved `x-display` name with the designated `x-identifier` beneath (ID as fallback; ADR 058 §3a), without redundant property-type chips. The existing **ID column** remains independent of the user's identifier property. Preserve D23's column-width and horizontal-scroll rules, pinned properties, Attributes popover, sticky row action and the relevant identity card. This is a design target; implementation PRs, including any already open Users-table work, must align with it separately.
+
 ### D47 · Reusable Console UI polishing patterns — 2026-11-23 · [standing]
 The seven [UI-01–UI-07 guides](console/ui-patterns/README.md) are the approved reusable design targets and verification criteria for Console polishing. They do not change code or supersede valid product, routing, accessibility or backend contracts. `apps/console/docs/styling.md` remains the description of current technical implementation; an implementation PR must reconcile changed components and that baseline together.
 
 The approved differences from the current technical baseline are: **44px** resource-list headers with `muted-foreground` labels for comfortable density (preserving **56px** body rows and existing **40px** compact lists); resource-name and secondary-reference links without hover underline (secondary references change from muted to foreground on hover); **vertical** row-menu ellipsis; and **12px monospace** resource identifiers where applicable, retaining the existing layout-aware middle truncation and full-value Copy. Preserve table widths, pinned columns, native link behavior and focus affordances. Do not apply resource-list header changes to panel-table heads or compact Events.
 
 The guides also record shared targets for real-route row navigation; actionable `+N` overflow; externally directed link indications; consistent page title → optional truthful metadata → content; field-semantic date/time formatting and the existing 24-hour relative rule; existing Card/Badge semantics; first-use versus filtered-empty feedback; contextual success/error/loading behavior; optional-field markers, blur/submit validation and useful helper placement; **FormSheet for Create**, while existing detail-page edits remain inline unless separately decided; and explicit destructive confirmations. These are reusable patterns, not authorization to redesign screen-specific columns, navigation, permissions, API states or page widths. Existing relevant D-decisions (including D5, D13, D15, D19, D27, D35, D40 and D41) still apply. Users-specific changes are D48.
-
-### D48 · Users table exposes Columns and uses schema-resolved identity — 2026-11-23 · [standing]
-Amends **only** D23's right-click-only Columns affordance and its mandatory identifier-property chip. The Users table exposes a visible text-labelled **Columns** control at the right of its table toolbar, while existing optional-property pinning remains available; the reviewed primary identity is the server-resolved `x-display` name with the designated `x-identifier` beneath (ID as fallback; ADR 058 §3a), without redundant property-type chips. The existing **ID column** remains independent of the user's identifier property. Preserve D23's column-width and horizontal-scroll rules, pinned properties, Attributes popover, sticky row action and the relevant identity card. This is a design target; implementation PRs, including any already open Users-table work, must align with it separately.
 
 ### D46 · Events' rows lead with the time, and an open event stands beside the list — 2026-11-13
 Amends D30 and D45. A pass on the team's comments, measured against Vercel's Logs, which Events follows (D30). Supabase's log explorer was the other reference raised; its filters stand in a second column beside the navigation, and Events keeps its one sidebar that swaps to its own list, as Vercel's does.
@@ -335,7 +357,7 @@ Amends D5, which left filtering out of the MVP. The title row carries a schema f
 The sidebar is one project's screens, so Projects leaves it: the logo and the project switcher's "All projects" open it, and it draws no sidebar, only a bar with the logo, search and the account menu. It is a project-free page, so the list sits in a centred column. A project is created from the app it connects, so the page hands over the CLI's `setup` command in a card beside the list instead of a New project button and drawer, and below the list it explains how a project lives: set up, build locally, deploy, add environments (each a project of its own), operate in the console. On the way to a screen (`?next=`, D22) the guide is left out. Supersedes D21's New project drawer and the sidebar row of D22.
 → Design review of the home bar, the setup card and the lifecycle guide.
 
-### D23 · The Users table pins properties; the rest reads in one Attributes column — 2026-10-24
+### D23 · The Users table pins properties; the rest reads in one Attributes column — 2026-10-24 · [amended by D48]
 Supersedes D4. Showing every schema property as a column made wide schemas scroll the table and pushed the row menu out of reach. By default the table shows User, Attributes, Status, Member of, ID and the row menu. Right-clicking the table (a long press on touch) opens a Columns menu that pins properties as columns, grouped by schema when the list mixes them; there is no toolbar button for it, and a right-click on a link keeps the browser's own menu; pins are per viewer, kept in the browser per project, schema and property. Every unpinned attribute reads in one fixed-width Attributes cell (`givenName: Maya · company: Acme · +3`) that opens the user's full attributes: a Fields tab first (the schema's labels, formatted values, each object inline one level deep and anything deeper opened in place, capped at 12 rows with a link to the user), then JSON and YAML. User schemas have no server limit on size or nesting, so the popover stays a quick look rather than growing with them. The row menu is sticky, so it is reachable at any width, and so is the User column from 640px (on a phone the two would leave no room between them).
 Identity: the identifier stays in the User cell (no Identifier column, D20), under the display name when there is one. Hovering the user opens an identity card: schema, what they sign in with, display name, memberships, lifecycle owner and created date. Chosen over bringing the Identifier column back, which repeats the identifier whenever a schema designates no display name. Amended (#2605): no chip names the identifier's property (`email`, `username`), in the cell or the card, and the card carries no line on what `x-identifier` and `x-display` decide: the card is about the user, and schema mechanics belong to the schema's documentation.
 Teams: the column is "Member of", since it lists memberships; a `pending` or `inactive` membership carries a tag. The team that owns a user's lifecycle is a different relation (ADR 024) and shows in the identity card, not the column.
