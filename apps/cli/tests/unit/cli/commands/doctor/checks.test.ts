@@ -3,6 +3,7 @@ import { chmod, lstat, mkdir, readdir, readFile, rm, stat, symlink } from "node:
 import { LocalRuntime } from "@/lib/server";
 import { join } from "node:path";
 
+import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, vi } from "vitest";
 
 import {
@@ -2700,6 +2701,16 @@ describe("ProjectMatchCheck", () => {
 });
 
 describe("ClaimCheck", () => {
+  // A cloud project's unclaimed record is checked with the server, which
+  // answers unclaimed unless a test says otherwise.
+  it.beforeEach(({ server }) => {
+    server.use(
+      http.get("*/projects/:project_id/claim", () => {
+        return HttpResponse.json({ status: "unclaimed" });
+      }),
+    );
+  });
+
   it("warns that a cloud project with no owning team is temporary", async ({ dir }) => {
     await aNextProject(dir);
 
@@ -2725,6 +2736,41 @@ describe("ClaimCheck", () => {
     const outcome = await new ClaimCheck().run(aCheckContext(dir));
 
     expect(outcome).toMatchObject({ status: "pass", message: expect.stringContaining("team-001") });
+  });
+
+  // The local record is written only where the claim ran, so a project claimed
+  // from another machine reads detached until the server is asked.
+  it("passes and names the team a project was claimed by from another machine", async ({
+    dir,
+    server,
+  }) => {
+    await aNextProject(dir);
+    server.use(
+      http.get(`*/projects/${PROJECT_ID}/claim`, () => {
+        return HttpResponse.json({
+          status: "claimed",
+          team_id: "team-002",
+          claimed_at: "2026-01-03T00:00:00Z",
+        });
+      }),
+    );
+
+    const outcome = await new ClaimCheck().run(aCheckContext(dir));
+
+    expect(outcome).toMatchObject({ status: "pass", message: expect.stringContaining("team-002") });
+  });
+
+  it("warns from the local record when the server cannot say", async ({ dir, server }) => {
+    await aNextProject(dir);
+    server.use(
+      http.get(`*/projects/${PROJECT_ID}/claim`, () => {
+        return HttpResponse.error();
+      }),
+    );
+
+    const outcome = await new ClaimCheck().run(aCheckContext(dir));
+
+    expect(outcome).toMatchObject({ status: "warn", details: { claimable: true } });
   });
 
   it.for(["http://localhost:8080", "https://zitadel.example.com"])(

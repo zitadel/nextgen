@@ -1,4 +1,8 @@
-import type { GetProjectClaimStatus200, CreateProjectClaim201 } from "@zitadel/api/generated/model";
+import type {
+  GetProjectClaim200,
+  GetProjectClaimStatus200,
+  CreateProjectClaim201,
+} from "@zitadel/api/generated/model";
 
 import { ApiService } from "@/lib/backend/api-service";
 import type { ZitadelClient } from "@/lib/backend/client";
@@ -197,6 +201,18 @@ export class ClaimService extends ApiService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Asks the server whether the project is claimed, with no challenge: the
+   * server reads its owning-team grant, so a claim made from another machine
+   * answers here too.
+   *
+   * @returns The project's claim, `unclaimed` or `claimed` with the owning team.
+   * @throws {BackendError} When the server refuses or cannot answer.
+   */
+  async current(): Promise<GetProjectClaim200> {
+    return await this.client.getProjectClaim(this.projectId);
   }
 
   /**

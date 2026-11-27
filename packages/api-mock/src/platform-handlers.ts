@@ -32,6 +32,7 @@ import type {
   CreateProject201OriginsItem,
   PublishSchema201,
   GetProjectClaimWindow200,
+  GetProjectClaim200,
   GetProjectClaimStatus200,
   GetFlowDefinition200,
   GetProject200,
@@ -87,6 +88,8 @@ import {
   PublishSchemaQueryParams,
   DeleteVariableParams,
   DeleteVariableQueryParams,
+  GetProjectClaimParams,
+  GetProjectClaimResponse,
   GetProjectClaimStatusParams,
   GetProjectClaimStatusQueryParams,
   GetProjectClaimStatusResponse,
@@ -3415,6 +3418,38 @@ export function setupPlatformHandlers() {
         expires_at: expiresAt,
       };
       return HttpResponse.json(responseBody, { status: 201 });
+    }),
+
+    // GET /projects/:project_id/claim — whether the project is claimed, with
+    // no challenge. The grant is the source of truth, as on the server. A
+    // valid secret for another project gets the server's read miss (404), so
+    // it learns nothing about this one.
+    http.get("*/projects/:project_id/claim", ({ params, request }) => {
+      const path = parse(GetProjectClaimParams, params);
+      if (!path.ok) {
+        return path.response;
+      }
+      const token = bearerToken(request);
+      const authed = [...store.projects.values()].find((p) => p.projectSecret === token);
+      if (!authed) {
+        return HttpResponse.json(errorBody("auth.unauthorized", "missing or invalid credentials"), {
+          status: 401,
+        });
+      }
+      if (authed.id !== path.data.project_id) {
+        return HttpResponse.json(errorBody("proj.not_found", "project not found"), {
+          status: 404,
+        });
+      }
+      const claim = store.claims.get(path.data.project_id);
+      const responseBody: GetProjectClaim200 = claim
+        ? { status: "claimed", team_id: claim.teamId, claimed_at: claim.claimedAt }
+        : { status: "unclaimed" };
+      const out = parseOut(GetProjectClaimResponse, responseBody);
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
     }),
 
     // GET /projects/:project_id/claim/status — poll a challenge. The bearer

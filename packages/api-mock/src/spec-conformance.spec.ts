@@ -36,6 +36,7 @@ import { PASSWORD_FIELD } from "./fixtures/login.js";
 import { setupMockHandlers } from "./handlers.js";
 import {
   acceptInvitation,
+  completeClaimChallenge,
   expireInvitation,
   expireClaimChallenge,
   expireClaimWindow,
@@ -1094,6 +1095,52 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     expect(parsed.team_id).toBeUndefined();
     expect(parsed.claimed_at).toBeUndefined();
     expect(parsed.dashboard_url).toBeUndefined();
+  });
+
+  async function projectClaim(projectId: string, secret: string): Promise<Response> {
+    return fetch(`${API}/projects/${projectId}/claim`, {
+      headers: { authorization: `Bearer ${secret}` },
+    });
+  }
+
+  test("GET /projects/:id/claim is unclaimed before any claim", async () => {
+    const project = await createProject("claim-read-unclaimed");
+
+    const res = await projectClaim(project.id, project.projectSecret);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: "unclaimed" });
+  });
+
+  test("GET /projects/:id/claim reports the owning team once claimed", async () => {
+    const project = await createProject("claim-read-claimed");
+    const init = await createProjectClaim(project.id, project.projectSecret);
+    const { challenge_id } = (await init.json()) as { challenge_id: string };
+    const completed = completeClaimChallenge(challenge_id, project.id);
+
+    const res = await projectClaim(project.id, project.projectSecret);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      status: "claimed",
+      team_id: (completed.body as { team_id: string }).team_id,
+      claimed_at: (completed.body as { claimed_at: string }).claimed_at,
+    });
+  });
+
+  test("GET /projects/:id/claim with a foreign project secret returns 404", async () => {
+    const project = await createProject("claim-read-owner");
+    const other = await createProject("claim-read-foreign");
+
+    const res = await projectClaim(project.id, other.projectSecret);
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as Record<string, unknown>).code).toBe("proj.not_found");
+  });
+
+  test("GET /projects/:id/claim without a project secret returns 401", async () => {
+    const project = await createProject("claim-read-anonymous");
+
+    const res = await projectClaim(project.id, "not-a-secret");
+    expect(res.status).toBe(401);
+    expect(((await res.json()) as Record<string, unknown>).code).toBe("auth.unauthorized");
   });
 
   test("GET /projects/:id/claim/status with a foreign project secret returns 403", async () => {

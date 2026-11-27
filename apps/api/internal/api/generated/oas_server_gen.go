@@ -819,6 +819,22 @@ type Handler interface {
 	//
 	// GET /projects/{project_id}
 	GetProject(ctx context.Context, params GetProjectParams) (GetProjectRes, error)
+	// GetProjectClaim implements getProjectClaim operation.
+	//
+	// Returns whether the project is claimed, and if so by which team and when.
+	//
+	// A [claim attaches a project to a team]. `zitadel status` and `zitadel doctor` call this operation to
+	// tell whether to suggest `zitadel claim`, so a project claimed from another machine stops being
+	// reported as unclaimed.
+	//
+	// Unlike `getProjectClaimStatus` (`GET /projects/{project_id}/claim/status`), it needs no challenge:
+	// it reads the project's owning-team grant, the claim's source of truth. It starts nothing and spends
+	// nothing. Authenticate with the project secret.
+	//
+	// [claim attaches a project to a team]: /docs/concepts/project-team-user#claim
+	//
+	// GET /projects/{project_id}/claim
+	GetProjectClaim(ctx context.Context, params GetProjectClaimParams) (GetProjectClaimRes, error)
 	// GetProjectClaimStatus implements getProjectClaimStatus operation.
 	//
 	// Returns the status of a claim challenge, `pending` or `completed`, while a browser completes the

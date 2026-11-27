@@ -1,4 +1,5 @@
 import { Claim } from "@/lib/claim";
+import { isCancellation } from "@/lib/errors";
 import { ZitadelRuntime } from "@/lib/server";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
@@ -12,7 +13,8 @@ const NO_TEAMS_MESSAGE = "Project is not on a server where teams apply";
 
 /**
  * Reports whether the project is attached to a team, reading `claimed_at` and
- * `team_id` from `.zitadel/secret`.
+ * `team_id` from `.zitadel/secret`, and checking a record that says unclaimed
+ * with the server ({@link Claim.confirmed}).
  *
  * Always advisory, never a failure. An unattached project works exactly like an
  * attached one — same issuer, same users, same applications — so the only thing
@@ -52,14 +54,18 @@ export class ClaimCheck implements SanityCheck {
     const state = await Project.at(ctx.cwd)
       .secret()
       .then(async (secret) => {
-        return Claim.state({
+        const server = (await Project.at(ctx.cwd).config()).server ?? ZitadelRuntime.DEFAULT;
+        return Claim.confirmed({
           secret: secret.data,
-          cloud: ZitadelRuntime.fromUrl(
-            (await Project.at(ctx.cwd).config()).server ?? ZitadelRuntime.DEFAULT,
-          ).isCloud(),
+          server,
+          cloud: ZitadelRuntime.fromUrl(server).isCloud(),
+          signal: ctx.signal,
         });
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        if (isCancellation(error)) {
+          throw error;
+        }
         return undefined;
       });
     if (state === undefined) {

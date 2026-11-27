@@ -4482,6 +4482,66 @@ func (s ChallengeResponseState) Validate() error {
 	}
 }
 
+func (s *ClaimClaimed) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Status.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "status",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.TeamID.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "team_id",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s ClaimClaimedStatus) Validate() error {
+	switch s {
+	case "claimed":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s ClaimResponse) Validate() error {
+	switch s.Type {
+	case ClaimUnclaimedClaimResponse:
+		if err := s.ClaimUnclaimed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ClaimClaimedClaimResponse:
+		if err := s.ClaimClaimed.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
 func (s *ClaimStatusCompleted) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -4571,6 +4631,38 @@ func (s ClaimStatusResponse) Validate() error {
 		return nil
 	default:
 		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s *ClaimUnclaimed) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Status.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "status",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s ClaimUnclaimedStatus) Validate() error {
+	switch s {
+	case "unclaimed":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
 	}
 }
 

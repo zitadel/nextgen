@@ -1,4 +1,9 @@
+import pTimeout from "p-timeout";
+
+import { ClaimService, createZitadelClient } from "@/lib/backend";
+import { isCancellation } from "@/lib/errors";
 import type { ProjectSecretData } from "@/lib/project";
+import { Runtime } from "@/lib/runtime";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import type { BoxAction } from "@/lib/ui";
 
@@ -36,6 +41,18 @@ type ClaimInput = Readonly<{
   cloud: boolean;
 }>;
 
+/** What {@link Claim.confirmed} reads a claim from, and asks the server with. */
+type ConfirmInput = Readonly<{
+  /** The project's local secret: the record, and the credential to ask with. */
+  secret: ClaimRecord & Pick<ProjectSecretData, "project_id" | "project_secret">;
+  /** The server the project lives on, from `zitadel.json`. */
+  server: string;
+  /** Whether that server is the Zitadel cloud. */
+  cloud: boolean;
+  /** Cancels the request. */
+  signal: AbortSignal;
+}>;
+
 /**
  * The claim of a project to a team: whether the local record says it is
  * attached, the window in which it can still be claimed, and the words every
@@ -69,6 +86,63 @@ export class Claim {
    */
   static state(input: ClaimInput): ClaimState {
     return Claim.classify(input);
+  }
+
+  /**
+   * How long {@link Claim.confirmed} waits for the server before it keeps the
+   * local answer, so `status` and `doctor` stay quick on a slow network.
+   */
+  private static readonly CONFIRM_TIMEOUT_MS = 1500;
+
+  /**
+   * Decides the attachment state of a project, asking the server when the
+   * local record says it is unclaimed.
+   *
+   * The local record is written only on the machine that claimed, so a
+   * project claimed from another machine, or a `.zitadel/secret` restored from
+   * a backup, reads as detached here though a team owns it. The server's
+   * owning-team grant is the source of truth, so a detached record is checked
+   * against it and an attached server answer wins. Only a detached record is
+   * checked: an attached record stays attached, since a claim cannot be
+   * undone, and a server the nudges do not apply to is never asked.
+   *
+   * Best effort by design: an unreachable server, a refused secret or a slow
+   * answer keep the local answer, so `status` and `doctor` still work offline.
+   * Cancelling is not a fallback: the person asked the command to stop.
+   *
+   * @param input - The project's secret, its server, and whether that is the cloud.
+   * @returns The state, confirmed with the server when it answered.
+   * @throws {Error} Only when the run was cancelled.
+   */
+  static async confirmed(input: ConfirmInput): Promise<ClaimState> {
+    const local = Claim.classify(input);
+    if (local.kind !== "detached") {
+      return local;
+    }
+    const service = new ClaimService(
+      createZitadelClient({
+        userAgent: Runtime.current().userAgent(),
+        baseUrl: input.server,
+        token: input.secret.project_secret,
+        signal: input.signal,
+        timeoutMs: Claim.CONFIRM_TIMEOUT_MS,
+      }),
+      input.secret.project_id,
+    );
+    try {
+      const claim = await pTimeout(service.current(), {
+        milliseconds: Claim.CONFIRM_TIMEOUT_MS + 250,
+      });
+      if (claim.status === "claimed") {
+        return { kind: "attached", team_id: claim.team_id, claimed_at: claim.claimed_at };
+      }
+      return local;
+    } catch (error) {
+      if (isCancellation(error)) {
+        throw error;
+      }
+      return local;
+    }
   }
 
   /**

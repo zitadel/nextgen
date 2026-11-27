@@ -1,0 +1,10 @@
+type: object
+description: A project no team has claimed yet.
+required:
+  - status
+properties:
+  status:
+    type: string
+    enum:
+      - unclaimed
+    description: No team owns the project.

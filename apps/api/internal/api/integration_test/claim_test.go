@@ -639,6 +639,13 @@ func TestClaimAuthNegatives(t *testing.T) {
 		assert.Equal(t, api.ErrorCode("auth.unauthorized"), details.Code)
 	})
 
+	t.Run("claim without bearer", func(t *testing.T) {
+		t.Parallel()
+		status, details := do(t, http.MethodGet, serverURL+"/projects/"+project.ID+"/claim", nil)
+		assert.Equal(t, http.StatusUnauthorized, status)
+		assert.Equal(t, api.ErrorCode("auth.unauthorized"), details.Code)
+	})
+
 	t.Run("complete without cookie", func(t *testing.T) {
 		t.Parallel()
 		status, details := do(t, http.MethodPost,
@@ -690,4 +697,47 @@ func TestGetClaimWindow(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.IsType(t, &api.GetProjectClaimWindowNotFound{}, unknown, helpers.MustMarshal(t, unknown))
+}
+
+// TestGetProjectClaim: the challenge-free read of a project's claim, on the
+// project secret. It reads the owning-team grant, so a project claimed
+// anywhere reads as claimed, and another project's secret learns nothing.
+func TestGetProjectClaim(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+	params := api.GetProjectClaimParams{ProjectID: api.ProjectID(project.ID)}
+
+	unclaimed, err := client.GetProjectClaim(t.Context(), params)
+	require.NoError(t, err)
+	require.IsType(t, &api.ClaimResponse{}, unclaimed, helpers.MustMarshal(t, unclaimed))
+	assert.True(t, unclaimed.(*api.ClaimResponse).IsClaimUnclaimed(), helpers.MustMarshal(t, unclaimed))
+
+	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
+		ProjectID: harness.EnsurePlatformProject(t).ID,
+		Name:      helpers.TeamName(),
+	})
+	require.NoError(t, err)
+	harness.SeedOwningTeam(t, project.ID, team.ID)
+
+	claimed, err := client.GetProjectClaim(t.Context(), params)
+	require.NoError(t, err)
+	require.IsType(t, &api.ClaimResponse{}, claimed, helpers.MustMarshal(t, claimed))
+	owner, ok := claimed.(*api.ClaimResponse).GetClaimClaimed()
+	require.True(t, ok, helpers.MustMarshal(t, claimed))
+	assert.Equal(t, api.TeamID(team.ID), owner.TeamID)
+	assert.WithinDuration(t, time.Now(), owner.ClaimedAt, time.Minute)
+
+	other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	foreign, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, foreign, other)
+	refused, err := foreign.GetProjectClaim(t.Context(), params)
+	require.NoError(t, err)
+	assert.IsType(t, &api.GetProjectClaimNotFound{}, refused, helpers.MustMarshal(t, refused))
 }

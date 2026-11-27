@@ -660,3 +660,68 @@ func TestClaimService_Window(t *testing.T) {
 		})
 	}
 }
+
+func TestClaimService_State(t *testing.T) {
+	t.Parallel()
+
+	const teamID = "team_1"
+	claimedAt := time.Now().Add(-time.Hour)
+
+	tests := []struct {
+		name      string
+		setupStmt func(s *servicemocks.MockAllStatements)
+		wantErr   error
+		want      *service.ClaimStateResult
+	}{
+		{
+			name: "unclaimed project",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(claimableProject(), nil)
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
+			},
+			want: &service.ClaimStateResult{},
+		},
+		{
+			name: "claimed project reports its owning team and claim time",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(claimableProject(), nil)
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(&domain.AuthzAssignment{PrincipalID: teamID, CreatedAt: claimedAt}, nil)
+			},
+			want: &service.ClaimStateResult{Claimed: true, TeamID: teamID, ClaimedAt: claimedAt},
+		},
+		{
+			// A claimed project stays claimed past its window: the window only
+			// limits new claims.
+			name: "claimed project past its window is still claimed",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(expiredWindowProject(), nil)
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(&domain.AuthzAssignment{PrincipalID: teamID, CreatedAt: claimedAt}, nil)
+			},
+			want: &service.ClaimStateResult{Claimed: true, TeamID: teamID, ClaimedAt: claimedAt},
+		},
+		{
+			name: "missing project",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
+			},
+			wantErr: domain.ErrProjectNotFound(),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc := newMockedClaimService(t, tc.setupStmt)
+
+			got, err := svc.State(t.Context(), "proj_1")
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+				assert.Nil(t, got)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}

@@ -16,6 +16,11 @@ import { stripAnsi } from "@tests/helpers/run-cli";
 // status keeps its lifecycle-only output.
 it.beforeEach(({ server }) => {
   server.use(http.post("*/users/query", () => HttpResponse.error()));
+  server.use(
+    http.get("*/projects/:project_id/claim", () => {
+      return HttpResponse.json({ status: "unclaimed" });
+    }),
+  );
 });
 
 const SECRET = {
@@ -191,6 +196,63 @@ describe("status command", () => {
     });
     expect(json.data.next_actions.join("\n")).not.toContain("its data may be lost");
     expect(json.data.next_commands).not.toContain(
+      expectedPublicCliCommand(`claim --server https://preview.zitadel.com --cwd ${cwd}`),
+    );
+  });
+
+  // The local record is written only where the claim ran, so a project claimed
+  // from another machine reads detached here until the server is asked.
+  it("reports a project claimed from another machine as owned, and stops nudging", async ({
+    dir: cwd,
+    server,
+  }) => {
+    await configuredProject(cwd);
+    server.use(
+      http.get("*/projects/proj-001/claim", () => {
+        return HttpResponse.json({
+          status: "claimed",
+          team_id: "team-002",
+          claimed_at: "2026-01-03T00:00:00Z",
+        });
+      }),
+    );
+
+    const res = await status(cwd);
+
+    const json = parseJson(res.stdout) as {
+      data: {
+        project: { claim?: { kind: string; team_id?: string; claimed_at?: string } };
+        next_commands: string[];
+      };
+    };
+    expect(json.data.project.claim).toEqual({
+      kind: "attached",
+      team_id: "team-002",
+      claimed_at: "2026-01-03T00:00:00Z",
+    });
+    expect(json.data.next_commands).not.toContain(
+      expectedPublicCliCommand(`claim --server https://preview.zitadel.com --cwd ${cwd}`),
+    );
+  });
+
+  it("keeps the local record when the server cannot say whether the project is claimed", async ({
+    dir: cwd,
+    server,
+  }) => {
+    await configuredProject(cwd);
+    server.use(
+      http.get("*/projects/proj-001/claim", () => {
+        return HttpResponse.error();
+      }),
+    );
+
+    const res = await status(cwd);
+
+    const json = parseJson(res.stdout) as {
+      data: { project: { claim?: { kind: string } }; next_commands: string[] };
+    };
+    expect(json.data.project.claim).toMatchObject({ kind: "detached", claimable: true });
+    expect(json.data.next_commands).toContain(
       expectedPublicCliCommand(`claim --server https://preview.zitadel.com --cwd ${cwd}`),
     );
   });

@@ -1,0 +1,14 @@
+description: |
+  Whether the project is claimed. An unclaimed project carries only `status`.
+  A claimed one also carries the owning team and the claim timestamp. Switch on
+  `status`: an `unclaimed` response never carries those fields, and a
+  `claimed` response always does.
+# Discriminated variants keep owner fields out of an `unclaimed` response.
+oneOf:
+  - $ref: ./claim-unclaimed.yaml
+  - $ref: ./claim-claimed.yaml
+discriminator:
+  propertyName: status
+  mapping:
+    unclaimed: ./claim-unclaimed.yaml
+    claimed: ./claim-claimed.yaml

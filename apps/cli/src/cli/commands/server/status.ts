@@ -75,6 +75,8 @@ type ProjectStatus =
  * project. It is gated on the server in `zitadel.json`, not on the run's
  * source: `status --server local` rewrites the source for the health probe but
  * does not move the project, so the source would answer the wrong question.
+ * A record that says unclaimed is checked with that server
+ * ({@link Claim.confirmed}), so a claim made from another machine shows.
  *
  * @param cwd - The directory whose project is read.
  * @param issuer - The issuer to report for a configured project.
@@ -82,6 +84,7 @@ type ProjectStatus =
  * @param named - Set when the run named an environment other than the default
  * development one, or a file: its project is whatever it resolves, never
  * setup's.
+ * @param signal - Cancels the claim check with the server.
  * @returns The project's lifecycle and what the status shows for it.
  */
 async function projectStatus(
@@ -89,6 +92,7 @@ async function projectStatus(
   issuer: string | undefined,
   resolvedProjectId: string | undefined,
   named: { name: string; envFile?: string } | undefined,
+  signal: AbortSignal,
 ): Promise<ProjectStatus> {
   if (!(await Project.at(cwd).hasConfig())) {
     return {
@@ -122,11 +126,14 @@ async function projectStatus(
 
   const projectId =
     resolvedProjectId ?? String(config.data.project ?? secret?.data.project_id ?? "");
+  const server = config.server ?? ZitadelRuntime.DEFAULT;
   const claim =
     secret !== undefined && projectId === secret.data.project_id
-      ? Claim.state({
+      ? await Claim.confirmed({
           secret: secret.data,
-          cloud: ZitadelRuntime.fromUrl(config.server ?? ZitadelRuntime.DEFAULT).isCloud(),
+          server,
+          cloud: ZitadelRuntime.fromUrl(server).isCloud(),
+          signal,
         })
       : ({ kind: "not-applicable" } as const);
   return {
@@ -397,6 +404,7 @@ export default class Status extends Telemetered(ProjectCommand) {
             envFile: this.environment.envFile,
           }
         : undefined,
+      this.signal,
     );
     this.ui.ranAgainst(
       project.lifecycle === "configured" ? project.project_id : undefined,

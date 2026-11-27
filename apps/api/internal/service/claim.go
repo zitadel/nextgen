@@ -31,6 +31,10 @@ type ClaimService interface {
 	// challenge alone, so the claim page can show the deadline before the
 	// developer has signed in.
 	Window(ctx context.Context, projectID, challengeID string) (*ClaimWindowResult, error)
+	// State reports whether the project is claimed, and by which team, from
+	// its owning-team grant. It needs no challenge, so a client can ask it at
+	// any time; the handler authorizes the project secret.
+	State(ctx context.Context, projectID string) (*ClaimStateResult, error)
 }
 
 type ClaimInitResult struct {
@@ -63,6 +67,14 @@ type ClaimWindowResult struct {
 	// Expired is the server's own verdict, so a browser with a skewed clock
 	// cannot decide the opposite of what the claim legs will enforce.
 	Expired bool
+}
+
+type ClaimStateResult struct {
+	Claimed bool
+	// TeamID and ClaimedAt are set only when Claimed, reconstructed from the
+	// grant (claim state lives in the permission engine, ADR 046 §1).
+	TeamID    string
+	ClaimedAt time.Time
 }
 
 type claimService struct {
@@ -377,6 +389,20 @@ func (s *claimService) Window(ctx context.Context, projectID, challengeID string
 	}
 	expiresAt := project.CreatedAt.Add(domain.ClaimWindow)
 	return &ClaimWindowResult{ExpiresAt: expiresAt, Expired: time.Now().After(expiresAt)}, nil
+}
+
+func (s *claimService) State(ctx context.Context, projectID string) (_ *ClaimStateResult, err error) {
+	ctx, end := startSpan(ctx, "ClaimService.State")
+	defer end(&err)
+
+	_, grant, err := claimedProjectState(ctx, s.v2Pool.Statements(), projectID)
+	if err != nil {
+		return nil, err
+	}
+	if grant == nil {
+		return &ClaimStateResult{}, nil
+	}
+	return &ClaimStateResult{Claimed: true, TeamID: grant.PrincipalID, ClaimedAt: grant.CreatedAt}, nil
 }
 
 // claimedProjectState resolves the claim state every leg branches on: a
