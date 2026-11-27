@@ -43,6 +43,7 @@ const DESTRUCTIVE = [
   ["user", "delete", "user_1", "Cannot delete user user_1", "Delete user user_1"],
   ["team", "deactivate", "team_1", "Cannot deactivate team team_1", "Deactivate team team_1"],
   ["session", "revoke", "sess_1", "Cannot revoke session sess_1", "Revoke session sess_1"],
+  ["grant", "delete", "asgn_1", "Cannot delete grant asgn_1", "Delete grant asgn_1"],
 ];
 
 const WRONG_KIND: readonly { args: string[]; list: string; message: string }[] = [
@@ -441,15 +442,6 @@ describe("resources", () => {
       });
 
       describe("leaving what it would change as it was", () => {
-        it.each(READ_BACK)("refuses %s %s without --force", async (topic, verb, arrange) => {
-          const app = await aSetUpApp();
-          const id = await arrange(app);
-
-          expect(await app.run([topic, verb, id, "--non-interactive", "--json"])).toFailWith(
-            "E_CONFIRMATION_REQUIRED",
-          );
-        });
-
         it.each(READ_BACK)(
           "changes nothing on %s %s without --force",
           async (topic, verb, arrange, read) => {

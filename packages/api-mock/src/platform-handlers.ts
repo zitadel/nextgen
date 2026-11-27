@@ -3256,9 +3256,17 @@ export function setupPlatformHandlers() {
         .filter((user) => {
           return user.projectId === project.id;
         })
-        .slice(0, body.data.limit)
-        .map(userResponse);
-      return HttpResponse.json({ users });
+        .sort((a, b) => {
+          return b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id);
+        });
+      const paged = pageOf(users, body.data.limit, body.data.page_token ?? undefined);
+      if (!paged.ok) {
+        return paged.response;
+      }
+      return HttpResponse.json({
+        users: paged.page.map(userResponse),
+        next_page_token: paged.next ?? null,
+      });
     }),
 
     http.post("*/schemas", async ({ request }) => {
@@ -4080,6 +4088,18 @@ export function setupPlatformHandlers() {
       if (!body.ok) {
         return body.response;
       }
+      const taken = [...store.teams.values()].some((candidate) => {
+        return (
+          candidate.status === "active" &&
+          candidate.projectId === query.data.project_id &&
+          candidate.name.toLowerCase() === body.data.name.toLowerCase()
+        );
+      });
+      if (taken) {
+        return HttpResponse.json(errorBody("team.already_exists", "team name already exists"), {
+          status: 409,
+        });
+      }
       const now = nowIso();
       const team: TeamRecord = {
         id: `team_${shortId()}`,
@@ -4120,7 +4140,7 @@ export function setupPlatformHandlers() {
       }
       const team = store.teams.get(path.data.team_id);
       if (team === undefined || team.projectId !== bearerProjectId(request)) {
-        return HttpResponse.json(TEAM_NOT_FOUND, { status: 404 });
+        return new HttpResponse(null, { status: 204 });
       }
       store.teams.set(team.id, { ...team, status: "deactivated", updatedAt: nowIso() });
       return new HttpResponse(null, { status: 204 });
@@ -4151,6 +4171,9 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/users/:user_id", ({ params, request }) => {
+      if (params.user_id === "me") {
+        return undefined;
+      }
       const path = parse(GetUserParams, params);
       if (!path.ok) {
         return path.response;
@@ -4177,9 +4200,14 @@ export function setupPlatformHandlers() {
       }
       const user = store.users.get(path.data.user_id);
       if (user === undefined || user.projectId !== bearerProjectId(request)) {
-        return HttpResponse.json(USER_NOT_FOUND, { status: 404 });
+        return new HttpResponse(null, { status: 204 });
       }
       store.users.delete(user.id);
+      for (const grant of store.grants.values()) {
+        if ("user_id" in grant.principal && grant.principal.user_id === user.id) {
+          store.grants.delete(grant.id);
+        }
+      }
       return new HttpResponse(null, { status: 204 });
     }),
 
@@ -4218,10 +4246,29 @@ export function setupPlatformHandlers() {
       if (!body.ok) {
         return body.response;
       }
+      const byIdentifier = body.data.user?.identifier !== undefined;
       const principal = grantPrincipal(query.data.project_id, body.data);
+      const held =
+        principal !== undefined &&
+        [...store.grants.values()].some((grant) => {
+          return (
+            grant.projectId === query.data.project_id &&
+            grant.relation === body.data.relation &&
+            JSON.stringify(grant.principal) === JSON.stringify(principal)
+          );
+        });
+      if (byIdentifier && (principal === undefined || held)) {
+        return new HttpResponse(null, { status: 202 });
+      }
       if (principal === undefined) {
-        return HttpResponse.json(errorBody("grant.invalid", "grant names no active user or team"), {
-          status: 400,
+        return HttpResponse.json(
+          errorBody("grant.principal_not_found", "grant names no active user or team"),
+          { status: 404 },
+        );
+      }
+      if (held) {
+        return HttpResponse.json(errorBody("grant.already_exists", "grant already exists"), {
+          status: 409,
         });
       }
       const grant: GrantRecord = {
@@ -4234,6 +4281,9 @@ export function setupPlatformHandlers() {
         seq: ++store.lastSeq,
       };
       store.grants.set(grant.id, grant);
+      if (byIdentifier) {
+        return new HttpResponse(null, { status: 202 });
+      }
       const out = parseOut(CreateGrantResponse, grantResponse(grant));
       if (!out.ok) {
         return out.response;
