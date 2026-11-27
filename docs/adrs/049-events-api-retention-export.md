@@ -76,6 +76,7 @@ GET /events/{event_id}?project_id=…   # project scope required (see below)
 | `session_id` | string | Session correlation |
 | `flow_id` | string | Login flow correlation |
 | `request_id` | string | HTTP request correlation |
+| `correlation_id` | string | The chain of requests one piece of work took ([ADR 048, amendment of 2026-11-26](048-wide-events-internal-audit-primitive.md#amendment-2026-11-26-a-correlation-id-that-requests-inherit)) |
 | `fingerprint` | string | Device correlation |
 | `entity_type` | string | Resource type affected |
 | `entity_id` | string | Resource ID affected |

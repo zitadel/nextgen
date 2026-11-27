@@ -124,9 +124,13 @@ type Session struct {
 	// The factors are stored in the database.
 	Factors []AuthFactor
 
-	// FlowID is the login flow whose handoff an exchange consumed. Set only on
-	// the session ExchangeSession returns, for its events; it is not stored.
-	FlowID string
+	// FlowID and CorrelationID are the login flow and the chain of the
+	// attempt whose handoff an exchange consumed. Set only on the session
+	// ExchangeSession returns, so the exchange can join both before it writes
+	// its events; they are not stored. A session is no carrier: the chain
+	// ends with the events that establish it.
+	FlowID        string
+	CorrelationID string
 }
 
 func NewSession(projectID string, agent *UserAgent) (*Session, error) {

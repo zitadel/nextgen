@@ -1,9 +1,5 @@
-import {
-  getApi,
-  getZitadelConfig,
-  type ZitadelApi,
-  type ZitadelProject,
-} from "@zitadel/api/config";
+import { getClient, getZitadelConfig, type ZitadelProject } from "@zitadel/api/config";
+import type { ZitadelClient } from "@zitadel/api/runtime/client";
 
 /** Matches the `configureZitadel()` default so attribute and JS config agree. */
 const DEFAULT_PROXY_PATH = "/__nextgen";
@@ -21,10 +17,10 @@ export interface ProjectAttrs {
 
 /**
  * Cache of project handles synthesized from attributes, keyed by their value
- * tuple. `getApi()` caches its client in a `WeakMap` keyed by the project's
+ * tuple. `getClient()` caches its client in a `WeakMap` keyed by the project's
  * identity, so the same attribute values must yield the *same* frozen object
  * across the several `resolveApi()` calls a single flow makes — otherwise
- * every call misses the cache and re-wraps a fresh client. A real page uses a
+ * every call misses the cache and makes a fresh client. A real page uses a
  * handful of distinct configs at most; the FIFO bound below is just a guard so
  * a pathological page that churns through unique configs can't leak memory.
  */
@@ -68,7 +64,7 @@ function projectFromAttrs({
 }
 
 /**
- * Resolves the effective SDK project handle and its typed API client for an
+ * Resolves the effective SDK project handle and its client for an
  * orchestrator element. Precedence, highest first:
  *
  * 1. the element's `project` property (an SDK handle set from JS / a framework),
@@ -93,7 +89,7 @@ export function resolveApi(
   project: ZitadelProject | undefined,
   attrs: ProjectAttrs,
   element: string,
-): { project: ZitadelProject; api: ZitadelApi } {
+): { project: ZitadelProject; client: ZitadelClient } {
   const cfg = project ?? getZitadelConfig() ?? projectFromAttrs(attrs);
   if (!cfg) {
     throw new Error(
@@ -101,5 +97,5 @@ export function resolveApi(
         `set the \`project\` property, or call configureZitadel().`,
     );
   }
-  return { project: cfg, api: getApi(cfg) };
+  return { project: cfg, client: getClient(cfg) };
 }

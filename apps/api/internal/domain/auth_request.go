@@ -84,6 +84,11 @@ type AuthRequest struct {
 	UserID        string
 	SessionID     string
 	CodeExpiresAt *time.Time
+	// CorrelationID is the chain of requests the authorization request
+	// starts: the flow created for it and the redemption of its code join it
+	// (ADR 048, amendment of 2026-11-26). Empty for a request stored before
+	// chains.
+	CorrelationID string
 }
 
 // NewAuthRequestBinding mints the nonce of the cookie that binds a request to

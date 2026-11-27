@@ -98,7 +98,7 @@ export function ClaimOutcomeCard({ outcome, retry }: { outcome: ClaimOutcome; re
         </StandaloneMessage>
       );
     case "csrf_refused":
-      // Still refused after the shared fetch's one retry: someone else is
+      // Still refused after `SessionCsrf`'s one retry: someone else is
       // signed in now (the session module may already have reloaded the page),
       // or the request came from another site. Reloading starts over with the
       // session this browser actually holds now.
