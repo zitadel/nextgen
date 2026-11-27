@@ -363,9 +363,7 @@ export default class ApplicationCreate extends Telemetered(Promptable(ChangeComm
       ZITADEL_CLIENT_ID: clientId,
       ...(secret === undefined ? {} : { ZITADEL_CLIENT_SECRET: secret.secret }),
       ZITADEL_CALLBACK_URL: intended.redirectUris[0],
-      ...(allowedOrigins === null
-        ? {}
-        : { ZITADEL_ALLOWED_ORIGINS: allowedOrigins.join(" ") }),
+      ...(allowedOrigins === null ? {} : { ZITADEL_ALLOWED_ORIGINS: allowedOrigins.join(" ") }),
     };
 
     const wrotePath = await this.writeEnv(intended, env);
