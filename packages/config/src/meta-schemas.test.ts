@@ -51,6 +51,7 @@ describe("meta-schemas", () => {
       "idp-connection.json",
       "branding.json",
       "application.json",
+      "oauth-settings.json",
       "policy.json",
       "policy-test.json",
       "project.json",

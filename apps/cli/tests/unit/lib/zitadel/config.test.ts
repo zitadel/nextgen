@@ -29,6 +29,7 @@ import {
   aFile,
   aGoogleConnection,
   aLoginFlow,
+  anOAuthSettings,
   anOidcConnection,
   aPasswordPolicy,
   aStore,
@@ -366,6 +367,7 @@ describe("ZitadelConfig.loadUnchecked", () => {
     ["connections", "connection"],
     ["policies", "policy"],
     ["branding", "branding"],
+    ["oauth", "oauth"],
   ] as const)("keeps an unparsed file of %s as a broken %s", async (directory, kind) => {
     const path = `${CONFIG_DIRECTORIES[directory]}/half-written.json`;
     const store = aStoreWithUnparsed(path);
@@ -910,6 +912,7 @@ describe("ZitadelConfig.bundle", () => {
   it.each([
     ["a schema, a flow and a connection", ONE_OF_EACH, 3],
     ["a schema and the branding", SCHEMA_AND_BRANDING, 2],
+    ["the OAuth settings", { oauth: { "oauth.json": anOAuthSettings() } }, 1],
     ["a policy file", POLICY_WITH_POINTER, 1],
     ["a policy file but not its test file", POLICY_AND_BROKEN_TEST, 1],
     ["exactly fifty resources", { schemas: schemas(50) }, 50],
@@ -919,6 +922,39 @@ describe("ZitadelConfig.bundle", () => {
     const { resourceCount } = config.bundle(new MemoryStore());
 
     expect(resourceCount).toBe(count);
+  });
+
+  it("sends the OAuth settings as one object under `oauth`, without their $schema pointer", () => {
+    const config = aConfig({
+      oauth: { "oauth.json": { $schema: "../meta/oauth-settings.json", ...anOAuthSettings() } },
+    });
+
+    const { bundle } = config.bundle(new MemoryStore());
+
+    expect(bundle.oauth).toEqual(anOAuthSettings());
+  });
+
+  it("leaves `oauth` out of a bundle without the settings", () => {
+    const config = aConfig(SCHEMA_AND_BRANDING);
+
+    const { bundle } = config.bundle(new MemoryStore());
+
+    expect(bundle).not.toHaveProperty("oauth");
+  });
+
+  it("refuses more than one OAuth settings file", () => {
+    const config = aConfig({
+      oauth: { "one.json": anOAuthSettings(), "two.json": {} },
+    });
+
+    const error = thrownBy(() => {
+      return config.bundle(new MemoryStore());
+    });
+
+    expect(error).toBeInstanceOf(ConfigError);
+    expect(error).toMatchObject({
+      message: "A release carries at most one OAuth settings file, but .zitadel/oauth/ holds 2",
+    });
   });
 
   it("sends the branding as one object under `branding`, never a `brandings` list", () => {

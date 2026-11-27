@@ -1,4 +1,5 @@
 import {
+  BuildReleaseBody,
   PublishApplicationBody,
   PublishBrandingBody,
   PublishFlowDefinitionBody,
@@ -408,4 +409,14 @@ export const brandingConfigSchema = z.strictObject({
   liquid_template: z
     .union([PublishBrandingBody.shape.liquid_template.unwrap(), localFileReferenceSchema])
     .optional(),
+});
+
+/**
+ * The local `.zitadel/oauth/oauth.json` dialect: the bundle's `oauth` shape
+ * (the meta-schema `oauth-settings.json` mirrors this), strict so a misspelt
+ * key fails the dry run instead of being dropped by the server.
+ */
+export const oauthConfigSchema = z.strictObject({
+  $schema: z.string().optional(),
+  ...BuildReleaseBody.shape.bundle.shape.oauth.unwrap().shape,
 });

@@ -499,7 +499,7 @@ schemas.
 
 | To | File | Command | SDK or element |
 |---|---|---|---|
-| Become an issuer | `.zitadel/oauth.json`, a singleton like branding: the switch (ADR 081 §7), the login-only declaration and the registration switches (§9), scope claim rules (§6) and token defaults | `zitadel settings oauth enable`, or `zitadel application create` when the issuer is off, which says so; `deploy` ships it; `doctor` checks the reserved paths and that a login-only issuer serves only the login | Nothing: the SDK already forwards the paths, and sets a login-only issuer's content security policy |
+| Become an issuer | `.zitadel/oauth/oauth.json`, a singleton like branding: the switch (ADR 081 §7), the login-only declaration and the registration switches (§9), scope claim rules (§6) and token defaults | `zitadel settings oauth enable`, or `zitadel application create` when the issuer is off, which says so; `deploy` ships it; `doctor` checks the reserved paths and that a login-only issuer serves only the login | Nothing: the SDK already forwards the paths, and sets a login-only issuer's content security policy |
 | Declare an application | `.zitadel/applications/<slug>.json` (§3) | `zitadel application create`, which writes the file and does not deploy, or `setup --sign-in-with` for a relying party (ADR 081 §12); `deploy --dry-run` and `deploy` | A relying party configures its proxy with the issuer and its client id; `auth()` and the session elements are unchanged |
 | Register an application | None | `zitadel application create --registered`, or `POST /applications` | The product's own UI calls `POST /applications` through the proxy with the admin's session |
 | Protect an API | The `apis` entry of the application's file (§5) | `zitadel application get` reads it; edit the file, then `deploy` | `protectResource({ api })` verifies bearers and serves the API's metadata |
@@ -685,7 +685,7 @@ Decided on 2026-11-06 and 2026-11-09 in
   confidential clients, so none breaks.
 - `iss` on authorization responses (§2) stays required, as the review asked.
   It may ship after step 2, since adding it breaks no client.
-- `zitadel application create` writes `.zitadel/oauth.json` when the issuer
+- `zitadel application create` writes `.zitadel/oauth/oauth.json` when the issuer
   is off, and `zitadel settings oauth enable` stays for doing that alone
   (§12), under a `settings` group that later protocol switches share.
 - A request without `resource` (§5) gets an access token for the client's

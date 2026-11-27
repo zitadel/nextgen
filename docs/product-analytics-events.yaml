@@ -193,7 +193,7 @@ properties:
     description: Where a deployment failed.
   changed_configuration_types:
     type: list
-    values: [user_schema, login_flow, branding, policy, identity_provider, application]
+    values: [user_schema, login_flow, branding, policy, identity_provider, application, oauth]
     description: Configuration a deployment actually changed, never one it merely included.
   preview_option:
     type: string

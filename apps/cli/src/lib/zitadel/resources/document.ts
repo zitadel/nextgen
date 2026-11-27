@@ -30,6 +30,7 @@ export const DOCUMENT_KINDS = [
   "policy-test",
   "branding",
   "application",
+  "oauth",
 ] as const;
 
 /**

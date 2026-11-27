@@ -258,6 +258,16 @@ describe("deploy", () => {
         });
       });
 
+      it("pins the OAuth settings once they are enabled", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin(PRIMARY_ORIGIN);
+        expect(await app.enableOAuth()).toSucceed();
+
+        const { release_id } = await app.deployData();
+
+        expect(await app.releasePointerKinds(release_id ?? "")).toContain("oauth");
+      });
+
       it("re-deploys the same release when nothing changed", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();

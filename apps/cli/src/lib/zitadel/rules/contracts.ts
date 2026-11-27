@@ -114,4 +114,7 @@ export const CONTRACT_RULES: readonly Rule[] = [
   documentRule("application", (config) => {
     return config.applications.all;
   }),
+  documentRule("oauth", (config) => {
+    return config.oauth.all;
+  }),
 ];

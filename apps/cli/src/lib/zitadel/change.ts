@@ -425,6 +425,7 @@ export class Change {
       ...before.policies.tests,
       ...before.branding.all,
       ...before.applications.all,
+      ...before.oauth.all,
     ];
     const read = documents.filter((document) => {
       return document.status !== "created";

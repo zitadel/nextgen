@@ -69,6 +69,7 @@ export function configFiles(documents: ConfigDocuments = {}): {
     policies: filesOf(documents, "policies"),
     branding: filesOf(documents, "branding"),
     applications: filesOf(documents, "applications"),
+    oauth: filesOf(documents, "oauth"),
   };
 }
 
@@ -248,6 +249,16 @@ export function aBranding(overrides: JsonObject = {}): JsonObject {
     liquid_template: "<zl-page-shell>{% mandatory_gates %}</zl-page-shell>",
     ...overrides,
   };
+}
+
+/**
+ * OAuth settings the server accepts: the switch on.
+ *
+ * @param overrides - Keys to set in place of the defaults.
+ * @returns The settings document.
+ */
+export function anOAuthSettings(overrides: JsonObject = {}): JsonObject {
+  return { enabled: true, ...overrides };
 }
 
 /**

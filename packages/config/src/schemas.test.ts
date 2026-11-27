@@ -11,6 +11,7 @@ import {
   declaredApplicationIssues,
   DEFAULT_USER_CREATE_POLICY,
   flowConfigSchema,
+  oauthConfigSchema,
   policyConfigSchema,
   policyTestFileSchema,
   schemaConfigSchema,
@@ -380,6 +381,19 @@ describe("flowConfigSchema", () => {
     expect(result.error?.issues).toEqual([
       expect.objectContaining({ code: "unrecognized_keys", keys: ["status"] }),
     ]);
+  });
+});
+
+describe("oauthConfigSchema", () => {
+  const parses = (value: object): boolean => oauthConfigSchema.safeParse(value).success;
+
+  it("takes the switch with the editor's $schema pointer", () => {
+    expect(parses({ $schema: "../meta/oauth-settings.json", enabled: true })).toBe(true);
+  });
+
+  it("refuses a missing switch and an unknown key", () => {
+    expect(parses({})).toBe(false);
+    expect(parses({ enabled: true, enabeld: false })).toBe(false);
   });
 });
 

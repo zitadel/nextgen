@@ -50,6 +50,7 @@ export const RULE_IDS = [
   "application/duplicate-slug",
   "application/duplicate-client-id",
   "application/shared-variable",
+  "contract/oauth",
   "connection/literal-secret",
   "connection/endpoints",
   "branding/legacy-template-key",

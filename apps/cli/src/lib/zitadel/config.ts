@@ -22,8 +22,11 @@ import {
 } from "@/lib/zitadel/errors";
 import { Flow } from "@/lib/zitadel/resources/flows/flow";
 import { Flows } from "@/lib/zitadel/resources/flows/collection";
+import { OAuthSettingsCollection } from "@/lib/zitadel/resources/oauth/collection";
+import { OAuthSettings } from "@/lib/zitadel/resources/oauth/oauth";
 import { Policies } from "@/lib/zitadel/resources/policies/collection";
 import { PasswordPolicy } from "@/lib/zitadel/resources/policies/password";
+import type { DocumentKind } from "@/lib/zitadel/resources/document";
 import type { Policy } from "@/lib/zitadel/resources/policies/policy";
 import { SignupPolicy } from "@/lib/zitadel/resources/policies/signup";
 import { PolicyTest } from "@/lib/zitadel/resources/policies/suite";
@@ -39,6 +42,7 @@ import { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
 import type { ConfigStore } from "@/lib/zitadel/storage/types";
 import { toJsonObject } from "@/lib/zitadel/utils/json";
 import {
+  CONFIG_DIRECTORIES,
   CONFIG_KINDS,
   type BuiltBundle,
   type ConfigFiles,
@@ -61,7 +65,8 @@ export type AnyDocument =
   | Policy
   | PolicyTest
   | Branding
-  | Application;
+  | Application
+  | OAuthSettings;
 
 /**
  * What a configuration knows beyond its files, which the caller keeps
@@ -101,6 +106,7 @@ type Parts = {
   readonly policyTests: readonly PolicyTest[];
   readonly brandings: readonly Branding[];
   readonly applications: readonly Application[];
+  readonly oauth: readonly OAuthSettings[];
   readonly broken: readonly BrokenFile[];
   readonly read: readonly (AnyDocument | BrokenFile)[];
   readonly options: ConfigOptions;
@@ -116,8 +122,8 @@ type ListEdit = <T extends AnyDocument>(documents: readonly T[], document: T) =>
 
 /**
  * A project's whole configuration under `.zitadel/`: its user schemas, login
- * flows, identity-provider connections, operation policies, branding and
- * declared applications, read and written together.
+ * flows, identity-provider connections, operation policies, branding,
+ * declared applications and OAuth settings, read and written together.
  *
  * @remarks
  * Immutable. Each kind of document is a collection, and every question and
@@ -165,9 +171,16 @@ export class ZitadelConfig {
   readonly applications: Applications;
 
   /**
+   * The OAuth settings under `.zitadel/oauth/`; a deploy refuses more than
+   * one file.
+   */
+  readonly oauth: OAuthSettingsCollection;
+
+  /**
    * The files read that their kind's contract refuses, so no collection holds
    * them: schemas, flows, connections, policies, policy test files, branding
-   * and applications, in that order and each kind in the order it was read.
+   * applications and OAuth settings, in that order and each kind in the order
+   * it was read.
    */
   readonly broken: readonly BrokenFile[];
 
@@ -195,6 +208,7 @@ export class ZitadelConfig {
     this.policies = new Policies(this, parts.policies, parts.policyTests);
     this.branding = new Brandings(this, parts.brandings);
     this.applications = new Applications(this, parts.applications);
+    this.oauth = new OAuthSettingsCollection(this, parts.oauth);
     this.broken = parts.broken;
     this.options = parts.options;
     this.read = parts.read;
@@ -254,8 +268,8 @@ export class ZitadelConfig {
    * @param options - What is known beyond the files.
    * @returns The configuration, with the kinds not named empty.
    * @throws The error the read of the first named kind in the kinds' fixed
-   *   order (schemas, flows, connections, policies, branding, applications)
-   *   failed with.
+   *   order (schemas, flows, connections, policies, branding, applications,
+   *   oauth) failed with.
    */
   static async loadKinds(
     store: ConfigStore,
@@ -269,6 +283,7 @@ export class ZitadelConfig {
       ZitadelConfig.readKind(store, kinds, "policies"),
       ZitadelConfig.readKind(store, kinds, "branding"),
       ZitadelConfig.readKind(store, kinds, "applications"),
+      ZitadelConfig.readKind(store, kinds, "oauth"),
     ]);
     return ZitadelConfig.of(
       {
@@ -278,6 +293,7 @@ export class ZitadelConfig {
         policies: ZitadelConfig.unwrap(settled[3]),
         branding: ZitadelConfig.unwrap(settled[4]),
         applications: ZitadelConfig.unwrap(settled[5]),
+        oauth: ZitadelConfig.unwrap(settled[6]),
       },
       options,
     );
@@ -310,7 +326,7 @@ export class ZitadelConfig {
    * @remarks
    * The reads run together, so the kinds are unwrapped one after another in
    * their fixed order (schemas, flows, connections, policies, branding,
-   * applications). When
+   * applications, oauth). When
    * several fail, the same one is named every time, rather than whichever
    * settled first.
    *
@@ -354,6 +370,7 @@ export class ZitadelConfig {
       .map(PolicyTest.read);
     const brandings = files.branding.map(Branding.read);
     const applications = files.applications.map(Application.read);
+    const oauth = files.oauth.map(OAuthSettings.read);
     const readings = [
       ...schemas,
       ...flows,
@@ -362,6 +379,7 @@ export class ZitadelConfig {
       ...policyTests,
       ...brandings,
       ...applications,
+      ...oauth,
     ];
     return new ZitadelConfig({
       schemas: ZitadelConfig.documentsIn(schemas),
@@ -371,6 +389,7 @@ export class ZitadelConfig {
       policyTests: ZitadelConfig.documentsIn(policyTests),
       brandings: ZitadelConfig.documentsIn(brandings),
       applications: ZitadelConfig.documentsIn(applications),
+      oauth: ZitadelConfig.documentsIn(oauth),
       broken: readings.filter((reading): reading is BrokenFile => {
         return reading instanceof BrokenFile;
       }),
@@ -399,6 +418,7 @@ export class ZitadelConfig {
       policies: [],
       branding: [],
       applications: [],
+      oauth: [],
     });
   }
 
@@ -435,24 +455,16 @@ export class ZitadelConfig {
    * @param store - Where branding's referenced files are read from.
    * @returns The bundle and how many resources it carries.
    * @throws {@link ConfigError} When there is nothing to deploy, more than one
-   *   branding, or more resources than a release may pin.
+   *   branding or OAuth settings file, or more resources than a release may pin.
    */
   bundle(store: ConfigStore): BuiltBundle {
-    const brandingCount =
-      this.branding.all.length +
-      this.broken.filter((file) => {
-        return file.kind === "branding";
-      }).length;
-    // A project has one branding, so the bundle carries a single one. The cap
-    // below would not catch a second descriptor, so it is refused here, before
-    // anything is inlined or sent.
-    if (brandingCount > 1) {
-      throw new ConfigError(
-        `A release carries at most one branding, but .zitadel/branding/ holds ${brandingCount}`,
-        { hint: "A project has a single branding; keep one descriptor under .zitadel/branding/." },
-      );
-    }
+    // A project has one branding and one OAuth settings file, so the bundle
+    // carries a single one of each. The cap below would not catch a second
+    // file, so it is refused here, before anything is inlined or sent.
+    this.refuseSecond("branding", this.branding.all.length, "branding");
+    this.refuseSecondOAuth();
     const branding = this.branding.all[0]?.toWireBody(store);
+    const oauth = this.oauth.all[0]?.toWireBody(store);
     const policyBodies = this.policies.all.map((policy) => {
       return policy.toWireBody(store);
     });
@@ -462,6 +474,7 @@ export class ZitadelConfig {
       return application.toWireBody(store);
     });
     const applications = applicationBodies.length === 0 ? {} : { applications: applicationBodies };
+    const oauthPart = oauth === undefined ? {} : { oauth };
     const bundle: ConfigurationBundle = {
       schemas: this.schemas.all.map((schema) => {
         return schema.toWireBody(store);
@@ -475,6 +488,7 @@ export class ZitadelConfig {
       ...policies,
       ...brandingPart,
       ...applications,
+      ...oauthPart,
     };
     const resourceCount =
       this.schemas.all.length +
@@ -482,7 +496,8 @@ export class ZitadelConfig {
       this.connections.all.length +
       this.policies.all.length +
       this.branding.all.length +
-      this.applications.all.length;
+      this.applications.all.length +
+      this.oauth.all.length;
     // A broken file is left out of the bundle, which a deploy never sends
     // while one is there, but it still counts: its validation names it.
     const fileCount =
@@ -492,7 +507,7 @@ export class ZitadelConfig {
       }).length;
     if (fileCount === 0) {
       throw new ConfigError("There is nothing in .zitadel/ to deploy", {
-        hint: "Add a schema, flow, policy, branding or application under .zitadel/, or run `zitadel setup` to scaffold one.",
+        hint: "Add a schema, flow, policy, branding, application or OAuth settings under .zitadel/, or run `zitadel setup` to scaffold one.",
       });
     }
     if (fileCount > ZitadelConfig.MAX_BUNDLE_RESOURCES) {
@@ -501,6 +516,43 @@ export class ZitadelConfig {
       );
     }
     return { bundle, resourceCount };
+  }
+
+  /**
+   * Refuses a second OAuth settings file, as building the bundle does, so a
+   * command that edits the one a release carries finds the problem before
+   * `deploy` does.
+   *
+   * @returns This configuration.
+   * @throws {@link ConfigError} When `.zitadel/oauth/` holds more than one file.
+   */
+  refuseSecondOAuth(): ZitadelConfig {
+    this.refuseSecond("oauth", this.oauth.all.length, "OAuth settings file");
+    return this;
+  }
+
+  /**
+   * Refuse a second file of a kind a release carries one of, a broken file
+   * counting as the file it would be.
+   *
+   * @param kind - The kind of document.
+   * @param documents - How many documents of the kind there are.
+   * @param what - What a release carries one of, as the refusal names it.
+   * @throws {@link ConfigError} When the kind's directory holds more than one file.
+   */
+  private refuseSecond(kind: ConfigKind & DocumentKind, documents: number, what: string): void {
+    const count =
+      documents +
+      this.broken.filter((file) => {
+        return file.kind === kind;
+      }).length;
+    if (count > 1) {
+      const directory = CONFIG_DIRECTORIES[kind];
+      throw new ConfigError(
+        `A release carries at most one ${what}, but ${directory}/ holds ${count}`,
+        { hint: `A project has a single ${what}; keep one descriptor under ${directory}/.` },
+      );
+    }
   }
 
   /**
@@ -726,6 +778,7 @@ export class ZitadelConfig {
         ...this.policies.tests,
         ...this.branding.all,
         ...this.applications.all,
+        ...this.oauth.all,
         ...this.broken,
       ].map((file) => {
         return file.path;
@@ -751,6 +804,7 @@ export class ZitadelConfig {
       ...this.policies.tests,
       ...this.branding.all,
       ...this.applications.all,
+      ...this.oauth.all,
     ];
     return documents.filter((document) => {
       return document.isUnsaved;
@@ -855,6 +909,7 @@ export class ZitadelConfig {
       policyTests: this.policies.tests,
       brandings: this.branding.all,
       applications: this.applications.all,
+      oauth: this.oauth.all,
       broken: this.broken,
       read: this.read,
       options: this.options,
@@ -896,6 +951,9 @@ export class ZitadelConfig {
       }
       case "application": {
         return { ...parts, applications: edit(parts.applications, document) };
+      }
+      case "oauth": {
+        return { ...parts, oauth: edit(parts.oauth, document) };
       }
     }
   }

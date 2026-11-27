@@ -14,7 +14,7 @@ import { CONFIG_DIRECTORIES, POLICY_TEST_SUFFIX } from "@/lib/zitadel";
  * whether the lockout step reads them.
  *
  * @remarks
- * Branding, policies, connections and applications cannot lock anyone out.
+ * Branding, policies, connections, applications and OAuth settings cannot lock anyone out.
  */
 const LOCKOUT_DIRECTORIES = [CONFIG_DIRECTORIES.schemas, CONFIG_DIRECTORIES.flows] as const;
 
@@ -28,6 +28,7 @@ const CONFIGURATION_TYPES: readonly (readonly [string, ConfigurationType])[] = [
   [CONFIG_DIRECTORIES.policies, "policy"],
   [CONFIG_DIRECTORIES.branding, "branding"],
   [CONFIG_DIRECTORIES.applications, "application"],
+  [CONFIG_DIRECTORIES.oauth, "oauth"],
 ];
 
 /**
