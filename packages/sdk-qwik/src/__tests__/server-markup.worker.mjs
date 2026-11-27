@@ -9,6 +9,7 @@ import { createServer } from "vite";
 // leaves a MessagePort open that would keep Vitest's own process from exiting;
 // the parent terminates the worker instead.
 const server = await createServer({
+  root: fileURLToPath(new URL("../..", import.meta.url)),
   configFile: false,
   logLevel: "silent",
   plugins: [qwikVite({ csr: true })],

@@ -6,6 +6,8 @@ import dts from "vite-plugin-dts";
 // externalized — the consumer provides them.
 export default defineConfig({
   build: {
+    // Readable output, as tsc emitted, so stack traces name the SDK's functions.
+    minify: false,
     lib: {
       entry: {
         index: "./src/index.ts",
@@ -47,6 +49,12 @@ export default defineConfig({
       exclude: ["src/**/*.spec.*", "src/**/*.test.*", "src/__tests__/**"],
       // Ships the hand-written src/jsx.d.ts (`exports["./jsx"]`).
       copyDtsFiles: true,
+      // Fail the build on any type error, as `tsc` did, instead of shipping partial types.
+      afterDiagnostic(diagnostics) {
+        if (diagnostics.length > 0) {
+          throw new Error(`vite-plugin-dts reported ${diagnostics.length} type error(s)`);
+        }
+      },
     }),
   ],
 });
