@@ -27,7 +27,7 @@ const TITLES = {
  * @param {boolean} property - Whether it is a property value, not the message.
  * @returns {string} The encoded text.
  */
-function escape(value, property) {
+function encode(value, property) {
   const message = value.replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A");
   if (!property) {
     return message;
@@ -51,15 +51,15 @@ export function annotations({ issues, cwd }) {
     return Object.values(records).flatMap((byFile) => {
       return Object.values(byFile).map((issue) => {
         const level = issue.severity === "warn" ? "warning" : "error";
-        const params = [`file=${escape(relative(cwd, issue.filePath), true)}`];
+        const params = [`file=${encode(relative(cwd, issue.filePath), true)}`];
         if (issue.line !== undefined) {
           params.push(`line=${issue.line}`);
         }
         if (issue.col !== undefined) {
           params.push(`col=${issue.col}`);
         }
-        params.push(`title=${escape(`knip: ${TITLES[type]}`, true)}`);
-        return `::${level} ${params.join(",")}::${escape(`${TITLES[type]}: ${issue.symbol}`, false)}`;
+        params.push(`title=${encode(`knip: ${TITLES[type]}`, true)}`);
+        return `::${level} ${params.join(",")}::${encode(`${TITLES[type]}: ${issue.symbol}`, false)}`;
       });
     });
   });
