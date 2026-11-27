@@ -6,6 +6,7 @@ import type { SetupServer } from "msw/node";
 import type { z } from "zod";
 
 import { createZitadelClient, type ZitadelClient } from "@/lib/backend";
+import type { HeldVariable } from "@tests/helpers/records";
 
 /**
  * The server every {@link testClient} is pointed at. Nothing resolves it: a
@@ -215,5 +216,31 @@ export function answeringPages<K extends PagedOperation & OperationName>(
       ...page,
       next_page_token: index + 1 < pages.length ? `page-${index + 1}` : null,
     });
+  });
+}
+
+/**
+ * Answers the project's variables, as `listVariables` holds them.
+ *
+ * @param server - The test's MSW server, from the `server` fixture.
+ * @param held - The values, by variable name.
+ * @param kind - The one kind that holds them; left out, every kind does.
+ * @returns The requests that read them, oldest first.
+ */
+export function answeringVariables(
+  server: SetupServer,
+  held: Readonly<Record<string, HeldVariable>>,
+  kind?: "primary" | "preview",
+): readonly Sent[] {
+  return answering(server, "listVariables", ({ url }) => {
+    const asked = url.searchParams.get("kind") === "preview" ? "preview" : "primary";
+    if (kind !== undefined && asked !== kind) {
+      return {};
+    }
+    return Object.fromEntries(
+      Object.entries(held).map(([name, value]) => {
+        return [name, { [asked]: value }];
+      }),
+    );
   });
 }

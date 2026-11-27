@@ -7,8 +7,8 @@ import { ForbiddenError } from "@/lib/backend/errors";
 import { ZitadelError } from "@/lib/errors";
 import { validateConnections } from "@/lib/publish/steps/idp-checks";
 import { aConfig, anOidcConnection } from "@tests/helpers/config";
-import { answering, refusal } from "@tests/helpers/api-answers";
-import { SECRET_VARIABLE, answeringVariables } from "@tests/helpers/records";
+import { answering, refusal, answeringVariables } from "@tests/helpers/api-answers";
+import { SECRET_VARIABLE } from "@tests/helpers/records";
 import { aStepContext } from "@tests/helpers/step-context";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 

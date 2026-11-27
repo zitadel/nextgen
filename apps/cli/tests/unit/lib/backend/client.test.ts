@@ -87,7 +87,10 @@ describe("createZitadelClient", () => {
   it("carries the server's request id, which finds the request in its logs", async ({ server }) => {
     answering(server, 400, { code: "invalid_argument" }, { "x-request-id": "req_1" });
 
-    expect(await rejectionOf(() => client().getProject("p1"))).toMatchObject({
+    const error = await rejectionOf(() => client().getProject("p1"));
+
+    expect(error).toBeInstanceOf(InvalidError);
+    expect(error).toMatchObject({
       requestId: "req_1",
     });
   });

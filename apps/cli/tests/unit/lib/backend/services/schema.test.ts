@@ -1,6 +1,8 @@
 import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
+
+import { NotFoundError, UnavailableError } from "@/lib/backend/errors";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { SchemaService } from "@/lib/backend/services/schema";
@@ -99,7 +101,10 @@ describe("SchemaService.get", () => {
     answering(server, "getSchema", refusal(404, "schema.not_found"));
     answeringPages(server, "listSchemas", { schemas: [] });
 
-    expect(await rejectionOf(() => service().get("typo"))).toMatchObject({
+    const error = await rejectionOf(() => service().get("typo"));
+
+    expect(error).toBeInstanceOf(NotFoundError);
+    expect(error).toMatchObject({
       name: "NotFoundError",
       message: 'No schema named "typo"',
       hint: "Run `schema list` to see the object types this project has.",
@@ -111,7 +116,10 @@ describe("SchemaService.get", () => {
   }) => {
     answering(server, "getSchema", refusal(500, "internal"));
 
-    expect(await rejectionOf(() => service().get("sch_1"))).toMatchObject({ status: 500 });
+    const error = await rejectionOf(() => service().get("sch_1"));
+
+    expect(error).toBeInstanceOf(UnavailableError);
+    expect(error).toMatchObject({ status: 500 });
   });
 
   // A revision id that nothing holds says the reference was an object type. A
@@ -122,7 +130,10 @@ describe("SchemaService.get", () => {
   }) => {
     answering(server, "getSchema", refusal(410, "schema.gone", "Gone"));
 
-    expect(await rejectionOf(() => service().get("sch_1"))).toMatchObject({
+    const error = await rejectionOf(() => service().get("sch_1"));
+
+    expect(error).toBeInstanceOf(NotFoundError);
+    expect(error).toMatchObject({
       name: "NotFoundError",
       status: 410,
     });

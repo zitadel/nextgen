@@ -2,6 +2,8 @@ import { HttpResponse } from "msw";
 import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
+
+import { ConflictError, UnavailableError } from "@/lib/backend/errors";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { ClaimService } from "@/lib/backend/services/claim";
@@ -63,13 +65,19 @@ describe("ClaimService.start", () => {
   }) => {
     answering(server, "createProjectClaim", refusal(409, "proj.already_claimed"));
 
-    expect(await rejectionOf(() => service().start())).toMatchObject({ status: 409 });
+    const error = await rejectionOf(() => service().start());
+
+    expect(error).toBeInstanceOf(ConflictError);
+    expect(error).toMatchObject({ status: 409 });
   });
 
   it("raises any other failure", async ({ server }) => {
     answering(server, "createProjectClaim", refusal(500, "internal"));
 
-    expect(await rejectionOf(() => service().start())).toMatchObject({ status: 500 });
+    const error = await rejectionOf(() => service().start());
+
+    expect(error).toBeInstanceOf(UnavailableError);
+    expect(error).toMatchObject({ status: 500 });
   });
 });
 
@@ -122,6 +130,9 @@ describe("ClaimService.status", () => {
   it("raises any other failure", async ({ server }) => {
     answering(server, "getProjectClaimStatus", refusal(500, "internal"));
 
-    expect(await rejectionOf(() => service().status("clm_1"))).toMatchObject({ status: 500 });
+    const error = await rejectionOf(() => service().status("clm_1"));
+
+    expect(error).toBeInstanceOf(UnavailableError);
+    expect(error).toMatchObject({ status: 500 });
   });
 });

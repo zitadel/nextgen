@@ -3,6 +3,8 @@ import type { SetupServer } from "msw/node";
 import { describe, expect } from "vitest";
 
 import { it } from "@tests/fixtures";
+
+import { ConflictError, ForbiddenError } from "@/lib/backend/errors";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { Origin, Origins, OriginService } from "@/lib/backend/services/origin";
@@ -276,7 +278,10 @@ describe("OriginService.promote", () => {
         : stored(ISSUER, "preview");
     });
 
-    expect(await rejectionOf(() => service().promote(ISSUER))).toMatchObject({ status: 409 });
+    const error = await rejectionOf(() => service().promote(ISSUER));
+
+    expect(error).toBeInstanceOf(ConflictError);
+    expect(error).toMatchObject({ status: 409 });
     expect(added.map(({ body }) => body)).toEqual([
       { pattern: ISSUER, kind: "primary" },
       { pattern: ISSUER, kind: "preview" },
@@ -289,7 +294,10 @@ describe("OriginService.promote", () => {
     answering(server, "removeProjectOrigin", undefined);
     answering(server, "addProjectOrigin", refusal(409, "proj.origin_conflict"));
 
-    expect(await rejectionOf(() => service().promote(ISSUER))).toMatchObject({ status: 409 });
+    const error = await rejectionOf(() => service().promote(ISSUER));
+
+    expect(error).toBeInstanceOf(ConflictError);
+    expect(error).toMatchObject({ status: 409 });
   });
 });
 
@@ -330,7 +338,10 @@ describe("OriginService.remove", () => {
   it("raises a removal the server refused, which removed nothing", async ({ server }) => {
     answering(server, "removeProjectOrigin", refusal(403, "proj.permission_denied"));
 
-    expect(await rejectionOf(() => service().remove(ISSUER))).toMatchObject({ status: 403 });
+    const error = await rejectionOf(() => service().remove(ISSUER));
+
+    expect(error).toBeInstanceOf(ForbiddenError);
+    expect(error).toMatchObject({ status: 403 });
   });
 });
 

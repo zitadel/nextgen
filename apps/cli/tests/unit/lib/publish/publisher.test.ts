@@ -16,15 +16,10 @@ import {
   type Sent,
   TEST_SERVER,
   testClient,
+  answeringVariables,
 } from "@tests/helpers/api-answers";
 import { it, test } from "@tests/fixtures";
-import {
-  aDeployment,
-  PRIMARY_ORIGIN,
-  PROJECT_ID,
-  SECRET_VARIABLE,
-  answeringVariables,
-} from "@tests/helpers/records";
+import { aDeployment, PRIMARY_ORIGIN, PROJECT_ID, SECRET_VARIABLE } from "@tests/helpers/records";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**

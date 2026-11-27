@@ -200,8 +200,9 @@ it stays here deliberately rather than by oversight.
   a doctor check's with `aCheckContext` (`helpers/check-context.ts`), an API
   record or variables answer with `helpers/records.ts`.
 - Give code that takes a client a real one, `testClient()`, and answer what it
-  sends with `answering` / `answeringPages` (`helpers/api-answers.ts`) on the
-  `server` fixture; never a hand-made client.
+  sends with `answering` / `answeringPages` / `answeringVariables`
+  (`helpers/api-answers.ts`) on the `server` fixture; never a hand-made client.
+  `records.ts` holds only the data those answers carry, so specs can import it.
 - Extend the shared builders rather than adding one to a test file; a builder
   only one file needs stays in that file.
 - A test that must create something and clean it up asks for a fixture in its

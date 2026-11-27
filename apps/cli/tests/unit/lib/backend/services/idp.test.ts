@@ -64,8 +64,9 @@ describe("IdpService.deployedSlugs", () => {
       "proj_1",
     );
 
-    expect(await rejectionOf(() => idpService.deployedSlugs())).toMatchObject({
-      code: "E_CANCELLED",
-    });
+    const error = await rejectionOf(() => idpService.deployedSlugs());
+
+    expect(error).toBeInstanceOf(ZitadelError);
+    expect(error).toMatchObject({ code: "E_CANCELLED" });
   });
 });

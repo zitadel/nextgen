@@ -6,7 +6,7 @@ import { describe, expect } from "vitest";
 import { it } from "@tests/fixtures";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
-import { ForbiddenError } from "@/lib/backend/errors";
+import { ForbiddenError, NotFoundError, UnavailableError } from "@/lib/backend/errors";
 import {
   Variable,
   VariableRemoval,
@@ -169,7 +169,10 @@ describe("VariableService.get", () => {
   }) => {
     answering(server, "getVariable", {});
 
-    expect(await rejectionOf(() => service().get("CLIENT_ID", "preview"))).toMatchObject({
+    const error = await rejectionOf(() => service().get("CLIENT_ID", "preview"));
+
+    expect(error).toBeInstanceOf(NotFoundError);
+    expect(error).toMatchObject({
       name: "NotFoundError",
       message: "Variable CLIENT_ID has no preview value.",
       hint: "A name has a preview value only once one is set with `--preview`.",
@@ -195,7 +198,10 @@ describe("VariableService.heldByName", () => {
   it("raises a token's refusal to read the values of that kind", async ({ server }) => {
     answering(server, "listVariables", refusal(403, "variable.permission_denied"));
 
-    expect(await rejectionOf(() => service().heldByName("primary"))).toMatchObject({
+    const error = await rejectionOf(() => service().heldByName("primary"));
+
+    expect(error).toBeInstanceOf(ForbiddenError);
+    expect(error).toMatchObject({
       name: "ForbiddenError",
     });
   });
@@ -397,11 +403,12 @@ describe("VariableService.set", () => {
   it("fails on any other error, since writing on an unknown is the outcome it guards against", async ({
     server,
   }) => {
-    expect(await rejectionOf(() => setPreviewOver(server, refusal(500, "internal")))).toMatchObject(
-      {
-        status: 500,
-      },
-    );
+    const error = await rejectionOf(() => setPreviewOver(server, refusal(500, "internal")));
+
+    expect(error).toBeInstanceOf(UnavailableError);
+    expect(error).toMatchObject({
+      status: 500,
+    });
   });
 });
 
