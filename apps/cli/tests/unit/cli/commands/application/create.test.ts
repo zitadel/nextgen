@@ -148,6 +148,26 @@ describe("application create flags", () => {
     ).resolves.toBe("http://localhost:3000/auth/callback");
   });
 
+  it("takes a private-use redirect URI", async () => {
+    await expect(
+      parseFlag(
+        ApplicationCreate.flags["redirect-uri"],
+        "com.acme.tunes:/callback",
+        "redirect-uri",
+      ),
+    ).resolves.toBe("com.acme.tunes:/callback");
+  });
+
+  it("refuses a non-loopback http redirect URI", async () => {
+    await expect(
+      parseFlag(
+        ApplicationCreate.flags["redirect-uri"],
+        "http://evil.com/callback",
+        "redirect-uri",
+      ),
+    ).rejects.toMatchObject({ code: "E_VALIDATION" });
+  });
+
   it("takes an origin", async () => {
     await expect(
       parseFlag(ApplicationCreate.flags.origin, "http://localhost:5173", "origin"),
