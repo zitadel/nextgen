@@ -4754,6 +4754,49 @@ describe("api-mock teams, users and grants", () => {
     expect(res.status).toBe(status);
   });
 
+  test("reads a session until it is revoked, and revokes it again as a no-op", async () => {
+    const project = await newProject("sessions-revoke");
+    const createdRes = await fetch(`${API}/sessions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project_id: project.id }),
+    });
+    const { session } = (await createdRes.json()) as { session: { session_id: string } };
+    const read = async () => {
+      return (await fetch(`${API}/sessions/${session.session_id}`, { headers: project.auth }))
+        .status;
+    };
+    const revoke = async () => {
+      return (
+        await fetch(`${API}/sessions/${session.session_id}`, {
+          method: "DELETE",
+          headers: project.auth,
+        })
+      ).status;
+    };
+    const before = await read();
+
+    const revoked = await revoke();
+
+    expect({
+      created: createdRes.status,
+      before,
+      revoked,
+      after: await read(),
+      again: await revoke(),
+    }).toEqual({ created: 201, before: 200, revoked: 204, after: 404, again: 204 });
+  });
+
+  test("refuses a session read or revoke without a bearer", async () => {
+    const statuses = await Promise.all(
+      ["GET", "DELETE"].map(async (method) => {
+        return (await fetch(`${API}/sessions/sess_1`, { method })).status;
+      }),
+    );
+
+    expect(statuses).toEqual([401, 401]);
+  });
+
   test("lists the grants that never expire, and names their teams", async () => {
     const project = await newProject("grants-never-expire");
     const teamId = await created(project, `/teams?project_id=${project.id}`, { name: "Support" });

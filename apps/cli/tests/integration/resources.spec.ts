@@ -110,6 +110,20 @@ async function aGrant(app: ScaffoldedApp): Promise<string> {
 }
 
 /**
+ * Start an anonymous session on the project through `zitadel api`, since no
+ * command creates one.
+ *
+ * @param app - The app to run the command in.
+ * @returns The session's id.
+ */
+async function aSession(app: ScaffoldedApp): Promise<string> {
+  const { ZITADEL_PROJECT_ID } = await app.developmentValues();
+  const result = await app.api("createSession", "--field", `project_id=${ZITADEL_PROJECT_ID}`);
+  expect(result, "arranging the session should have succeeded").toSucceed();
+  return app.envelopeOf<{ session: { session_id: string } }>(result).data.session.session_id;
+}
+
+/**
  * Read a resource back with its get or list command.
  *
  * @param app - The app to run the command in.
@@ -142,6 +156,14 @@ const READ_BACK: readonly [
     aTeam,
     (id) => {
       return ["team", "get", id];
+    },
+  ],
+  [
+    "session",
+    "revoke",
+    aSession,
+    (id) => {
+      return ["session", "get", id];
     },
   ],
   [
@@ -534,6 +556,15 @@ describe("resources", () => {
             created_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
             updated_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
           });
+        });
+
+        it("leaves a revoked session unreadable", async () => {
+          const app = await aSetUpApp();
+          const id = await aSession(app);
+
+          await app.run(["session", "revoke", id, "--force", "--json"]);
+
+          expect(await app.run(["session", "get", id, "--json"])).toFailWith("E_NOT_FOUND");
         });
 
         it("leaves a deleted grant out of the list", async () => {

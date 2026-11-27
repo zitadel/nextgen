@@ -150,11 +150,16 @@ import {
   QueryIdpsQueryParams,
   QueryIdpsResponse,
   QueryUsersBody,
+  CreateSessionBody,
+  CreateSessionResponse,
+  GetSessionParams,
+  GetSessionResponse,
   RemoveProjectOriginBody,
   RemoveProjectOriginParams,
   RemoveProjectPreviewBody,
   RemoveProjectPreviewParams,
   RevokeReleaseParams,
+  RevokeSessionParams,
   RevokeReleaseQueryParams,
   RollbackDeploymentBody,
   RollbackDeploymentParams,
@@ -556,6 +561,17 @@ type UserRecord = {
   createdAt: string;
 };
 
+/** An anonymous session, as `createSession` starts one; revoking deletes it. */
+type SessionRecord = {
+  id: string;
+  projectId: string;
+  createdAt: string;
+  expiresAt: string;
+};
+
+/** How long an anonymous session lasts before its first factor, as the contract states. */
+const ANONYMOUS_SESSION_TTL_MS = 10 * 60 * 1000;
+
 /** A collaboration grant giving a user or a team a role on a project. */
 type GrantRecord = {
   id: string;
@@ -574,6 +590,7 @@ const INVITATION_NOT_FOUND = errorBody("inv.not_found", "invitation not found");
 const TEAM_NOT_FOUND = errorBody("team.not_found", "team not found");
 const USER_NOT_FOUND = errorBody("user.not_found", "user not found");
 const GRANT_NOT_FOUND = errorBody("grant.not_found", "grant not found");
+const SESSION_NOT_FOUND = errorBody("sess.not_found", "The session was not found");
 const UNAUTHORIZED = errorBody("auth.unauthorized", "missing or invalid credentials");
 
 type Store = {
@@ -591,6 +608,7 @@ type Store = {
   teams: Map<string, TeamRecord>;
   users: Map<string, UserRecord>;
   grants: Map<string, GrantRecord>;
+  sessions: Map<string, SessionRecord>;
   /**
    * Owner key -> variable name -> value. The project level and each
    * environment are separate owners: the project does not see into its
@@ -622,6 +640,7 @@ function makeStore(): Store {
     teams: new Map(),
     users: new Map(),
     grants: new Map(),
+    sessions: new Map(),
     variables: new Map(),
     claimChallenges: new Map(),
     claims: new Map(),
@@ -2205,16 +2224,19 @@ function teamResponse(team: TeamRecord): Record<string, unknown> {
 }
 
 /**
- * A user as every read answers it.
+ * A user as every read answers it, its `email` as the identifier the default
+ * schema designates.
  *
  * @param user - The stored user.
  * @returns The user's wire shape.
  */
 function userResponse(user: UserRecord): Record<string, unknown> {
+  const email = user.attributes.email;
   return {
     id: user.id,
     schema: user.schema,
     attributes: user.attributes,
+    ...(typeof email === "string" ? { identifier: email, identifier_property: "email" } : {}),
     metadata: {
       created_at: user.createdAt,
       updated_at: user.createdAt,
@@ -2498,6 +2520,25 @@ function expandedGrantResponse(grant: GrantRecord): Record<string, unknown> {
 }
 
 /**
+ * A session as every read answers it: anonymous, so still building, with no
+ * user and no factors.
+ *
+ * @param session - The stored session.
+ * @returns The session's wire shape.
+ */
+function sessionResponse(session: SessionRecord): Record<string, unknown> {
+  return {
+    session_id: session.id,
+    project_id: session.projectId,
+    state: "building",
+    user_id: null,
+    factors: [],
+    created_at: session.createdAt,
+    expires_at: session.expiresAt,
+  };
+}
+
+/**
  * The project whose secret the request carries as its bearer, the way the
  * server scopes a team or a user read by id alone.
  *
@@ -2540,43 +2581,6 @@ function projectRefusal(request: Request, projectId: string): HttpResponse<Error
 function identifierOf(user: UserRecord): string | undefined {
   const email = user.attributes.email;
   return typeof email === "string" ? email.toLowerCase() : undefined;
-}
-
-/**
- * The active user or team a grant request names, by id or by team name.
- *
- * @param projectId - The project the grant is for, which a team name is looked up in.
- * @param body - The grant request's locators.
- * @returns The principal ref, or undefined when the request names none that is active.
- */
-function grantPrincipal(
-  projectId: string,
-  body: {
-    user?: { user_id?: string; identifier?: string };
-    team?: { team_id?: string; name?: string };
-  },
-): { user_id: string } | { team_id: string } | undefined {
-  const { user: userRef, team: teamRef } = body;
-  const users = [...store.users.values()].filter((candidate) => {
-    return (
-      candidate.projectId === projectId &&
-      (candidate.id === userRef?.user_id ||
-        (userRef?.identifier !== undefined &&
-          identifierOf(candidate) === userRef.identifier.toLowerCase()))
-    );
-  });
-  if (users.length === 1 && users[0] !== undefined) {
-    return { user_id: users[0].id };
-  }
-  const team = [...store.teams.values()].find((candidate) => {
-    return (
-      candidate.status === "active" &&
-      candidate.projectId === projectId &&
-      (candidate.id === teamRef?.team_id ||
-        candidate.name.toLowerCase() === teamRef?.name?.toLowerCase())
-    );
-  });
-  return team === undefined ? undefined : { team_id: team.id };
 }
 
 export function setupPlatformHandlers() {
@@ -4595,6 +4599,75 @@ export function setupPlatformHandlers() {
       return new HttpResponse(null, { status: 204 });
     }),
 
+    http.post("*/sessions", async ({ request }) => {
+      const body = parse(CreateSessionBody, await readJson(request));
+      if (!body.ok) {
+        return body.response;
+      }
+      if (!store.projects.has(body.data.project_id)) {
+        return HttpResponse.json(errorBody("proj.not_found", "resource not found"), {
+          status: 404,
+        });
+      }
+      const createdAt = new Date();
+      const session: SessionRecord = {
+        id: `sess_${shortId()}`,
+        projectId: body.data.project_id,
+        createdAt: createdAt.toISOString(),
+        expiresAt: new Date(createdAt.getTime() + ANONYMOUS_SESSION_TTL_MS).toISOString(),
+      };
+      store.sessions.set(session.id, session);
+      const out = parseOut(CreateSessionResponse, {
+        session: sessionResponse(session),
+        session_token: randomBytes(32).toString("base64url"),
+        project_id: session.projectId,
+      });
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data, { status: 201 });
+    }),
+
+    http.get("*/sessions/:session_id", ({ params, request }) => {
+      if (params.session_id === "me") {
+        return undefined;
+      }
+      const path = parse(GetSessionParams, params);
+      if (!path.ok) {
+        return path.response;
+      }
+      if (bearerProjectId(request) === undefined) {
+        return HttpResponse.json(UNAUTHORIZED, { status: 401 });
+      }
+      const session = store.sessions.get(path.data.session_id);
+      if (session === undefined || session.projectId !== bearerProjectId(request)) {
+        return HttpResponse.json(SESSION_NOT_FOUND, { status: 404 });
+      }
+      const out = parseOut(GetSessionResponse, sessionResponse(session));
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    http.delete("*/sessions/:session_id", ({ params, request }) => {
+      if (params.session_id === "me") {
+        return undefined;
+      }
+      const path = parse(RevokeSessionParams, params);
+      if (!path.ok) {
+        return path.response;
+      }
+      if (bearerProjectId(request) === undefined) {
+        return HttpResponse.json(UNAUTHORIZED, { status: 401 });
+      }
+      const session = store.sessions.get(path.data.session_id);
+      if (session !== undefined && session.projectId === bearerProjectId(request)) {
+        store.sessions.delete(session.id);
+      }
+      return new HttpResponse(null, { status: 204 });
+    }),
+
     http.post("*/grants/query", async ({ request }) => {
       const query = parse(QueryGrantsQueryParams, queryRecord(request));
       if (!query.ok) {
@@ -4674,7 +4747,29 @@ export function setupPlatformHandlers() {
         });
       }
       const byIdentifier = body.data.user?.identifier !== undefined;
-      const principal = grantPrincipal(query.data.project_id, body.data);
+      const { user: userRef, team: teamRef } = body.data;
+      const users = [...store.users.values()].filter((candidate) => {
+        return (
+          candidate.projectId === query.data.project_id &&
+          (candidate.id === userRef?.user_id ||
+            (userRef?.identifier !== undefined &&
+              identifierOf(candidate) === userRef.identifier.toLowerCase()))
+        );
+      });
+      const team = [...store.teams.values()].find((candidate) => {
+        return (
+          candidate.status === "active" &&
+          candidate.projectId === query.data.project_id &&
+          (candidate.id === teamRef?.team_id ||
+            candidate.name.toLowerCase() === teamRef?.name?.toLowerCase())
+        );
+      });
+      const principal: GrantRecord["principal"] | undefined =
+        users.length === 1 && users[0] !== undefined
+          ? { user_id: users[0].id }
+          : team === undefined
+            ? undefined
+            : { team_id: team.id };
       const held =
         principal !== undefined &&
         [...store.grants.values()].some((grant) => {
