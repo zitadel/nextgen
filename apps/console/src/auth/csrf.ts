@@ -97,9 +97,10 @@ export class SessionCsrf {
    * @returns The response the server gave, to the retry when there was one.
    */
   readonly fetch = async (input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> => {
-    const headers = new Headers(init.headers);
-    const method = (init.method ?? "GET").toUpperCase();
-    const url = new URL(input instanceof Request ? input.url : String(input), window.location.href);
+    const request = input instanceof Request ? input : undefined;
+    const headers = new Headers(init.headers ?? request?.headers);
+    const method = (init.method ?? request?.method ?? "GET").toUpperCase();
+    const url = new URL(request?.url ?? String(input), window.location.href);
     if (SAFE_METHODS.has(method) || headers.has(CSRF_HEADER) || url.origin !== this.origin) {
       return fetch(input, init);
     }

@@ -92,6 +92,14 @@ describe("SessionCsrf.fetch header", () => {
     expect(sent).toEqual(["first", "second", null]);
   });
 
+  it("reads the method and URL of a Request given as the input", async () => {
+    const sent = answering(API);
+
+    await sessionCsrf("tok").csrf.fetch(new Request(`${API}/x`, { method: "POST" }));
+
+    expect(sent).toEqual(["tok"]);
+  });
+
   it("keeps a header the caller set itself", async () => {
     const sent = answering(API);
 
