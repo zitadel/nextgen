@@ -98,31 +98,15 @@
   --title-fade: 95%;
 }
 
-/* The page's own pieces: the hero (page.tsx), the logo (logo.tsx) and the
-   steps' dots. */
+/* The page's own pieces: the hero's title (page.tsx), the logo (logo.tsx)
+   and the steps' dots. */
 @layer components {
-  /* The hero takes the first screen under the header (h-16), its content
-     just above the middle and the cue to the steps at its foot (page.tsx).
-     Never shorter than its content needs, and on a very tall screen no
-     taller than 60rem, so the content does not float in a void and the
-     steps begin in view. */
-  .hero {
-    min-height: clamp(36rem, 100svh - 4rem, 60rem);
-  }
-
-  /* The cue nods down now and then, once the hero has settled. */
-  @media (prefers-reduced-motion: no-preference) {
-    .scroll-cue svg {
-      animation: cue-nod 2.4s var(--ease) 1.8s infinite;
-    }
-  }
-
-  /* The text of the display titles, the hero's and the phase pages'
-     (.hero-title) and the finish's (showcase/finish.tsx), in one look: white
-     at the top, and toward the foot of each line the process's colors,
-     --title-from on its left to --title-to on its right (the hero's:
-     Zitadel's orange to the finish's green; the finish: its own green).
-     Cloned per line, so a title that wraps lights every line alike. */
+  /* The text of the display titles, the hero's and the other pages'
+     (.hero-title), the closing band's and the finish's (showcase/finish.tsx),
+     in one look: white at the top, and toward the foot of each line the
+     process's colors, --title-from on its left to --title-to on its right
+     (the hero's: Zitadel's orange to the finish's green; the finish: its own
+     green). Cloned per line, so a title that wraps lights every line alike. */
   .display-title {
     font-family: var(--font-heading);
     letter-spacing: -0.025em;
@@ -142,9 +126,9 @@
     color: transparent;
   }
 
-  /* The hero's title, and a phase page's (phase-page.tsx): the front page's
-     a line per sentence (page.tsx breaks it after the first), a long one
-     wrapping on a phone. */
+  /* The hero's title, and every other page's (sections.tsx): the front
+     page's a line per sentence (page.tsx breaks it after the first), a long
+     one wrapping on a phone. */
   .hero-title {
     --title-from: var(--color-step-start);
     --title-to: var(--color-step-end);
@@ -196,12 +180,10 @@
       animation: caption-in 1.4s var(--ease) both;
     }
 
-    /* The line, the commands and the buttons (page.tsx), soon after: they
-       are what a visitor came to copy. */
+    /* The hero's line and its ways to start (page.tsx), soon after. */
     .teaser {
       animation: teaser-in 1s var(--ease) 0.25s both;
     }
-
   }
 
   /* The logo (logo.tsx) plays as on the website once a hover, or with
@@ -480,19 +462,8 @@
   }
 }
 
-@keyframes cue-nod {
-  0%,
-  60%,
-  to {
-    translate: 0 0;
-  }
-
-  30% {
-    translate: 0 0.25rem;
-  }
-}
-
-/* The words come into focus, and the commands rise into place under them. */
+/* The words come into focus, and the line and the ways to start rise into
+   place under them. */
 @keyframes caption-in {
   from {
     opacity: 0;

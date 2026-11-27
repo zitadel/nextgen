@@ -33,7 +33,7 @@ export function segment(on: boolean): string {
 }
 
 /**
- * Every window on the page, the hero's terminal and the showcase's terminals,
+ * Every window on the site, the quickstart's terminal and the showcase's terminals,
  * editors and browsers: a raised surface with a hairline edge, lit from the
  * top, and a title bar of one height (h-11), so two windows side by side start
  * their content on one line. `title` fills the middle of the bar, a name

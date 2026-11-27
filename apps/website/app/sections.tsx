@@ -1,8 +1,8 @@
 import { Fragment, type ReactNode } from "react";
 
-// What the phase pages (phase-page.tsx) and the feature pages
-// (feature-page.tsx) are built from, in the front page's look: its light, its
-// display title, sections under a heading, and lists set off by hairlines.
+// What the front page, the phase pages (phase-page.tsx) and the feature pages
+// (feature-page.tsx) are built from: the light, the display title, sections
+// under a heading, and lists set off by hairlines.
 
 /** The front page's light over the top of a page: the accent's purple meeting the finish's green. */
 export function TopLight() {
@@ -14,16 +14,16 @@ export function TopLight() {
   );
 }
 
-/** A title with each hyphenated word on one line, so a phone never breaks it at "sign-in". */
+/** Text with each hyphenated word on one line, so a phone never breaks it at "sign-in". */
 function Unbroken({ text }: { text: string }) {
   return text.split(/(\S*-\S*)/).map((part, index) =>
     part.includes("-") ? (
-      // biome-ignore lint/suspicious/noArrayIndexKey: the parts of a fixed title, never reordered
+      // biome-ignore lint/suspicious/noArrayIndexKey: the parts of a fixed text, never reordered
       <span key={index} className="whitespace-nowrap">
         {part}
       </span>
     ) : (
-      // biome-ignore lint/suspicious/noArrayIndexKey: the parts of a fixed title, never reordered
+      // biome-ignore lint/suspicious/noArrayIndexKey: the parts of a fixed text, never reordered
       <Fragment key={index}>{part}</Fragment>
     ),
   );
@@ -67,25 +67,31 @@ const H2 = "font-heading text-2xl leading-8 tracking-[-0.02em] md:text-3xl md:le
 
 /**
  * A page's section: its heading and line over its content, or from a laptop
- * up, with `split`, beside it.
+ * up, with `split`, beside it; `wide` gives it the showcase's width.
  */
 export function Part({
   id,
   title,
   line,
   split = false,
+  wide = false,
   children,
 }: {
   id: string;
   title: string;
   line?: ReactNode;
   split?: boolean;
+  wide?: boolean;
   children: ReactNode;
 }) {
   return (
-    <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-20 px-6 py-12 md:py-16">
+    <section
+      id={id}
+      aria-labelledby={`${id}-title`}
+      className="scroll-mt-20 overflow-x-clip px-6 py-12 md:py-16"
+    >
       <div
-        className={`mx-auto max-w-5xl ${
+        className={`mx-auto ${wide ? "max-w-6xl" : "max-w-5xl"} ${
           split
             ? "grid items-start gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-14"
             : "flex flex-col gap-8"
@@ -113,6 +119,61 @@ export function PointList({ points }: { points: readonly string[] }) {
           className="border-border-primary border-t py-4 text-pretty text-text-primary leading-7"
         >
           {point}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export type TitleRow = { label: string; title: string; line: string; ask?: string; href: string };
+
+/**
+ * Pages set off by hairlines, a row each: its name in the steps' small type
+ * beside its title, its line and, given one, an ask at its prompt.
+ */
+export function TitleRows({ rows }: { rows: readonly TitleRow[] }) {
+  return (
+    <ul className="border-border-primary border-b">
+      {rows.map(({ label, title, line, ask, href }) => (
+        <li key={href} className="border-border-primary border-t">
+          <a
+            href={href}
+            className="group grid gap-x-10 gap-y-2 py-6 md:grid-cols-[10rem_minmax(0,1fr)_auto]"
+          >
+            <span className="font-mono text-text-muted text-xs leading-7">{label}</span>
+            <span className="flex flex-col gap-1">
+              <span className="text-balance font-heading text-text-primary text-xl leading-7">
+                <Unbroken text={title} />
+              </span>
+              <span className="text-pretty text-text-secondary leading-7 transition-colors group-hover:text-text-primary">
+                {line}
+              </span>
+              {ask && (
+                <span className="mt-1 flex gap-2 font-mono text-[0.8125rem] text-text-primary leading-6">
+                  <span aria-hidden="true" className="select-none text-text-accent">
+                    &gt;
+                  </span>
+                  <span>
+                    <Unbroken text={ask} />
+                  </span>
+                </span>
+              )}
+            </span>
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 16 16"
+              fill="none"
+              className="mt-1.5 hidden size-4 text-text-muted transition-transform group-hover:translate-x-0.5 group-hover:text-text-primary md:block"
+            >
+              <path
+                d="M3 8h10M9 4l4 4-4 4"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </a>
         </li>
       ))}
     </ul>

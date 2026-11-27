@@ -51,24 +51,24 @@ describe("trackEvent", () => {
 
   it("sends the header, the page and the event's properties", () => {
     vi.stubEnv("WEBSITE_VERSION", "fa1eade");
-    trackEvent("copied_command", { snippet: "setup", placement: "hero" });
+    trackEvent("copied_command", { snippet: "skills", placement: "hero" });
     expect(track).toHaveBeenCalledWith("copied_command", {
       surface: "website",
       website_version: "fa1eade",
       page: "home",
-      snippet: "setup",
+      snippet: "skills",
       placement: "hero",
     });
   });
 
   it("leaves the version out where the build knew no commit", () => {
     vi.stubEnv("WEBSITE_VERSION", "");
-    trackEvent("clicked_link", { target: "github", placement: "showcase" });
+    trackEvent("clicked_link", { target: "sign_up", placement: "hero" });
     expect(track).toHaveBeenCalledWith("clicked_link", {
       surface: "website",
       page: "home",
-      target: "github",
-      placement: "showcase",
+      target: "sign_up",
+      placement: "hero",
     });
   });
 });

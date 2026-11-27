@@ -60,7 +60,7 @@ export type Page = { url: string; screens: Screen[] };
  */
 export type Result = Page & { before?: Screen[] };
 
-/** A command of the hero and the lines it printed, in a terminal window titled `title`. */
+/** A command of the quickstart and the lines it printed, in a terminal window titled `title`. */
 export type Recording = { title: string; command: string; output: string[] };
 
 /**

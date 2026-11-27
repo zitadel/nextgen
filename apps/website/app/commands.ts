@@ -2,10 +2,10 @@
 // it and the docs' quickstart without its optional `doctor` (AGENTS.md), in a
 // new folder for the app: start, setup for a Next.js app, the app's dev
 // server. The session the showcase was recorded from (showcase/sessions.ts)
-// ran the same, with `doctor` first. The hero shows them, with the folder as
-// its terminal's title, and the showcase's first two steps start and setup;
-// /llms.txt hands them to agents after the folder's command; the footer
-// offers start.
+// ran the same, with `doctor` first. /get-started's walkthrough shows them,
+// with the folder as its terminal's title, and the showcase's first two steps
+// start and setup; /llms.txt hands them to agents after the folder's command;
+// the footer offers start.
 export const appFolder = "myapp";
 // The folder as the windows' title bars show it.
 export const appPath = `~/${appFolder}`;

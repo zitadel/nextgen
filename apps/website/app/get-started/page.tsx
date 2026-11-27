@@ -1,67 +1,42 @@
-import { ChangeHistory, CodeFile, NumberedCommands } from "../blocks";
+import { ChangeHistory, NumberedCommands, SkillsLine } from "../blocks";
 import { appPath, devCommand, setupCommand, startCommand } from "../commands";
-import { CallToAction } from "../cta";
 import { PhasePage, phaseMetadata } from "../phase-page";
+import { Showcase } from "../showcase/showcase";
 
 export const metadata = phaseMetadata("get-started");
 
-// The user schema setup writes (packages/config/defaults/default-human-user.json),
-// cut to the keys that decide how people sign in.
-const SCHEMA = `{
-  "objectType": "human-user",
-  "x-identifier": "email",
-  "x-auth-methods": {
-    "password": {
-      "enabled": true
-    },
-    "passkey": {
-      "enabled": true
-    }
-  },
-  "required": [
-    "email"
-  ],
-  "properties": {
-    "email": {
-      "type": "string",
-      "format": "email",
-      "x-unique": "project"
-    }
-  }
-}`;
-
-// The commands of README.md's quick start, as the front page shows them.
+// The commands of README.md's quick start (commands.ts), as numbered steps.
 const STEPS = [
   { label: "Start Zitadel on your machine", command: startCommand },
   { label: "Add sign-in to your app", command: setupCommand },
   { label: "Run your app", command: devCommand },
 ];
 
+// The quickstart's walkthrough: the commands to copy, then each step as it
+// runs (the showcase). It shows the files setup writes and the commands that
+// publish a change, so this page has no Under the hood or Try it of its own.
 export default function GetStartedPage() {
   return (
     <PhasePage
       slug="get-started"
       content={{
-        asks: [
-          {
-            ask: "Add sign-in to my app.",
-            reply:
-              "Setup added the login, sign-up and profile pages to your app. I signed up a test user and signed in again to check that it works.",
-          },
-          {
-            ask: "Add passkeys.",
-            reply:
-              "Passkeys are on in your user schema, and the sign-in and sign-up steps offer them. The change is ready for your review.",
-          },
-          {
-            ask: "Use our brand on the login screen.",
-            reply:
-              "I set the login's design tokens to your colors and font in your stylesheet, so the login screens look like the rest of your app.",
-          },
-        ],
-        hood: {
-          line: "Your user model is a file in your repo. This is the one setup writes, cut to how people sign in: by email, with a password or a passkey. Your agent edits it like any other code.",
-          artifact: <CodeFile title=".zitadel/schemas/default-human-user.json" code={SCHEMA} />,
+        walkthrough: {
+          line: "Run these in an empty folder. Each step below shows what it writes into your app and the login it serves.",
+          content: (
+            <div className="flex flex-col gap-20 md:gap-28">
+              <div className="max-w-[42rem]">
+                <NumberedCommands
+                  title={appPath}
+                  note="Node 24+"
+                  steps={STEPS}
+                  placement="showcase"
+                  copyAll
+                  footer={<SkillsLine placement="showcase" className="text-xs" />}
+                />
+              </div>
+              <Showcase />
+            </div>
+          ),
         },
         decide: {
           line: "What setup writes lands in your repo as files: the pages, the user model and the login flow. You read the diff and commit it, and each deploy records who made it, from which commit and why.",
@@ -74,23 +49,6 @@ export default function GetStartedPage() {
                 { change: "Update the logo", agent: false },
               ]}
             />
-          ),
-        },
-        tryIt: {
-          line: "Run these in an empty folder. The quickstart walks you through each step.",
-          content: (
-            <div className="flex max-w-3xl flex-col items-start gap-7">
-              <div className="w-full">
-                <NumberedCommands
-                  title={appPath}
-                  note="Node 24+"
-                  steps={STEPS}
-                  placement="try_it"
-                  copyAll
-                />
-              </div>
-              <CallToAction placement="try_it" />
-            </div>
           ),
         },
         questions: [

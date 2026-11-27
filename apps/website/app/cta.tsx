@@ -7,13 +7,81 @@ import { phasePath } from "./phases";
 
 const BUTTON =
   "group inline-flex h-11 items-center gap-2 rounded-lg px-5 font-semibold text-sm transition-colors";
+const FILLED = "bg-text-primary text-background hover:opacity-85";
+const OUTLINED =
+  "border border-window-border bg-tint/[0.03] text-text-primary hover:bg-tint/[0.07]";
+
+function Arrow() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      fill="none"
+      className="size-4 transition-transform group-hover:translate-x-0.5"
+    >
+      <path
+        d="M3 8h10M9 4l4 4-4 4"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 /**
- * The page's two ways on, under the hero, at the end of the steps and in a
- * phase page's Try it: the quickstart, the one thing to do next, and the
- * code. A click reports `clicked_link` with `placement` (analytics.ts): page
- * views cannot say which page sent a visitor to the quickstart, and GitHub is
- * another site.
+ * The front page's two ways to start, in the hero and in its closing band:
+ * the cloud's sign-up, or running it yourself from the quickstart's
+ * walkthrough (/get-started); with `talk`, a quieter third to talk to us. A
+ * click reports `clicked_link` with `placement` (analytics.ts): page views
+ * cannot say which button sent a visitor on, and the sign-up and the contact
+ * page are other apps.
+ */
+export function StartButtons({
+  placement,
+  talk = false,
+  className = "",
+}: {
+  placement: Placement;
+  talk?: boolean;
+  className?: string;
+}) {
+  return (
+    <div className={`flex flex-wrap items-center justify-center gap-3 ${className}`}>
+      <a
+        href={links.signUp}
+        onClick={() => trackEvent("clicked_link", { target: "sign_up", placement })}
+        className={`${BUTTON} ${FILLED}`}
+      >
+        Start in our cloud
+        <Arrow />
+      </a>
+      <a
+        href={phasePath("get-started")}
+        onClick={() => trackEvent("clicked_link", { target: "get_started", placement })}
+        className={`${BUTTON} ${OUTLINED}`}
+      >
+        Run it yourself
+      </a>
+      {talk && (
+        <a
+          href={links.contact}
+          onClick={() => trackEvent("clicked_link", { target: "contact", placement })}
+          className={`${BUTTON} text-text-secondary hover:text-text-primary`}
+        >
+          Talk to us
+        </a>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The ways on at the end of the showcase's steps: the quickstart, the one
+ * thing to do next, and the code. A click reports `clicked_link` with
+ * `placement` (analytics.ts): page views cannot say which page sent a visitor
+ * to the quickstart, and GitHub is another site.
  */
 export function CallToAction({
   placement,
@@ -27,28 +95,15 @@ export function CallToAction({
       <a
         href={links.quickstart}
         onClick={() => trackEvent("clicked_link", { target: "quickstart", placement })}
-        className={`${BUTTON} bg-text-primary text-background hover:opacity-85`}
+        className={`${BUTTON} ${FILLED}`}
       >
         Read the quickstart
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 16 16"
-          fill="none"
-          className="size-4 transition-transform group-hover:translate-x-0.5"
-        >
-          <path
-            d="M3 8h10M9 4l4 4-4 4"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        <Arrow />
       </a>
       <a
         href={links.github}
         onClick={() => trackEvent("clicked_link", { target: "github", placement })}
-        className={`${BUTTON} border border-window-border bg-tint/[0.03] text-text-primary hover:bg-tint/[0.07]`}
+        className={`${BUTTON} ${OUTLINED}`}
       >
         <GitHubMark className="size-4" />
         View on GitHub

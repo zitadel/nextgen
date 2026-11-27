@@ -15,23 +15,6 @@ export default function GovernPage() {
     <PhasePage
       slug="govern"
       content={{
-        asks: [
-          {
-            ask: "Let our support agent look up orders for a user.",
-            reply:
-              "Done. The support agent can look up a user's orders once that user agrees, and each look-up names the agent and the user.",
-          },
-          {
-            ask: "Show what our agents did for Dana.",
-            reply:
-              "Only the support agent acted for her: it looked up her orders after she agreed.",
-          },
-          {
-            ask: "Remove the support agent's access.",
-            reply:
-              "Removed. The agent's requests are refused from now on, and the events show that you removed it.",
-          },
-        ],
         hood: {
           line: "Every event carries the fields that name who acted and for whom. These are their descriptions in the API.",
           artifact: (

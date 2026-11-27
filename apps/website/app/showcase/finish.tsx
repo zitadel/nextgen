@@ -52,12 +52,12 @@ export function Finish({ index, count }: { index: number; count: number }) {
         <p className="finish-reveal font-mono text-(--step) text-xs leading-4" style={order(0)}>
           That's the whole loop
         </p>
-        <h2
+        <h3
           className="finish-reveal mx-auto mt-4 max-w-xl text-balance text-3xl leading-tight md:text-5xl"
           style={order(1)}
         >
           <span className="display-title">Your agent can run all of it.</span>
-        </h2>
+        </h3>
         <p
           className="finish-reveal mx-auto mt-4 max-w-lg text-balance text-lg text-text-secondary leading-7"
           style={order(2)}

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { type Exchange, type Question, Questions, Transcript } from "./blocks";
+import { type Question, Questions, Transcript } from "./blocks";
 import { appPath } from "./commands";
 import og from "./og.jpg";
 import { PHASES, type PhaseSlug, phaseOf, phasePath } from "./phases";
@@ -34,16 +34,17 @@ export function phaseMetadata(slug: PhaseSlug): Metadata {
 }
 
 /**
- * What a phase page says beside its title (phases.ts): three asks and their
- * replies; one real thing from the repository under the hood; how review,
- * rollback and naming who acted work here; commands that work now; and
- * three to five questions.
+ * What a phase page says beside its title and its asks (phases.ts): one real
+ * thing from the repository under the hood; how review, rollback and naming
+ * who acted work here; commands that work now; and three to five questions.
+ * A page that walks through its commands step by step gives `walkthrough`,
+ * first after the title, instead of Under the hood and Try it.
  */
 export type PhaseContent = {
-  asks: readonly Exchange[];
-  hood: { line: ReactNode; artifact: ReactNode };
+  walkthrough?: { line?: ReactNode; content: ReactNode };
+  hood?: { line: ReactNode; artifact: ReactNode };
   decide: { line: ReactNode; block: ReactNode };
-  tryIt: { line?: ReactNode; content: ReactNode };
+  tryIt?: { line?: ReactNode; content: ReactNode };
   questions: readonly Question[];
 };
 
@@ -102,9 +103,10 @@ function PhaseStepper({ current }: { current: PhaseSlug }) {
 }
 
 /**
- * A phase page, the same seven parts every time (AGENTS.md): the title with
- * the phases' stepper and what your agent does, Ask it, Under the hood, You
- * decide, Try it, Questions, and the way on to the phase after it.
+ * A phase page, in the same parts every time (AGENTS.md): the title with the
+ * phases' stepper and what your agent does, Ask it, Under the hood, You
+ * decide, Try it, Questions, and the way on to the phase after it; or, with a
+ * walkthrough, the walkthrough first, in place of Under the hood and Try it.
  */
 export function PhasePage({ slug, content }: { slug: PhaseSlug; content: PhaseContent }) {
   const { phase, next } = phaseOf(slug);
@@ -117,23 +119,33 @@ export function PhasePage({ slug, content }: { slug: PhaseSlug; content: PhaseCo
           <PhaseStepper current={slug} />
         </TitleBlock>
 
+        {content.walkthrough && (
+          <Part id="step-by-step" title="Step by step" line={content.walkthrough.line} wide>
+            {content.walkthrough.content}
+          </Part>
+        )}
+
         <Part id="ask-it" title="Ask it">
           <div className="max-w-3xl">
-            <Transcript title={appPath} exchanges={content.asks} />
+            <Transcript title={appPath} exchanges={phase.asks} />
           </div>
         </Part>
 
-        <Part id="under-the-hood" title="Under the hood" line={content.hood.line} split>
-          {content.hood.artifact}
-        </Part>
+        {content.hood && (
+          <Part id="under-the-hood" title="Under the hood" line={content.hood.line} split>
+            {content.hood.artifact}
+          </Part>
+        )}
 
         <Part id="you-decide" title="You decide" line={content.decide.line} split>
           {content.decide.block}
         </Part>
 
-        <Part id="try-it" title="Try it" line={content.tryIt.line}>
-          {content.tryIt.content}
-        </Part>
+        {content.tryIt && (
+          <Part id="try-it" title="Try it" line={content.tryIt.line}>
+            {content.tryIt.content}
+          </Part>
+        )}
 
         <Part id="questions" title="Questions">
           <Questions questions={content.questions} />

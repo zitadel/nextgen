@@ -57,7 +57,7 @@ export const loginAfterFlowChange: Page = { url: login.url, screens: [signInWith
 
 // The showcase's recorded steps, from zitadel/new-website's narrative redesign
 // (its homepage's terminalSection), re-recorded on 10 November 2026 with
-// @zitadel/cli 0.5.0, the hero's commands: the first step is what that
+// @zitadel/cli 0.5.0, the quickstart's commands: the first step is what that
 // session's start printed; the second the files its setup wrote (the rest it
 // summed up as "env, project config, the editable user schema and login
 // flow"); the next two its recorded diffs and command output, each change
@@ -192,8 +192,7 @@ export const sessions: Session[] = [
   },
 ];
 
-// The last step, live (brand-row.tsx): no recording, only its words, here so
-// the hero can point to it by name.
+// The last step, live (brand-row.tsx): no recording, only its words.
 export const brandStep = {
   label: "Match your brand",
   description:

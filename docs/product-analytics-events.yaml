@@ -78,17 +78,20 @@ properties:
     description: The selected tab, on pages with tracked tabs.
   placement:
     type: string
-    values: [header, hero, showcase, try_it, footer]
+    values: [header, hero, showcase, try_it, closing, footer]
     description: >-
       Where on its page a copy button or a call to action sits: `header` is
-      the bar over every website page, `try_it` the Try it section of a
-      website phase or feature page, which `page` names.
+      the bar over every website page, `showcase` the quickstart's
+      walkthrough on /get-started, `try_it` the Try it section of a website
+      phase or feature page, which `page` names, and `closing` the website
+      front page's closing band.
   target:
     type: string
-    values: [quickstart, github, get_started]
+    values: [quickstart, github, get_started, sign_up, contact]
     description: >-
       Where a link leads, as a stable name, never a URL: `get_started` is the
-      website's /get-started page.
+      website's /get-started page, `sign_up` the cloud's sign-up page and
+      `contact` zitadel.com's contact page.
 
   # Attribution
   utm_source:
@@ -806,8 +809,9 @@ components:
       clicked_link:
         status: emitted
         trigger: >-
-          A call to action, to the quickstart or to GitHub, or the header's
-          Get started button is clicked.
+          A call to action is clicked: the front page's Start in our cloud,
+          Run it yourself and Talk to us, the walkthrough's quickstart and
+          GitHub, or the header's Get started.
         destinations: [vercel]
         properties: [page, target, placement]
 

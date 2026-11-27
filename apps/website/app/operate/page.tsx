@@ -25,23 +25,6 @@ export default function OperatePage() {
     <PhasePage
       slug="operate"
       content={{
-        asks: [
-          {
-            ask: "Connect this customer's single sign-on.",
-            reply:
-              "I connected their OpenID Connect provider and added it to your sign-in steps. Their people sign in with their work accounts once you deploy.",
-          },
-          {
-            ask: "Require 12-character passwords.",
-            reply:
-              "The password policy asks for at least 12 characters. New passwords are checked once you deploy; passwords already set stay as they are.",
-          },
-          {
-            ask: "Give support read access to users.",
-            reply:
-              "I gave the support team viewer access to the project. They can read your users and change nothing.",
-          },
-        ],
         hood: {
           line: "A policy is a file in your repo. This is the password policy once your agent asks for 12 characters. Deploy refuses a setting it does not know, or a value out of bounds, before anything is sent.",
           artifact: (

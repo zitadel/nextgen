@@ -3,7 +3,7 @@ import { Disclosure } from "./disclosure";
 import { GitHubMark } from "./github-mark";
 import { links } from "./links";
 import { Logo } from "./logo";
-import { NAV, type NavEntry, type NavGroup } from "./nav";
+import { NAV, NAV_END, type NavEntry, type NavGroup } from "./nav";
 import type { PhaseSlug } from "./phases";
 import type { FeatureSlug } from "./platform";
 import { ThemeToggle } from "./theme-toggle";
@@ -141,17 +141,17 @@ function MenuIcon() {
 // The bar over the page, on a plane of frosted glass that floats over the
 // page as it scrolls: the logo, the preview's label and, from a laptop up,
 // the top level of app/nav.ts on the left; the theme (from sm up), GitHub
-// (from md up) and the one primary button on the right. Below a laptop one
-// menu holds the top level: every menu's groups under their headings and the
-// page that lists them, then the links. The header keeps its place (h-16), so
-// the hero below keeps its measure.
+// (from md up), nav.ts's links for the right (from a laptop up) and the one
+// primary button on the right. Below a laptop one menu holds the top level:
+// every menu's groups under their headings and the page that lists them,
+// then all the links. The header keeps its place (h-16).
 export function SiteHeader({
   current,
 }: {
   current?: "changelog" | "platform" | PhaseSlug | FeatureSlug;
 }) {
   const menus = NAV.flatMap((item) => (item.kind === "menu" ? [item] : []));
-  const navLinks = NAV.flatMap((item) => (item.kind === "link" ? [item] : []));
+  const navLinks = [...NAV.flatMap((item) => (item.kind === "link" ? [item] : [])), ...NAV_END];
   return (
     <header className="sticky top-0 z-40 h-16 px-3 pt-3 sm:px-4">
       <div className="mx-auto flex h-12 max-w-6xl items-center justify-between gap-4 rounded-2xl border border-tint/10 bg-glass pr-1.5 pl-4 shadow-(--glass-shadow) backdrop-blur-xl backdrop-saturate-150">
@@ -215,6 +215,11 @@ export function SiteHeader({
           >
             <GitHubMark className="size-[1.125rem]" />
           </a>
+          {NAV_END.map((item) => (
+            <a key={item.label} href={item.href} className={`${NAV_LINK} max-lg:hidden`}>
+              {item.label}
+            </a>
+          ))}
           <GetStartedButton />
           <nav aria-label="Main" className="lg:hidden">
             <Disclosure

@@ -32,23 +32,6 @@ export default function InvestigatePage() {
     <PhasePage
       slug="investigate"
       content={{
-        asks: [
-          {
-            ask: "Why couldn't Dana sign in yesterday?",
-            reply:
-              "The events show her password checks failed. She signed up with a passkey and never set a password, so her passkey is the way in.",
-          },
-          {
-            ask: "Who changed the password policy?",
-            reply:
-              "Your agent did, for you, in the release that requires 12-character passwords. The release names the commit it came from and why.",
-          },
-          {
-            ask: "Which sign-ins failed this morning?",
-            reply:
-              "Some password checks, and a single sign-on the provider turned down. I listed each one with its user and the time it happened.",
-          },
-        ],
         hood: {
           line: "Every sign-in check is an event. This is a failed password check as the event list returns it, cut to the fields your agent reads first. The events of one sign-in share its correlation ID.",
           artifact: <CodeFile title="auth.check.failed" code={EVENT} />,

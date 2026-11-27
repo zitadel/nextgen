@@ -56,3 +56,8 @@ export const NAV: readonly NavItem[] = [
   { kind: "link", label: "Docs", href: links.docs },
   { kind: "link", label: "Changelog", href: links.changelog, id: "changelog" },
 ];
+
+/** The header's plain links on the right, before its one primary button. */
+export const NAV_END: readonly Extract<NavItem, { kind: "link" }>[] = [
+  { kind: "link", label: "Talk to us", href: links.contact },
+];

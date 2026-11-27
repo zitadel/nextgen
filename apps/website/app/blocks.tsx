@@ -1,16 +1,19 @@
 import type { ReactNode } from "react";
 import type { Placement } from "./analytics";
-import { CommandLine } from "./command-line";
+import { CommandLine, Words } from "./command-line";
+import { skillsCommand } from "./commands";
 import { CopyButton } from "./copy-button";
+import type { Exchange } from "./phases";
 import { WINDOW_FOOTER, WINDOW_INSET, Window } from "./window";
 
-// What the front page and the phase pages (phase-page.tsx) show in their
-// windows: a person asking their agent, the changes and events that name who
-// acted, a file, commands to copy as numbered steps, and the questions with
-// their FAQPage data. All in the page's neutral inks: a brand color never
-// marks who acted or what is current (AGENTS.md).
+// What the front page and the phase and feature pages (phase-page.tsx,
+// feature-page.tsx) show: in windows, a person asking their agent, the
+// changes and events that name who acted, a file and commands to copy as
+// numbered steps; the line for coding agents; and the questions with their
+// FAQPage data. All in the page's neutral inks: a brand color never marks who
+// acted or what is current (AGENTS.md).
 
-export type Exchange = { ask: string; reply: string };
+export type { Exchange };
 
 /**
  * A person asking their coding agent, and its replies, in a terminal window:
@@ -185,6 +188,45 @@ export function NumberedCommands({
       </List>
       {footer && <div className={`${WINDOW_FOOTER} px-5 py-2.5`}>{footer}</div>}
     </Window>
+  );
+}
+
+// The skills command but its last word, and that word, which its copy button
+// keeps to.
+const SKILLS_HEAD = skillsCommand.slice(0, skillsCommand.lastIndexOf(" "));
+const SKILLS_LAST = skillsCommand.slice(skillsCommand.lastIndexOf(" ") + 1);
+
+/**
+ * The line for coding agents: the command that gives an agent the Zitadel
+ * skills, with its copy button, and what to ask it then. It wraps as text,
+ * the copy button kept to the command's last word so that it never starts a
+ * line on a phone. `placement` is where the line sits, which a copy reports
+ * (analytics.ts).
+ */
+export function SkillsLine({
+  placement,
+  className = "",
+}: {
+  placement: Placement;
+  className?: string;
+}) {
+  return (
+    <p className={`text-text-muted leading-6 ${className}`}>
+      Using a coding agent? Run{" "}
+      <code className="font-mono text-text-secondary">
+        <Words text={SKILLS_HEAD} />{" "}
+        <span className="whitespace-nowrap">
+          {SKILLS_LAST}
+          <CopyButton
+            text={skillsCommand}
+            label="the skills command"
+            event={{ snippet: "skills", placement }}
+            className="-my-1 ml-1 align-middle"
+          />
+        </span>
+      </code>{" "}
+      and ask it to add sign-in.
+    </p>
   );
 }
 

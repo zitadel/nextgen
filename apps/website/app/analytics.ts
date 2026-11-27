@@ -36,10 +36,19 @@ import {
 
 /**
  * Where on its page a copy button or a call to action sits: `header` is the
- * bar over every page, `try_it` the Try it of a phase or a feature page
- * (phase-page.tsx, feature-page.tsx), whose page the event's `page` names.
+ * bar over every page, `showcase` the quickstart's walkthrough on
+ * /get-started, `try_it` the Try it of a phase or a feature page
+ * (phase-page.tsx, feature-page.tsx), whose page the event's `page` names,
+ * and `closing` the front page's closing band.
  */
-export type Placement = "header" | "hero" | "showcase" | "try_it" | "footer";
+export type Placement = "header" | "hero" | "showcase" | "try_it" | "closing" | "footer";
+
+/**
+ * Where a call to action leads, as a stable name, never a URL: `get_started`
+ * is /get-started, `sign_up` the cloud's sign-up and `contact` zitadel.com's
+ * contact page.
+ */
+export type Target = "quickstart" | "github" | "get_started" | "sign_up" | "contact";
 
 /**
  * What a copy button copied, never its text: `all` is a whole block of
@@ -100,7 +109,7 @@ export function snippetOf(command: string): Snippet | undefined {
 
 type Events = {
   copied_command: { snippet: Snippet; placement: Placement };
-  clicked_link: { target: "quickstart" | "github" | "get_started"; placement: Placement };
+  clicked_link: { target: Target; placement: Placement };
 };
 
 /**

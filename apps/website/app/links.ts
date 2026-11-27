@@ -8,6 +8,11 @@ export const origin = "https://preview.zitadel.com";
 export const links = {
   docs: "/docs",
   quickstart: "/docs/get-started/quickstart",
+  // The cloud's sign-up, the console's unlisted page for it
+  // (docs/runbooks/cloud.md, apps/cloud-console/src/screens/sign-up.tsx).
+  signUp: "/console/signup",
+  // Talking to Zitadel's team, on zitadel.com.
+  contact: "https://zitadel.com/contact",
   llms: "/llms.txt",
   changelog: "/changelog",
   chooseVersion: "/choose-version",

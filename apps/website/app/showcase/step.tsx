@@ -97,9 +97,9 @@ export function Step({
             className="step-dot absolute top-1 -left-4 size-2 md:hidden"
           />
           <span className="font-mono text-(--step) text-xs leading-4">Step {number}</span>
-          <h2 className="font-heading text-2xl leading-8 tracking-[-0.02em] lg:text-[2rem] lg:leading-10">
+          <h3 className="font-heading text-2xl leading-8 tracking-[-0.02em] lg:text-[2rem] lg:leading-10">
             {label}
-          </h2>
+          </h3>
           <p className="text-text-secondary leading-6">
             <Sentences text={description} />
           </p>
