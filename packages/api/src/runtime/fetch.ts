@@ -88,7 +88,7 @@ export type RequestPolicy = Readonly<{
  * every `DELETE`, and any operation the spec marks `x-zitadel-destructive`.
  */
 export class DestructiveOperationError extends Error {
-  /** The generated function that was called, such as `deleteProject`. */
+  /** The generated function that was called, such as `deleteUser`. */
   readonly operation: string;
 
   /**
