@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import type { Placement } from "./analytics";
 import { Json } from "./code";
 import { CommandLine, CommandWords, Words } from "./command-line";
@@ -111,19 +111,37 @@ export function Transcript({ title, exchanges }: { title: string; exchanges: rea
   );
 }
 
+// A table's rule, box-drawing characters alone. The site's mono face has
+// none of them, and the browser's fallback draws each an em wide, so the rule
+// came out half as wide again as the rows; the system's mono face draws them
+// a column each, as the terminal did.
+const RULE = /^[\s─━┄┈═]+$/;
+
 /**
  * A recorded command (showcase/runs.ts) in a terminal window titled with the
  * app's folder: the command at its prompt with its copy button, and what it
- * printed as it printed it, scrolling sideways where a table is wider than
- * the window. `placement` is where it sits (analytics.ts).
+ * printed as it printed it, a size smaller below 1280px so the deployment
+ * history fits a laptop's half column, and scrolling sideways only where a
+ * table is still wider than the window. `placement` is where it sits
+ * (analytics.ts).
  */
 export function RunWindow({ run, placement }: { run: Run; placement: Placement }) {
   return (
     <Window title={appPath} className="min-w-0">
       <div className={`py-4 font-mono text-xs leading-6 ${WINDOW_INSET}`}>
         <CommandLine command={run.command} placement={placement} pinned />
-        <pre className="mt-2 overflow-x-auto text-[0.6875rem] text-text-secondary leading-5">
-          {run.output.join("\n")}
+        <pre className="mt-2 overflow-x-auto text-[0.625rem] text-text-secondary leading-5 xl:text-[0.6875rem]">
+          {run.output.map((line, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: the lines of a fixed recording, never reordered
+            <Fragment key={index}>
+              {index > 0 && "\n"}
+              {RULE.test(line) ? (
+                <span className="font-[ui-monospace,monospace]">{line}</span>
+              ) : (
+                line
+              )}
+            </Fragment>
+          ))}
         </pre>
       </div>
     </Window>

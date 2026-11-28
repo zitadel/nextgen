@@ -23,6 +23,8 @@
   --color-window-bar: #18181c;
   --color-window-border: rgb(255 255 255 / 0.08);
   --color-window-sunken: rgb(0 0 0 / 0.2);
+  /* The thin thumb of what scrolls inside a window (.window). */
+  --color-window-scrollbar: rgb(255 255 255 / 0.18);
 
   /* The header's frosted plane (site-header.tsx). */
   --color-glass: rgb(20 20 23 / 0.55);
@@ -118,6 +120,7 @@
   --color-window-border: rgb(17 17 20 / 0.1);
   --window-shadow: 0 1px 2px rgb(17 17 20 / 0.05), 0 6px 16px -10px rgb(17 17 20 / 0.12);
   --color-window-sunken: rgb(17 17 20 / 0.025);
+  --color-window-scrollbar: rgb(17 17 20 / 0.2);
   --color-glass: rgb(255 255 255 / 0.65);
   --glass-shadow: 0 1px 2px rgb(17 17 20 / 0.04), 0 4px 12px -8px rgb(17 17 20 / 0.1);
   --color-diff-added: #15803d;
@@ -151,9 +154,32 @@
   --title-fade: 95%;
 }
 
-/* The page's own pieces: the hero's title (page.tsx), the logo (logo.tsx)
-   and the steps' dots. */
+/* The page's own pieces: the windows' scrollbars, the hero's title
+   (page.tsx), the logo (logo.tsx) and the steps' dots. */
 @layer components {
+  /* Whatever scrolls inside a window (window.tsx), a code file, a table, a
+     run: a thin thumb in the theme's neutral ink on a clear track, never the
+     system's grey bar. Safari reads the -webkit- rules; the others the
+     standard pair, which wins where both apply. */
+  .window * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-window-scrollbar) transparent;
+  }
+
+  .window ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .window ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .window ::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background: var(--color-window-scrollbar);
+  }
+
   /* The text of the display titles, the hero's and the other pages'
      (.hero-title), the closing band's and the finish's (showcase/finish.tsx),
      in one look: white at the top, and toward the foot of each line the

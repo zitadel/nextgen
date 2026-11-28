@@ -38,7 +38,8 @@ export const acmeSsoRuns: readonly Run[] = [
 ];
 
 // The deployments since setup, newest first, each with why: the table as the
-// terminal drew it, and its closing line.
+// terminal drew it, without its closing summary line, which is wider than a
+// window.
 export const historyRun: Run = {
   command: deploymentHistoryCommand,
   output: [
@@ -48,7 +49,5 @@ export const historyRun: Run = {
     "  deploy     Connect Acme's single sign-on            2026-11-28T02:16:57Z",
     "  deploy     Ask for the company at sign-up           2026-11-28T02:15:52Z",
     "  deploy     Initial deployment from setup            2026-11-28T02:13:14Z",
-    "",
-    "Found 4 deployments · project proj_01M8FYV5HWDZXNAFGHQYGAQC8V on localhost:8080",
   ],
 };

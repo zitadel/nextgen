@@ -289,7 +289,9 @@ export default function Home() {
           {/* A bento: the recorded deployment history across the top on the
               section's one light, wide enough for its table, the four points
               under it as notched cards, each over what is behind it. */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {/* One column on a phone that may shrink below the history's
+              table, which then scrolls inside its window. */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             <div className="brand-stage brand-noise flex justify-center rounded-[1.25rem] px-4 py-8 sm:px-8 md:col-span-2 md:py-12 lg:col-span-4">
               <div className="w-full min-w-0 max-w-[44rem]">
                 <RunWindow run={historyRun} placement="decide" />

@@ -39,6 +39,7 @@ export function segment(on: boolean): string {
  * their content on one line. `title` fills the middle of the bar, a name
  * centered in it or a browser's address; `end` holds the window's controls. The body fills the
  * window, so windows stretched to one height keep their surface to the bottom.
+ * Whatever scrolls inside it gets the thin scrollbar of `.window` (globals.css).
  */
 export function Window({
   title,
@@ -53,7 +54,7 @@ export function Window({
 }) {
   return (
     <div
-      className={`flex flex-col overflow-hidden rounded-xl border border-window-border bg-window shadow-(--window-shadow) ${className}`}
+      className={`window flex flex-col overflow-hidden rounded-xl border border-window-border bg-window shadow-(--window-shadow) ${className}`}
     >
       <div className="flex h-11 shrink-0 items-center gap-2 border-window-border border-b bg-window-bar px-3 sm:gap-3 sm:px-4">
         <Dots />
