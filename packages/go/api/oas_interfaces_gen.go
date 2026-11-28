@@ -289,6 +289,10 @@ type GetPolicyRevisionRes interface {
 	getPolicyRevisionRes()
 }
 
+type GetProjectClaimRes interface {
+	getProjectClaimRes()
+}
+
 type GetProjectClaimStatusRes interface {
 	getProjectClaimStatusRes()
 }

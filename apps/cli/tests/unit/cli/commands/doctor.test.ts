@@ -1,6 +1,8 @@
 import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
+import { http, HttpResponse } from "msw";
+import type { SetupServer } from "msw/node";
 import { describe, expect } from "vitest";
 
 import { type Serve, test } from "@tests/fixtures";
@@ -258,6 +260,21 @@ const it = test.extend<{
   },
 });
 
+/**
+ * Answers the claim read a cloud project's unclaimed record makes, as unclaimed.
+ * Only the tests that make it start the mock: it would also catch the requests
+ * other tests send to a server they start on this machine.
+ *
+ * @param server - The test's mock.
+ */
+function answersUnclaimed(server: SetupServer): void {
+  server.use(
+    http.get("*/projects/:project_id/claim", () => {
+      return HttpResponse.json({ status: "unclaimed" });
+    }),
+  );
+}
+
 describe("doctor command", () => {
   it("passes every check for a well-formed managed project", async ({ dir, doctor }) => {
     const cwd = await makeHealthyProject(dir);
@@ -287,9 +304,11 @@ describe("doctor command", () => {
   // so failing here would break every scripted `zitadel doctor` run against a
   // project nobody has attached to a team yet.
   it("warns (but passes) when the project is not attached to a team, and points at claim", async ({
+    server,
     dir,
     doctor,
   }) => {
+    answersUnclaimed(server);
     const cwd = await makeHealthyProject(dir);
     await writeDetachedSecret(cwd);
 
@@ -313,10 +332,12 @@ describe("doctor command", () => {
   });
 
   it("suggests the claim on the project's own server, not the one doctor was pointed at", async ({
+    server,
     port,
     dir,
     docker,
   }) => {
+    answersUnclaimed(server);
     const cwd = await makeHealthyProject(dir);
     await writeDetachedSecret(cwd);
 
@@ -341,9 +362,11 @@ describe("doctor command", () => {
   });
 
   it("does not pin the claim to a file that names the project but not its secret", async ({
+    server,
     dir,
     doctor,
   }) => {
+    answersUnclaimed(server);
     const cwd = await makeHealthyProject(dir);
     await writeDetachedSecret(cwd);
     await writeFile(join(cwd, ".env.development.local"), "ZITADEL_PROJECT_ID=proj-001\n");
@@ -372,9 +395,11 @@ describe("doctor command", () => {
   });
 
   it("suggests no claim when .env.development.local names another project", async ({
+    server,
     dir,
     doctor,
   }) => {
+    answersUnclaimed(server);
     const cwd = await makeHealthyProject(dir);
     await writeDetachedSecret(cwd);
     await writeFile(join(cwd, ".env.development.local"), "ZITADEL_PROJECT_ID=someone-else\n");
@@ -385,7 +410,12 @@ describe("doctor command", () => {
     expect((data.next_commands ?? []).some((command) => command.includes(" claim"))).toBe(false);
   });
 
-  it("pins the claim it suggests to setup's file when there is one", async ({ dir, doctor }) => {
+  it("pins the claim it suggests to setup's file when there is one", async ({
+    server,
+    dir,
+    doctor,
+  }) => {
+    answersUnclaimed(server);
     const cwd = await makeHealthyProject(dir);
     await writeDetachedSecret(cwd);
     await writeFile(
@@ -408,7 +438,12 @@ describe("doctor command", () => {
   // the warning explains both outcomes, and the claim command stays
   // suggested because the local record can be stale (claimed from another
   // machine reads detached) and running claim answers authoritatively.
-  it("switches to reconciliation wording once the window has closed", async ({ dir, doctor }) => {
+  it("switches to reconciliation wording once the window has closed", async ({
+    server,
+    dir,
+    doctor,
+  }) => {
+    answersUnclaimed(server);
     const cwd = await makeHealthyProject(dir);
     await writeDetachedSecret(cwd, "2026-01-01T00:00:00.000Z");
 
@@ -429,10 +464,12 @@ describe("doctor command", () => {
   });
 
   it("says each next step once when its output is read by a pipe", async ({
+    server,
     dir,
     docker,
     port,
   }) => {
+    answersUnclaimed(server);
     const cwd = await makeHealthyProject(dir);
     await writeDetachedSecret(cwd, "2026-01-01T00:00:00.000Z");
 
@@ -475,7 +512,12 @@ describe("doctor command", () => {
 
   // Claiming needs a human in a browser, so --fix has nothing safe to do. The
   // warning has to survive it rather than being silently "repaired".
-  it("leaves the claim warning (and the secret) alone under --fix", async ({ dir, doctor }) => {
+  it("leaves the claim warning (and the secret) alone under --fix", async ({
+    server,
+    dir,
+    doctor,
+  }) => {
+    answersUnclaimed(server);
     const cwd = await makeHealthyProject(dir);
     await writeDetachedSecret(cwd);
     const before = await readFile(join(cwd, ".zitadel/secret"), "utf8");
@@ -794,7 +836,12 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
     expect(res.stdout).not.toContain("logs --follow");
   });
 
-  it("fails the project-match check when secret and config disagree", async ({ dir, doctor }) => {
+  it("fails the project-match check when secret and config disagree", async ({
+    server,
+    dir,
+    doctor,
+  }) => {
+    answersUnclaimed(server);
     const cwd = await makeHealthyProject(dir);
     await writeFile(
       join(cwd, ".zitadel/secret"),
@@ -834,9 +881,11 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
   });
 
   it("reports E_VALIDATION (not a crash) when --fix cannot repair a broken project", async ({
+    server,
     dir,
     doctor,
   }) => {
+    answersUnclaimed(server);
     const cwd = await makeHealthyProject(dir);
     // project-match has no auto-repair: a secret/config project_id mismatch
     // stays failed through --fix, so doctor must report E_VALIDATION rather
@@ -869,9 +918,11 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
   });
 
   it("fails when a scaffolded infrastructure file is missing and --fix restores it", async ({
+    server,
     dir,
     doctor,
   }) => {
+    answersUnclaimed(server);
     const cwd = await makeHealthyProject(dir);
     await rm(join(cwd, "middleware.ts"));
 
@@ -1161,6 +1212,24 @@ describe("advisoryForWarnings", () => {
     );
 
     expect(advice?.nextCommands).toEqual([expectedPublicCliCommand("claim")]);
+  });
+
+  it("suggests doctor --fix, not claim, for a team the record does not name", () => {
+    const unrecorded = {
+      name: "claim",
+      status: "warn" as const,
+      message: "not recorded",
+      details: { recorded: false },
+    };
+
+    const advice = advisoryForWarnings(
+      [unrecorded],
+      aSuggest({ cwd: "apps/web" }, cliVersion.version),
+      aSuggest({ cwd: "apps/web" }, cliVersion.version),
+      againIn(aSuggest({ cwd: "apps/web" }, cliVersion.version)),
+    );
+
+    expect(advice?.nextCommands).toEqual([expectedPublicCliCommand("doctor --fix --cwd apps/web")]);
   });
 
   it("suggests doctor --fix for outdated editor schemas in the directory doctor checked", () => {

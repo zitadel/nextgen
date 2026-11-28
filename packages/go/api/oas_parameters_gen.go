@@ -432,6 +432,13 @@ type GetProjectParams struct {
 	ProjectID ProjectID
 }
 
+// GetProjectClaimParams is parameters of getProjectClaim operation.
+type GetProjectClaimParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup` also
+	// prints as `project_id`.
+	ProjectID ProjectID
+}
+
 // GetProjectClaimStatusParams is parameters of getProjectClaimStatus operation.
 type GetProjectClaimStatusParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup` also

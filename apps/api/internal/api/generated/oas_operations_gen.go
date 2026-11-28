@@ -54,6 +54,7 @@ const (
 	GetPolicyOperation                       OperationName = "GetPolicy"
 	GetPolicyRevisionOperation               OperationName = "GetPolicyRevision"
 	GetProjectOperation                      OperationName = "GetProject"
+	GetProjectClaimOperation                 OperationName = "GetProjectClaim"
 	GetProjectClaimStatusOperation           OperationName = "GetProjectClaimStatus"
 	GetProjectClaimWindowOperation           OperationName = "GetProjectClaimWindow"
 	GetReadyOperation                        OperationName = "GetReady"

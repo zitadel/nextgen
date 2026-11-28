@@ -44,8 +44,9 @@ type ProjectStatus =
       issuer?: string;
       /**
        * Whether the project is attached to a team, from the local
-       * `.zitadel/secret`. Omitted entirely off the cloud, where there is
-       * nothing to attach and the field would only invite agents to act on it.
+       * `.zitadel/secret`, confirmed with the server when the record names
+       * none. Omitted entirely off the cloud, where there is nothing to attach
+       * and the field would only invite agents to act on it.
        */
       claim?: ClaimState;
     };
@@ -75,6 +76,8 @@ type ProjectStatus =
  * project. It is gated on the server in `zitadel.json`, not on the run's
  * source: `status --server local` rewrites the source for the health probe but
  * does not move the project, so the source would answer the wrong question.
+ * A record that says unclaimed is checked with that server
+ * ({@link Claim.confirmed}), so a claim made from another machine shows.
  *
  * @param cwd - The directory whose project is read.
  * @param issuer - The issuer to report for a configured project.
@@ -82,6 +85,7 @@ type ProjectStatus =
  * @param named - Set when the run named an environment other than the default
  * development one, or a file: its project is whatever it resolves, never
  * setup's.
+ * @param signal - Cancels the claim check with the server.
  * @returns The project's lifecycle and what the status shows for it.
  */
 async function projectStatus(
@@ -89,6 +93,7 @@ async function projectStatus(
   issuer: string | undefined,
   resolvedProjectId: string | undefined,
   named: { name: string; envFile?: string } | undefined,
+  signal: AbortSignal,
 ): Promise<ProjectStatus> {
   if (!(await Project.at(cwd).hasConfig())) {
     return {
@@ -122,11 +127,14 @@ async function projectStatus(
 
   const projectId =
     resolvedProjectId ?? String(config.data.project ?? secret?.data.project_id ?? "");
+  const server = config.server ?? ZitadelRuntime.DEFAULT;
   const claim =
     secret !== undefined && projectId === secret.data.project_id
-      ? Claim.state({
+      ? await Claim.confirmed({
           secret: secret.data,
-          cloud: ZitadelRuntime.fromUrl(config.server ?? ZitadelRuntime.DEFAULT).isCloud(),
+          server,
+          cloud: ZitadelRuntime.fromUrl(server).isCloud(),
+          signal,
         })
       : ({ kind: "not-applicable" } as const);
   return {
@@ -224,24 +232,26 @@ function nextActionsFor(
     return [];
   }
   const claim =
-    project.claim?.kind === "detached"
-      ? project.claim.claimable
-        ? [
-            Claim.nudge(
-              suggest({ id: "claim" }),
-              project.claim.deadline === undefined ? undefined : new Date(project.claim.deadline),
-            ),
-          ]
-        : [
-            Claim.windowClosedNudge(
-              suggest({ id: "claim" }),
-              suggest({
-                id: "setup",
-                flags: { cwd: Claim.FRESH_DIRECTORY },
-              }),
-            ),
-          ]
-      : [];
+    project.claim?.kind === "attached" && project.claim.recorded === false
+      ? [Claim.unrecordedNudge(suggest({ id: "claim" }), project.claim.team_id)]
+      : project.claim?.kind === "detached"
+        ? project.claim.claimable
+          ? [
+              Claim.nudge(
+                suggest({ id: "claim" }),
+                project.claim.deadline === undefined ? undefined : new Date(project.claim.deadline),
+              ),
+            ]
+          : [
+              Claim.windowClosedNudge(
+                suggest({ id: "claim" }),
+                suggest({
+                  id: "setup",
+                  flags: { cwd: Claim.FRESH_DIRECTORY },
+                }),
+              ),
+            ]
+        : [];
   if (users === "none") {
     return [Guidance.verifyLogin(project.issuer), ...claim];
   }
@@ -317,7 +327,10 @@ function nextCommandsFor(
     );
   } else {
     commands.push(suggest({ id: "doctor" }));
-    if (project.claim?.kind === "detached") {
+    if (
+      project.claim?.kind === "detached" ||
+      (project.claim?.kind === "attached" && project.claim.recorded === false)
+    ) {
       commands.push(suggest({ id: "claim" }));
     }
     if (users === "none") {
@@ -397,6 +410,7 @@ export default class Status extends Telemetered(ProjectCommand) {
             envFile: this.environment.envFile,
           }
         : undefined,
+      this.signal,
     );
     this.ui.ranAgainst(
       project.lifecycle === "configured" ? project.project_id : undefined,

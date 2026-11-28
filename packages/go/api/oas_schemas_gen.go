@@ -15117,6 +15117,82 @@ func (s *ClaimChallengeNotFoundDetails) init() ClaimChallengeNotFoundDetails {
 	return m
 }
 
+// A claimed project. It carries the owning team and when the claim landed. These fields are always
+// present when `status` is `claimed`.
+// Ref: #
+type ClaimClaimed struct {
+	// A team owns the project.
+	Status ClaimClaimedStatus `json:"status"`
+	TeamID TeamID             `json:"team_id"`
+	// The time when the project was claimed.
+	ClaimedAt time.Time `json:"claimed_at"`
+}
+
+// GetStatus returns the value of Status.
+func (s *ClaimClaimed) GetStatus() ClaimClaimedStatus {
+	return s.Status
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *ClaimClaimed) GetTeamID() TeamID {
+	return s.TeamID
+}
+
+// GetClaimedAt returns the value of ClaimedAt.
+func (s *ClaimClaimed) GetClaimedAt() time.Time {
+	return s.ClaimedAt
+}
+
+// SetStatus sets the value of Status.
+func (s *ClaimClaimed) SetStatus(val ClaimClaimedStatus) {
+	s.Status = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *ClaimClaimed) SetTeamID(val TeamID) {
+	s.TeamID = val
+}
+
+// SetClaimedAt sets the value of ClaimedAt.
+func (s *ClaimClaimed) SetClaimedAt(val time.Time) {
+	s.ClaimedAt = val
+}
+
+// A team owns the project.
+type ClaimClaimedStatus string
+
+const (
+	ClaimClaimedStatusClaimed ClaimClaimedStatus = "claimed"
+)
+
+// AllValues returns all ClaimClaimedStatus values.
+func (ClaimClaimedStatus) AllValues() []ClaimClaimedStatus {
+	return []ClaimClaimedStatus{
+		ClaimClaimedStatusClaimed,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ClaimClaimedStatus) MarshalText() ([]byte, error) {
+	switch s {
+	case ClaimClaimedStatusClaimed:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ClaimClaimedStatus) UnmarshalText(data []byte) error {
+	switch ClaimClaimedStatus(data) {
+	case ClaimClaimedStatusClaimed:
+		*s = ClaimClaimedStatusClaimed
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // Merged schema.
 // Ref: #
 type ClaimNoPersonalTeam struct {
@@ -15222,6 +15298,77 @@ func (s *ClaimPersonalTeamNotActiveDetails) init() ClaimPersonalTeamNotActiveDet
 	}
 	return m
 }
+
+// Whether the project is claimed. An unclaimed project carries only `status`. A claimed one also
+// carries the owning team and the claim timestamp. Switch on `status`: an `unclaimed` response never
+// carries those fields, and a `claimed` response always does.
+// Ref: #
+// ClaimResponse represents sum type.
+type ClaimResponse struct {
+	// Type selects the active sum variant, switch on this field.
+	Type           ClaimResponseType
+	ClaimUnclaimed ClaimUnclaimed
+	ClaimClaimed   ClaimClaimed
+}
+
+// ClaimResponseType is oneOf type of ClaimResponse.
+type ClaimResponseType string
+
+// Possible values for ClaimResponseType.
+const (
+	ClaimUnclaimedClaimResponse ClaimResponseType = "unclaimed"
+	ClaimClaimedClaimResponse   ClaimResponseType = "claimed"
+)
+
+// IsClaimUnclaimed reports whether ClaimResponse is ClaimUnclaimed.
+func (s ClaimResponse) IsClaimUnclaimed() bool { return s.Type == ClaimUnclaimedClaimResponse }
+
+// IsClaimClaimed reports whether ClaimResponse is ClaimClaimed.
+func (s ClaimResponse) IsClaimClaimed() bool { return s.Type == ClaimClaimedClaimResponse }
+
+// SetClaimUnclaimed sets ClaimResponse to ClaimUnclaimed.
+func (s *ClaimResponse) SetClaimUnclaimed(v ClaimUnclaimed) {
+	s.Type = ClaimUnclaimedClaimResponse
+	s.ClaimUnclaimed = v
+}
+
+// GetClaimUnclaimed returns ClaimUnclaimed and true boolean if ClaimResponse is ClaimUnclaimed.
+func (s ClaimResponse) GetClaimUnclaimed() (v ClaimUnclaimed, ok bool) {
+	if !s.IsClaimUnclaimed() {
+		return v, false
+	}
+	return s.ClaimUnclaimed, true
+}
+
+// NewClaimUnclaimedClaimResponse returns new ClaimResponse from ClaimUnclaimed.
+func NewClaimUnclaimedClaimResponse(v ClaimUnclaimed) ClaimResponse {
+	var s ClaimResponse
+	s.SetClaimUnclaimed(v)
+	return s
+}
+
+// SetClaimClaimed sets ClaimResponse to ClaimClaimed.
+func (s *ClaimResponse) SetClaimClaimed(v ClaimClaimed) {
+	s.Type = ClaimClaimedClaimResponse
+	s.ClaimClaimed = v
+}
+
+// GetClaimClaimed returns ClaimClaimed and true boolean if ClaimResponse is ClaimClaimed.
+func (s ClaimResponse) GetClaimClaimed() (v ClaimClaimed, ok bool) {
+	if !s.IsClaimClaimed() {
+		return v, false
+	}
+	return s.ClaimClaimed, true
+}
+
+// NewClaimClaimedClaimResponse returns new ClaimResponse from ClaimClaimed.
+func NewClaimClaimedClaimResponse(v ClaimClaimed) ClaimResponse {
+	var s ClaimResponse
+	s.SetClaimClaimed(v)
+	return s
+}
+
+func (*ClaimResponse) getProjectClaimRes() {}
 
 // A completed claim. It carries the owning team, when the claim landed and the dashboard where it can
 // be managed. These fields are always present when `status` is `completed`.
@@ -15437,6 +15584,58 @@ func NewClaimStatusCompletedClaimStatusResponse(v ClaimStatusCompleted) ClaimSta
 }
 
 func (*ClaimStatusResponse) getProjectClaimStatusRes() {}
+
+// A project no team has claimed yet.
+// Ref: #
+type ClaimUnclaimed struct {
+	// No team owns the project.
+	Status ClaimUnclaimedStatus `json:"status"`
+}
+
+// GetStatus returns the value of Status.
+func (s *ClaimUnclaimed) GetStatus() ClaimUnclaimedStatus {
+	return s.Status
+}
+
+// SetStatus sets the value of Status.
+func (s *ClaimUnclaimed) SetStatus(val ClaimUnclaimedStatus) {
+	s.Status = val
+}
+
+// No team owns the project.
+type ClaimUnclaimedStatus string
+
+const (
+	ClaimUnclaimedStatusUnclaimed ClaimUnclaimedStatus = "unclaimed"
+)
+
+// AllValues returns all ClaimUnclaimedStatus values.
+func (ClaimUnclaimedStatus) AllValues() []ClaimUnclaimedStatus {
+	return []ClaimUnclaimedStatus{
+		ClaimUnclaimedStatusUnclaimed,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ClaimUnclaimedStatus) MarshalText() ([]byte, error) {
+	switch s {
+	case ClaimUnclaimedStatusUnclaimed:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ClaimUnclaimedStatus) UnmarshalText(data []byte) error {
+	switch ClaimUnclaimedStatus(data) {
+	case ClaimUnclaimedStatusUnclaimed:
+		*s = ClaimUnclaimedStatusUnclaimed
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 // How long the project can still be claimed. It derives from the project's creation time and the fixed
 // 14-day claim window. It does not depend on the challenge, which has its own much shorter expiry.
@@ -43783,6 +43982,247 @@ func (s *GetPolicyRevisionErrorResponseStatusCode) SetResponse(val GetPolicyRevi
 
 func (*GetPolicyRevisionErrorResponseStatusCode) getPolicyRevisionRes() {}
 
+// GetProjectClaimErrorResponse represents sum type.
+type GetProjectClaimErrorResponse struct {
+	// Type selects the active sum variant, switch on this field.
+	Type                 GetProjectClaimErrorResponseType
+	AuthUnauthorized     AuthUnauthorized
+	Internal             Internal
+	NotImplemented       NotImplemented
+	ProjNotFound         ProjNotFound
+	ProjPermissionDenied ProjPermissionDenied
+	ReqInvalid           ReqInvalid
+	Unavailable          Unavailable
+}
+
+// GetProjectClaimErrorResponseType is oneOf type of GetProjectClaimErrorResponse.
+type GetProjectClaimErrorResponseType string
+
+// Possible values for GetProjectClaimErrorResponseType.
+const (
+	AuthUnauthorizedGetProjectClaimErrorResponse     GetProjectClaimErrorResponseType = "auth.unauthorized"
+	InternalGetProjectClaimErrorResponse             GetProjectClaimErrorResponseType = "internal"
+	NotImplementedGetProjectClaimErrorResponse       GetProjectClaimErrorResponseType = "not_implemented"
+	ProjNotFoundGetProjectClaimErrorResponse         GetProjectClaimErrorResponseType = "proj.not_found"
+	ProjPermissionDeniedGetProjectClaimErrorResponse GetProjectClaimErrorResponseType = "proj.permission_denied"
+	ReqInvalidGetProjectClaimErrorResponse           GetProjectClaimErrorResponseType = "req.invalid"
+	UnavailableGetProjectClaimErrorResponse          GetProjectClaimErrorResponseType = "unavailable"
+)
+
+// IsAuthUnauthorized reports whether GetProjectClaimErrorResponse is AuthUnauthorized.
+func (s GetProjectClaimErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetProjectClaimErrorResponse
+}
+
+// IsInternal reports whether GetProjectClaimErrorResponse is Internal.
+func (s GetProjectClaimErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetProjectClaimErrorResponse
+}
+
+// IsNotImplemented reports whether GetProjectClaimErrorResponse is NotImplemented.
+func (s GetProjectClaimErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetProjectClaimErrorResponse
+}
+
+// IsProjNotFound reports whether GetProjectClaimErrorResponse is ProjNotFound.
+func (s GetProjectClaimErrorResponse) IsProjNotFound() bool {
+	return s.Type == ProjNotFoundGetProjectClaimErrorResponse
+}
+
+// IsProjPermissionDenied reports whether GetProjectClaimErrorResponse is ProjPermissionDenied.
+func (s GetProjectClaimErrorResponse) IsProjPermissionDenied() bool {
+	return s.Type == ProjPermissionDeniedGetProjectClaimErrorResponse
+}
+
+// IsReqInvalid reports whether GetProjectClaimErrorResponse is ReqInvalid.
+func (s GetProjectClaimErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetProjectClaimErrorResponse
+}
+
+// IsUnavailable reports whether GetProjectClaimErrorResponse is Unavailable.
+func (s GetProjectClaimErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetProjectClaimErrorResponse
+}
+
+// SetAuthUnauthorized sets GetProjectClaimErrorResponse to AuthUnauthorized.
+func (s *GetProjectClaimErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetProjectClaimErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetProjectClaimErrorResponse is AuthUnauthorized.
+func (s GetProjectClaimErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetProjectClaimErrorResponse returns new GetProjectClaimErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetProjectClaimErrorResponse(v AuthUnauthorized) GetProjectClaimErrorResponse {
+	var s GetProjectClaimErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetProjectClaimErrorResponse to Internal.
+func (s *GetProjectClaimErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetProjectClaimErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetProjectClaimErrorResponse is Internal.
+func (s GetProjectClaimErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetProjectClaimErrorResponse returns new GetProjectClaimErrorResponse from Internal.
+func NewInternalGetProjectClaimErrorResponse(v Internal) GetProjectClaimErrorResponse {
+	var s GetProjectClaimErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetProjectClaimErrorResponse to NotImplemented.
+func (s *GetProjectClaimErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetProjectClaimErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetProjectClaimErrorResponse is NotImplemented.
+func (s GetProjectClaimErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetProjectClaimErrorResponse returns new GetProjectClaimErrorResponse from NotImplemented.
+func NewNotImplementedGetProjectClaimErrorResponse(v NotImplemented) GetProjectClaimErrorResponse {
+	var s GetProjectClaimErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjNotFound sets GetProjectClaimErrorResponse to ProjNotFound.
+func (s *GetProjectClaimErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundGetProjectClaimErrorResponse
+	s.ProjNotFound = v
+}
+
+// GetProjNotFound returns ProjNotFound and true boolean if GetProjectClaimErrorResponse is ProjNotFound.
+func (s GetProjectClaimErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+	if !s.IsProjNotFound() {
+		return v, false
+	}
+	return s.ProjNotFound, true
+}
+
+// NewProjNotFoundGetProjectClaimErrorResponse returns new GetProjectClaimErrorResponse from ProjNotFound.
+func NewProjNotFoundGetProjectClaimErrorResponse(v ProjNotFound) GetProjectClaimErrorResponse {
+	var s GetProjectClaimErrorResponse
+	s.SetProjNotFound(v)
+	return s
+}
+
+// SetProjPermissionDenied sets GetProjectClaimErrorResponse to ProjPermissionDenied.
+func (s *GetProjectClaimErrorResponse) SetProjPermissionDenied(v ProjPermissionDenied) {
+	s.Type = ProjPermissionDeniedGetProjectClaimErrorResponse
+	s.ProjPermissionDenied = v
+}
+
+// GetProjPermissionDenied returns ProjPermissionDenied and true boolean if GetProjectClaimErrorResponse is ProjPermissionDenied.
+func (s GetProjectClaimErrorResponse) GetProjPermissionDenied() (v ProjPermissionDenied, ok bool) {
+	if !s.IsProjPermissionDenied() {
+		return v, false
+	}
+	return s.ProjPermissionDenied, true
+}
+
+// NewProjPermissionDeniedGetProjectClaimErrorResponse returns new GetProjectClaimErrorResponse from ProjPermissionDenied.
+func NewProjPermissionDeniedGetProjectClaimErrorResponse(v ProjPermissionDenied) GetProjectClaimErrorResponse {
+	var s GetProjectClaimErrorResponse
+	s.SetProjPermissionDenied(v)
+	return s
+}
+
+// SetReqInvalid sets GetProjectClaimErrorResponse to ReqInvalid.
+func (s *GetProjectClaimErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetProjectClaimErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetProjectClaimErrorResponse is ReqInvalid.
+func (s GetProjectClaimErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetProjectClaimErrorResponse returns new GetProjectClaimErrorResponse from ReqInvalid.
+func NewReqInvalidGetProjectClaimErrorResponse(v ReqInvalid) GetProjectClaimErrorResponse {
+	var s GetProjectClaimErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetProjectClaimErrorResponse to Unavailable.
+func (s *GetProjectClaimErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetProjectClaimErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetProjectClaimErrorResponse is Unavailable.
+func (s GetProjectClaimErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetProjectClaimErrorResponse returns new GetProjectClaimErrorResponse from Unavailable.
+func NewUnavailableGetProjectClaimErrorResponse(v Unavailable) GetProjectClaimErrorResponse {
+	var s GetProjectClaimErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// GetProjectClaimErrorResponseStatusCode wraps GetProjectClaimErrorResponse with StatusCode.
+type GetProjectClaimErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetProjectClaimErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetProjectClaimErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetProjectClaimErrorResponseStatusCode) GetResponse() GetProjectClaimErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetProjectClaimErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetProjectClaimErrorResponseStatusCode) SetResponse(val GetProjectClaimErrorResponse) {
+	s.Response = val
+}
+
+func (*GetProjectClaimErrorResponseStatusCode) getProjectClaimRes() {}
+
+type GetProjectClaimNotFound ErrorDetails
+
+func (*GetProjectClaimNotFound) getProjectClaimRes() {}
+
 // GetProjectClaimStatusErrorResponse represents sum type.
 type GetProjectClaimStatusErrorResponse struct {
 	// Type selects the active sum variant, switch on this field.
@@ -44186,6 +44626,10 @@ func (*GetProjectClaimStatusTooManyRequests) getProjectClaimStatusRes() {}
 type GetProjectClaimStatusUnauthorized ErrorDetails
 
 func (*GetProjectClaimStatusUnauthorized) getProjectClaimStatusRes() {}
+
+type GetProjectClaimUnauthorized ErrorDetails
+
+func (*GetProjectClaimUnauthorized) getProjectClaimRes() {}
 
 // GetProjectClaimWindowErrorResponse represents sum type.
 type GetProjectClaimWindowErrorResponse struct {
@@ -88661,6 +89105,7 @@ func (s *ProjPermissionDenied) SetDetails(val OptProjPermissionDeniedDetails) {
 	s.Details = val
 }
 
+func (*ProjPermissionDenied) getProjectClaimRes()       {}
 func (*ProjPermissionDenied) getProjectClaimStatusRes() {}
 
 // Additional error-specific context.

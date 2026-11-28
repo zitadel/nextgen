@@ -2950,6 +2950,73 @@
         }
       }
     },
+    "/projects/{project_id}/claim": {
+      "get": {
+        "operationId": "getProjectClaim",
+        "summary": "Get a project's claim",
+        "description": "Returns whether the project is claimed, and if so by which team and when.\n\nA [claim attaches a project to a team](/docs/concepts/project-team-user#claim).\n`zitadel status` and `zitadel doctor` call this operation to tell whether\nto suggest `zitadel claim`, and `zitadel claim` calls it to record the\nowning team of a project that is already claimed, so a project claimed from\nanother machine stops being reported as unclaimed.\n\nUnlike `getProjectClaimStatus` (`GET /projects/{project_id}/claim/status`), it needs\nno challenge: it reads the project's owning-team grant, the claim's source\nof truth. It starts nothing and spends nothing. Authenticate with the project\nsecret.\n",
+        "tags": [
+          "Projects"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project-id-path"
+          }
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "project.write"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The project's claim.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/claim-response"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The credential does not grant access to this project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/proj-permission_denied"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/getProjectClaim-error-response"
+          }
+        }
+      }
+    },
     "/projects/{project_id}/claim/init": {
       "post": {
         "operationId": "createProjectClaim",
@@ -17368,6 +17435,66 @@
           }
         }
       },
+      "claim-unclaimed": {
+        "type": "object",
+        "description": "A project no team has claimed yet.",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "unclaimed"
+            ],
+            "description": "No team owns the project."
+          }
+        }
+      },
+      "claim-claimed": {
+        "type": "object",
+        "description": "A claimed project. It carries the owning team and when the claim landed.\nThese fields are always present when `status` is `claimed`.\n",
+        "required": [
+          "status",
+          "team_id",
+          "claimed_at"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "claimed"
+            ],
+            "description": "A team owns the project."
+          },
+          "team_id": {
+            "$ref": "#/components/schemas/team-id"
+          },
+          "claimed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The time when the project was claimed."
+          }
+        }
+      },
+      "claim-response": {
+        "description": "Whether the project is claimed. An unclaimed project carries only `status`.\nA claimed one also carries the owning team and the claim timestamp. Switch on\n`status`: an `unclaimed` response never carries those fields, and a\n`claimed` response always does.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/claim-unclaimed"
+          },
+          {
+            "$ref": "#/components/schemas/claim-claimed"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "status",
+          "mapping": {
+            "unclaimed": "#/components/schemas/claim-unclaimed",
+            "claimed": "#/components/schemas/claim-claimed"
+          }
+        }
+      },
       "claim_challenge-invalid": {
         "description": "The claim challenge is invalid. Expected a non-empty id, project id, and initiating secret hash.\n\nError code: claim_challenge.invalid\n",
         "allOf": [
@@ -31717,6 +31844,73 @@
               },
               "proj.missing_id": {
                 "$ref": "#/components/examples/proj-missing_id"
+              },
+              "proj.not_found": {
+                "$ref": "#/components/examples/proj-not_found"
+              },
+              "proj.permission_denied": {
+                "$ref": "#/components/examples/proj-permission_denied"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
+      "getProjectClaim-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/proj-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/proj-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "proj.not_found": "#/components/schemas/proj-not_found",
+                  "proj.permission_denied": "#/components/schemas/proj-permission_denied",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable"
+                }
+              }
+            },
+            "examples": {
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
               },
               "proj.not_found": {
                 "$ref": "#/components/examples/proj-not_found"

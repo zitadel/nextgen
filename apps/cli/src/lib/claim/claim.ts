@@ -1,4 +1,10 @@
+import pTimeout from "p-timeout";
+
+import { ClaimService, createZitadelClient } from "@/lib/backend";
+import { isCancellation } from "@/lib/errors";
 import type { ProjectSecretData } from "@/lib/project";
+import { Runtime } from "@/lib/runtime";
+import { ZitadelRuntime } from "@/lib/server";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import type { BoxAction } from "@/lib/ui";
 
@@ -10,14 +16,19 @@ import type { BoxAction } from "@/lib/ui";
  * opposite output: the first prints nothing at all, the second nudges.
  */
 export type ClaimState =
-  | { kind: "attached"; team_id: string; claimed_at: string }
+  /**
+   * `recorded: false` marks a team the server confirmed that the local record
+   * does not name ({@link Claim.confirmed}); running `claim` writes it down.
+   */
+  | { kind: "attached"; team_id: string; claimed_at: string; recorded?: false }
   /**
    * `claimable` classifies the claim window from the locally recorded
    * creation time: once it has passed, nudges switch to reconciliation
-   * wording (Claim.windowClosedNudge). Never proof of anything: the local
-   * record can be stale (a project claimed from another machine still reads
-   * detached), so the claim command stays advertised as the safe check —
-   * the server resolves the grant before the window. Lenient on an unknown
+   * wording (Claim.windowClosedNudge). Never proof of anything offline: the
+   * local record can be stale (a project claimed from another machine reads
+   * detached until Claim.confirmed reaches the server), so the claim command
+   * stays advertised as the safe check — the server resolves the grant
+   * before the window. Lenient on an unknown
    * or unparsable creation time (claimable, no deadline) because the server
    * is the enforcer and the CLI only advises. `deadline` is the ISO date
    * the window closes, when the creation time is known.
@@ -34,6 +45,18 @@ type ClaimInput = Readonly<{
   secret: ClaimRecord;
   /** Whether the server the project lives on is the Zitadel cloud. */
   cloud: boolean;
+}>;
+
+/** What {@link Claim.confirmed} reads a claim from, and asks the server with. */
+type ConfirmInput = Readonly<{
+  /** The project's local secret: the record, and the credential to ask with. */
+  secret: ClaimRecord & Pick<ProjectSecretData, "project_id" | "project_secret">;
+  /** The server the project lives on, from `zitadel.json`. */
+  server: string;
+  /** Whether that server is the Zitadel cloud. */
+  cloud: boolean;
+  /** Cancels the request. */
+  signal: AbortSignal;
 }>;
 
 /**
@@ -72,6 +95,68 @@ export class Claim {
   }
 
   /**
+   * How long a best-effort claim read waits for the server before it keeps the
+   * local answer, so `status`, `doctor` and `claim` stay quick on a slow network.
+   */
+  static readonly CONFIRM_TIMEOUT_MS = 1500;
+
+  /**
+   * Decides the attachment state of a project, asking the server when the
+   * local record says it is unclaimed.
+   *
+   * The local record is written only on the machine that claimed, so a
+   * project claimed from another machine, or a `.zitadel/secret` restored from
+   * a backup, reads as detached here though a team owns it. The server's
+   * owning-team grant is the source of truth, so a detached record is checked
+   * against it and an attached server answer wins. Only a detached record is
+   * checked: an attached record stays attached, since a claim cannot be
+   * undone, and a server the nudges do not apply to is never asked.
+   *
+   * Best effort by design: an unreachable server, a refused secret or a slow
+   * answer keep the local answer, so `status` and `doctor` still work offline.
+   * Cancelling is not a fallback: the person asked the command to stop.
+   *
+   * @param input - The project's secret, its server, and whether that is the cloud.
+   * @returns The state, confirmed with the server when it answered.
+   * @throws {Error} Only when the run was cancelled.
+   */
+  static async confirmed(input: ConfirmInput): Promise<ClaimState> {
+    const local = Claim.classify(input);
+    if (local.kind !== "detached" || !ZitadelRuntime.fromUrl(input.server).isCloudOrigin()) {
+      return local;
+    }
+    const service = new ClaimService(
+      createZitadelClient({
+        userAgent: Runtime.current().userAgent(),
+        baseUrl: input.server,
+        token: input.secret.project_secret,
+        signal: input.signal,
+        timeoutMs: Claim.CONFIRM_TIMEOUT_MS,
+      }),
+      input.secret.project_id,
+    );
+    try {
+      const claim = await pTimeout(service.current(), {
+        milliseconds: Claim.CONFIRM_TIMEOUT_MS + 250,
+      });
+      if (claim.status === "claimed") {
+        return {
+          kind: "attached",
+          team_id: claim.team_id,
+          claimed_at: claim.claimed_at,
+          recorded: false,
+        };
+      }
+      return local;
+    } catch (error) {
+      if (isCancellation(error)) {
+        throw error;
+      }
+      return local;
+    }
+  }
+
+  /**
    * Whether the local record says a team owns this project.
    *
    * Both fields or neither: a half-written record is not an attachment, and
@@ -104,6 +189,18 @@ export class Claim {
   static deadline(createdAt: string | undefined, now = Date.now()): Date {
     const base = createdAt === undefined ? now : Date.parse(createdAt);
     return new Date((Number.isNaN(base) ? now : base) + Claim.WINDOW_MS);
+  }
+
+  /**
+   * The nudge for a team the server confirmed but the local record does not
+   * name: `claim` writes it down, so later commands know it offline.
+   *
+   * @param claim - The `claim` command, rendered by the run that reports it.
+   * @param teamId - The team the server named.
+   * @returns The nudge.
+   */
+  static unrecordedNudge(claim: SuggestedCommand, teamId: string): string {
+    return `Team ${teamId} owns this project, but .zitadel/secret does not record it. Run ${claim} to record it.`;
   }
 
   /**
@@ -198,13 +295,11 @@ export class Claim {
   /**
    * Decides the attachment state from local state alone.
    *
-   * **Why no network call.** The contract exposes no ambient claim-state read:
-   * `getProjectClaimStatus` answers for one live challenge and rejects a secret that did
-   * not mint it, and claim attributes were deliberately kept off
-   * `GET /projects/{id}` because they belong to the grant, not the project. So
-   * `.zitadel/secret` is the only source, which is also why `status` and `doctor`
-   * stay fast and work offline. `zitadel claim` reaches the same conclusion the
-   * same way before it decides to skip.
+   * **Why no network call.** This is the offline half: it reads
+   * `.zitadel/secret` alone, so it is instant and works without a network.
+   * {@link Claim.confirmed} wraps it for `status` and `doctor`, asking the
+   * server (`getProjectClaim`) only when the record names no team. `zitadel
+   * claim` reads the record the same way before it decides to skip.
    *
    * **Why cloud only.** Claiming attaches a project to a team on the platform
    * that hosts it. The cloud always has one. A local or self-hosted server has
@@ -218,9 +313,9 @@ export class Claim {
    *
    * The local record can be stale in one direction: a project claimed from
    * another machine, or a `.zitadel/secret` restored from a backup, reads as
-   * `detached` here. That is tolerable because everything downstream is
-   * advisory, and `zitadel claim` itself turns the resulting `409` into a clean
-   * skip rather than an error.
+   * `detached` here. {@link Claim.confirmed} corrects it when the server
+   * answers, `doctor --fix` writes the answer into the record, and `zitadel
+   * claim` turns the resulting `409` into a clean skip rather than an error.
    *
    * @param input - The project's secret, and whether it lives on the cloud.
    * @returns The state.

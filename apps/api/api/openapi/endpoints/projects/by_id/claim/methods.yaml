@@ -1,0 +1,54 @@
+get:
+  operationId: getProjectClaim
+  summary: Get a project's claim
+  description: |
+    Returns whether the project is claimed, and if so by which team and when.
+
+    A [claim attaches a project to a team](/docs/concepts/project-team-user#claim).
+    `zitadel status` and `zitadel doctor` call this operation to tell whether
+    to suggest `zitadel claim`, and `zitadel claim` calls it to record the
+    owning team of a project that is already claimed, so a project claimed from
+    another machine stops being reported as unclaimed.
+
+    Unlike `getProjectClaimStatus` (`GET /projects/{project_id}/claim/status`), it needs
+    no challenge: it reads the project's owning-team grant, the claim's source
+    of truth. It starts nothing and spends nothing. Authenticate with the project
+    secret.
+  tags:
+    - Projects
+  parameters:
+    - $ref: ../../../../components/parameters/project-id-path.yaml
+  security:
+    - oauth2:
+        # project.write, not project.read, for the same reason as
+        # getProjectClaimStatus: project.read is carried by the browser-plane
+        # preview secret, so it cannot gate an operator read until ADR 036
+        # splits the credential planes into distinct schemes.
+        - project.write
+  responses:
+    '200':
+      description: The project's claim.
+      content:
+        application/json:
+          schema:
+            $ref: claim-response.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '403':
+      description: The credential does not grant access to this project.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/schemas/errors/proj-permission_denied.yaml
+    '404':
+      description: Project not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    default:
+      $ref: getProjectClaim-error-response.yaml

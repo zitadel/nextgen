@@ -17398,6 +17398,45 @@ func (c *MockClaimServiceInitCall) DoAndReturn(f func(context.Context, string, s
 	return c
 }
 
+// State mocks base method.
+func (m *MockClaimService) State(ctx context.Context, projectID string) (*service.ClaimStateResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "State", ctx, projectID)
+	ret0, _ := ret[0].(*service.ClaimStateResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// State indicates an expected call of State.
+func (mr *MockClaimServiceMockRecorder) State(ctx, projectID any) *MockClaimServiceStateCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "State", reflect.TypeOf((*MockClaimService)(nil).State), ctx, projectID)
+	return &MockClaimServiceStateCall{Call: call}
+}
+
+// MockClaimServiceStateCall wrap *gomock.Call
+type MockClaimServiceStateCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockClaimServiceStateCall) Return(arg0 *service.ClaimStateResult, arg1 error) *MockClaimServiceStateCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockClaimServiceStateCall) Do(f func(context.Context, string) (*service.ClaimStateResult, error)) *MockClaimServiceStateCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockClaimServiceStateCall) DoAndReturn(f func(context.Context, string) (*service.ClaimStateResult, error)) *MockClaimServiceStateCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // Status mocks base method.
 func (m *MockClaimService) Status(ctx context.Context, projectID, challengeID, secretHash string) (*service.ClaimStatusResult, error) {
 	m.ctrl.T.Helper()

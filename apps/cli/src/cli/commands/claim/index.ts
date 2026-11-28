@@ -6,7 +6,7 @@ import { ClaimService } from "@/lib/backend";
 import { getProjectClaimStatusQueryChallengeIdRegExp } from "@/lib/backend/schemas";
 import { openInBrowser } from "@/lib/browser";
 import { Claim as ClaimWindow } from "@/lib/claim";
-import { ZitadelError } from "@/lib/errors";
+import { isCancellation, ZitadelError } from "@/lib/errors";
 import { announce, section, warnings } from "@/lib/ui";
 import { CommandGroups } from "@/cli/commands/groups";
 import type { Admitted, CommandResult, Connection } from "@/cli/core";
@@ -323,9 +323,30 @@ export default class Claim extends Telemetered(ChangeCommand) {
     const started = await claimService.start();
     switch (started.outcome) {
       case "already-claimed": {
+        const current = localRecord
+          ? await new ClaimService(
+              (await this.connect({ prompt: false, timeoutMs: ClaimWindow.CONFIRM_TIMEOUT_MS }))
+                .client,
+              projectId,
+            )
+              .current()
+              .catch((error: unknown) => {
+                if (isCancellation(error)) {
+                  throw error;
+                }
+                return undefined;
+              })
+          : undefined;
+        if (localRecord && current?.status === "claimed") {
+          await localRecord
+            .with({ claimed_at: current.claimed_at, team_id: current.team_id })
+            .write();
+        }
         return this.alreadyClaimed({
           project_id: projectId,
-          team_id: started.teamId,
+          ...(current?.status === "claimed"
+            ? { team_id: current.team_id, claimed_at: current.claimed_at }
+            : { team_id: started.teamId }),
           dashboard_url: started.dashboardUrl,
         });
       }

@@ -314,7 +314,10 @@ export type WarningFix = { check: string; action: string; command: SuggestedComm
  * command for one check is also a `fix`, which the report shows under that
  * check's row instead of among the next steps.
  *
- * The claim check classifies the window (details.claimable); absent or
+ * A claim the server confirmed but `.zitadel/secret` does not record
+ * (details.recorded is false) is repaired by `--fix`, which writes it down, so
+ * it suggests that rather than the claim command. Otherwise the claim check
+ * classifies the window (details.claimable); absent or
  * malformed details mean "not closed". Once it looks
  * closed the advisory switches to reconciliation wording, but the claim
  * command stays suggested either way: the local record can be stale (claimed
@@ -368,7 +371,17 @@ export function advisoryForWarnings(
   const claimWarning = warnings.find((check) => {
     return check.name === "claim";
   });
-  if (claimWarning) {
+  const claimUnrecorded =
+    typeof claimWarning?.details === "object" &&
+    claimWarning.details !== null &&
+    (claimWarning.details as { recorded?: unknown }).recorded === false;
+  if (claimUnrecorded) {
+    fix(
+      "claim",
+      "Record the owning team the server confirmed in .zitadel/secret, so status and doctor know it offline.",
+      again.repair,
+    );
+  } else if (claimWarning) {
     if (local === undefined) {
       nextActions.push(
         `Claim this project with ${suggest({ id: "claim" })} once .env.development.local sets ZITADEL_PROJECT_ID and ZITADEL_PROJECT_SECRET to the project in .zitadel/secret; until then claim would resolve a different project.`,

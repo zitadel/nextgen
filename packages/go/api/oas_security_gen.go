@@ -146,6 +146,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetProjectOperation: []string{
 		"project.write",
 	},
+	GetProjectClaimOperation: []string{
+		"project.write",
+	},
 	GetProjectClaimStatusOperation: []string{
 		"project.write",
 	},

@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { http, HttpResponse } from "msw";
+import { describe, expect } from "vitest";
 
 import { Claim } from "@/lib/claim";
+import { ZitadelError } from "@/lib/errors";
+import { it } from "@tests/fixtures";
 import { aSuggest } from "@tests/helpers/suggestions";
 
 /** A run that named no environment, so its suggestions carry no selector. */
@@ -76,6 +79,131 @@ describe("claim state", () => {
   it("is not applicable off the cloud, attached or not", () => {
     expect(claimState({ secret: DETACHED, cloud: false })).toEqual({ kind: "not-applicable" });
     expect(claimState({ secret: ATTACHED, cloud: false })).toEqual({ kind: "not-applicable" });
+  });
+});
+
+/** The credential and server {@link Claim.confirmed} asks with. */
+const REMOTE = {
+  server: "https://preview.zitadel.com",
+  secret: { project_id: "proj-001", project_secret: "sk_proj_test" },
+} as const;
+
+/** A claimed answer from the server, for a project the record calls unclaimed. */
+const CLAIMED = { status: "claimed", team_id: "team-002", claimed_at: "2026-01-03T00:00:00Z" };
+
+describe("confirmed claim state", () => {
+  it("takes the server's owning team over a record that says unclaimed", async ({ server }) => {
+    server.use(
+      http.get("*/projects/proj-001/claim", () => {
+        return HttpResponse.json(CLAIMED);
+      }),
+    );
+
+    const state = await Claim.confirmed({
+      ...REMOTE,
+      cloud: true,
+      signal: new AbortController().signal,
+    });
+
+    expect(state).toEqual({
+      kind: "attached",
+      team_id: "team-002",
+      claimed_at: "2026-01-03T00:00:00Z",
+      recorded: false,
+    });
+  });
+
+  it("keeps the record when the server says unclaimed", async ({ server }) => {
+    server.use(
+      http.get("*/projects/proj-001/claim", () => {
+        return HttpResponse.json({ status: "unclaimed" });
+      }),
+    );
+
+    const state = await Claim.confirmed({
+      ...REMOTE,
+      cloud: true,
+      signal: new AbortController().signal,
+    });
+
+    expect(state).toEqual({ kind: "detached", claimable: true });
+  });
+
+  it.for([
+    ["refuses the secret", () => HttpResponse.json({ code: "auth.unauthorized" }, { status: 401 })],
+    ["cannot be reached", () => HttpResponse.error()],
+  ] as const)("keeps the record when the server %s", async ([, answer], { server }) => {
+    server.use(http.get("*/projects/proj-001/claim", answer));
+
+    const state = await Claim.confirmed({
+      ...REMOTE,
+      cloud: true,
+      signal: new AbortController().signal,
+    });
+
+    expect(state).toEqual({ kind: "detached", claimable: true });
+  });
+
+  it("keeps an attached record whatever the server would say", async ({ server }) => {
+    server.use(
+      http.get("*/projects/proj-001/claim", () => {
+        return HttpResponse.json({ status: "unclaimed" });
+      }),
+    );
+
+    const state = await Claim.confirmed({
+      ...REMOTE,
+      secret: { ...REMOTE.secret, ...ATTACHED },
+      cloud: true,
+      signal: new AbortController().signal,
+    });
+
+    expect(state).toEqual({ kind: "attached", ...ATTACHED });
+  });
+
+  it("stays not applicable off the cloud, whatever the server would say", async ({ server }) => {
+    server.use(
+      http.get("*/projects/proj-001/claim", () => {
+        return HttpResponse.json(CLAIMED);
+      }),
+    );
+
+    const state = await Claim.confirmed({
+      ...REMOTE,
+      cloud: false,
+      signal: new AbortController().signal,
+    });
+
+    expect(state).toEqual({ kind: "not-applicable" });
+  });
+
+  it.for(["http://preview.zitadel.com", "https://preview.zitadel.com:8443"])(
+    "asks nothing of %s, keeping the record",
+    async (server, { server: msw }) => {
+      msw.use(
+        http.get("*/projects/proj-001/claim", () => {
+          return HttpResponse.json(CLAIMED);
+        }),
+      );
+
+      const state = await Claim.confirmed({
+        ...REMOTE,
+        server,
+        cloud: true,
+        signal: new AbortController().signal,
+      });
+
+      expect(state).toEqual({ kind: "detached", claimable: true });
+    },
+  );
+
+  it("stops when the run is cancelled, rather than guessing", async () => {
+    const cancelled = new AbortController();
+    cancelled.abort(new ZitadelError("E_CANCELLED", "cancelled"));
+
+    await expect(
+      Claim.confirmed({ ...REMOTE, cloud: true, signal: cancelled.signal }),
+    ).rejects.toMatchObject({ code: "E_CANCELLED" });
   });
 });
 
