@@ -188,6 +188,28 @@ describe("the next steps of a normal command", () => {
   });
 });
 
+describe("where a normal command's ending opens", () => {
+  const RELEASED = "Release r1 is now live.";
+  const opening = (summary: Partial<Summary>): string =>
+    plain(
+      new Ending({ title: "Done", sections: [], ...summary }, nowhere, "plain").renderStandalone(),
+    );
+
+  it("is right under what the command wrote when its answer comes first", () => {
+    expect(opening({ lines: [RELEASED] }).startsWith(RELEASED)).toBe(true);
+  });
+
+  it.each([
+    ["an answer", { lines: [RELEASED] }, RELEASED],
+    ["a failure", { title: "Deploy failed", failed: true }, "Deploy failed"],
+  ] as const)(
+    "is a blank line above %s set apart from a block of text",
+    (_what, summary, first) => {
+      expect(opening({ ...summary, apart: true }).startsWith(`\n${first}`)).toBe(true);
+    },
+  );
+});
+
 describe("what a long failure looks like under its closing line", () => {
   // Outside a frame nothing is widened by a wide line, so a table the command
   // was asked for keeps its columns however wide they are.

@@ -53,6 +53,8 @@ export class Ui {
   private readonly printer: LogPrinter;
   /** Whether a command took its own ending away as text ({@link ending}). */
   private handedOver = false;
+  /** Whether the run drew a block of text its ending opens apart from ({@link drewABlock}). */
+  private apart = false;
 
   /**
    * Questions answered from a session instead of from a run's audience, for
@@ -234,9 +236,18 @@ export class Ui {
     return this.chain.spinner(label, options);
   }
 
+  /**
+   * Records that the run drew a block of text, such as a diff, so that the
+   * ending a normal command closes on opens on a blank line under it
+   * ({@link Summary.apart}). The base command calls it, having drawn the block.
+   */
+  drewABlock(): void {
+    this.apart = true;
+  }
+
   /** Closes the chain on its summary. A command does not call this; the base command does. */
   finish(summary: Summary): void {
-    this.chain.finish(summary);
+    this.chain.finish(this.spaced(summary));
   }
 
   /**
@@ -260,6 +271,11 @@ export class Ui {
    * an answer, stderr for a failure — so that `--json` stays one envelope.
    */
   written(summary: Summary): string {
-    return this.chain.written(summary);
+    return this.chain.written(this.spaced(summary));
+  }
+
+  /** The summary, set apart from a block the run drew above it, if it drew one. */
+  private spaced(summary: Summary): Summary {
+    return this.apart ? { ...summary, apart: true } : summary;
   }
 }

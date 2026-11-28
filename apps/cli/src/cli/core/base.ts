@@ -488,7 +488,8 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
    *
    * A pipe is given none of the narration, so the text comes back as the lines
    * a result carries for that reader. On a terminal it has just been drawn, so
-   * nothing comes back and a result that ends on it does not show it twice.
+   * nothing comes back and a result that ends on it does not show it twice;
+   * the ending opens on a blank line instead, so it is not read as part of it.
    *
    * @param notices - The text, each notice ending in its own newlines.
    * @returns The notices as result lines, a blank line between two, or none on
@@ -502,6 +503,9 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
       this.info(notice);
     }
     if (Output.screen) {
+      if (said.length > 0) {
+        this.ui.drewABlock();
+      }
       return [];
     }
 

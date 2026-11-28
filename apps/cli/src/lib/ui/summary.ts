@@ -54,6 +54,12 @@ export type Summary = {
   readonly lines?: readonly string[];
   /** What the command adds after its rendering, such as `Resolved now: …`. */
   readonly extras?: readonly string[];
+  /**
+   * Open a normal command's ending on a blank line, apart from a block of text
+   * the run drew above it, such as the diff a deploy is about to make, so what
+   * it ends on does not read as the block's last line.
+   */
+  readonly apart?: boolean;
   /** What to do next, each step a sentence and the commands it asks for. */
   readonly next?: readonly BoxAction[];
   /**
