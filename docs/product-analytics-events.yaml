@@ -74,8 +74,18 @@ properties:
     description: The kind of page; on a modal, the page it was opened from.
   tab:
     type: string
-    values: [sign_in_methods, identity_providers, overview, authentication, active, deactivated]
-    description: The selected tab, on pages with tracked tabs.
+    values:
+      - sign_in_methods
+      - identity_providers
+      - overview
+      - authentication
+      - active
+      - deactivated
+      - with_agent
+      - in_terminal
+    description: >-
+      The selected tab, on pages with tracked tabs; `with_agent` and
+      `in_terminal` are the website front page's start window.
   placement:
     type: string
     values: [header, hero, showcase, try_it, closing, footer]
@@ -130,6 +140,7 @@ properties:
     type: string
     values:
       - all
+      - ask
       - start
       - setup
       - dev
@@ -154,8 +165,9 @@ properties:
       `grant_create`, `grant_delete`, `members` for `api listProjectMembers`,
       `event_list` for any `event list`, `auth_method` for any `auth-method`
       command, `idp_list`, `user_list`, `invitation_create`), `dev` for the
-      app's dev server, `skills` for the coding agents' skills, or `all` for
-      a whole block of commands.
+      app's dev server, `skills` for the coding agents' skills, `ask` for the
+      ask that has your agent add sign-in, or `all` for a whole block of
+      commands.
 
   # Journeys and actions
   flow:
@@ -826,6 +838,13 @@ components:
           walkthrough's quickstart and GitHub, or the header's Get started.
         destinations: [vercel]
         properties: [page, target, placement]
+      selected_tab:
+        status: emitted
+        trigger: >-
+          A tab of the front page's start window is chosen: with your agent,
+          or in your terminal.
+        destinations: [vercel]
+        properties: [page, tab, placement]
 
   docs:
     source: apps/docs

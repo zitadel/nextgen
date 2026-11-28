@@ -6,13 +6,15 @@ changelog at `/changelog`, with a page per entry and a feed under it, and the
 guide to choosing it or Zitadel v4 at `/choose-version`.
 Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
-- The front page leads with the quickstart, then shows what is in it, and
-  nothing else: the hero (title, the sentence of `app/message.ts`, the
-  capabilities to turn on, the quickstart's numbered commands, the skills
-  command, Start in our cloud and Run it yourself), What you get (the
-  features by group, each with a window), What your agent runs (a row per
-  phase with its first ask), You decide (beside the change history), and a
-  closing band with both ways to start and Talk to us.
+- The front page says your agent can do the auth work and shows how, in
+  this order and nothing else: the hero (title, line, the asks it takes, the
+  start window with your agent's tab first, Start in our cloud and Run it
+  yourself), the work (each phase's first exchange, linking its page), What
+  your agent can turn on (the features by group, each with a window and its
+  page), You stay in charge (beside the change history), the questions, and
+  a closing band with both ways to start and Talk to us.
+- What Zitadel Next is lives in `app/message.ts`: the description, the share
+  image, `/llms.txt` and the first question's answer, not the hero's line.
 - A front-page window renders what another page shows, from the same data or
   component, never a copy: a feature's is its Under the hood
   (`app/hoods.tsx`), Sign-in's the live login.
@@ -100,14 +102,16 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 - `layout.tsx` imports the share image (`app/og.jpg`) and sets no
   `metadataBase`: on Vercel, Next makes its URL absolute with the deployment's
   host. Render it from `scripts/og.html` at 1200×630 as a JPEG (quality 88),
-  and change both when the hero's title, line or commands change.
+  and change both when the hero's title, `app/message.ts`'s sentence or the
+  quickstart's commands change.
 
 ## The commands and the showcase
 
-- `app/commands.ts` holds every command the site shows. Its `quickstart`, in
-  the hero and on `/get-started`, follows the README's quick start; never add
-  `--force`. When that journey changes, change the commands and the
-  showcase, and run them once against the published CLI.
+- `app/commands.ts` holds every command and ask the site shows. Its
+  `quickstart`, on `/get-started` and in the hero's terminal tab, follows the
+  README's quick start; never add `--force`. When that journey changes,
+  change the commands and the showcase, and run them once against the
+  published CLI.
 - Steps 1 to 4 replay a recorded session (`app/showcase/sessions.ts`).
   Re-record rather than edit when what the CLI prints, the files setup writes
   or the flow format change.

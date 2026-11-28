@@ -1,14 +1,23 @@
 import type { CSSProperties } from "react";
-import { ChangeHistory, QuickstartCommands, SkillsLine } from "./blocks";
+import { AskTeaser } from "./ask-teaser";
+import { ChangeHistory, type Question, Questions, Transcript } from "./blocks";
 import { Capabilities } from "./capabilities";
-import { CapabilityStrip, StartButtons } from "./cta";
+import { appPath } from "./commands";
+import { StartButtons } from "./cta";
 import { HISTORY } from "./get-started/history";
-import { SENTENCE } from "./message";
+import { ANSWER } from "./message";
 import { PHASES, phasePath } from "./phases";
 import { PLATFORM } from "./platform";
-import { Part, PointList, TitleRows, TopLight } from "./sections";
+import { Part, PointList, TopLight, Unbroken } from "./sections";
 import { SiteFooter } from "./site-footer";
 import { SiteHeader } from "./site-header";
+import { StartWindow } from "./start-window";
+
+// The line under the title: what you ask, and what you keep. What Zitadel
+// Next is, in the message house's words, is the site's description
+// (message.ts).
+const LINE =
+  "Ask the agent you already use for passkeys, single sign-on or a new role. It sets them up in your app and in Zitadel, and you review every change before it goes live.";
 
 // What stays yours, whatever your agent runs (LICENSING.md for the licenses).
 const DECIDE = [
@@ -16,6 +25,37 @@ const DECIDE = [
   "Each change names who made it: a person, or an agent acting for one.",
   "You can roll back to the release before.",
   "It's open source: the server under AGPL-3.0, the SDKs under MIT. Run it in our cloud or on your servers.",
+];
+
+// The questions, word for word from the message house; the first answers
+// with what Zitadel Next is (message.ts).
+const QUESTIONS: readonly Question[] = [
+  { question: "What is Zitadel Next?", answer: ANSWER },
+  {
+    question: "Does Zitadel have its own AI agent?",
+    answer:
+      "No. It opens every part of auth to the agent you already use, and that agent acts with your permissions. Every change it makes names it.",
+  },
+  {
+    question: "Can a coding agent set up sign-in with it?",
+    answer:
+      "Yes. Your agent adds sign-in to your app and changes every setting, and you review each change.",
+  },
+  {
+    question: "How do the agents in my product get identity?",
+    answer:
+      "Each signs in as itself and acts for a user only with that user's consent. Every action names both.",
+  },
+  {
+    question: "Is it open source?",
+    answer:
+      "Yes. The server is AGPL-3.0, and the SDKs and client libraries are MIT. It runs in Zitadel Cloud or on your servers.",
+  },
+  {
+    question: "How is it different from Auth0?",
+    answer:
+      "It is open source and self-hostable, multi-tenant, and the agent you already use can run every part of it.",
+  },
 ];
 
 // The closing title in the hero's colors: Zitadel's orange to the green.
@@ -50,11 +90,11 @@ function MoreLink({ href, children }: { href: string; children: string }) {
   );
 }
 
-// The front page leads with the quickstart, then shows what is in it
-// (AGENTS.md): what it is and its commands with the ways to start, the
-// features with what each looks like, what your agent runs in each phase,
-// what you decide, and the ways to start again at its end. The quickstart's
-// walkthrough is /get-started.
+// The front page says your agent can do the auth work and shows how
+// (AGENTS.md): the asks it takes and how to start, agent first; the work of
+// each phase; the features, each with a window and its page; what stays
+// yours; the questions; and the ways to start again at its end. The
+// quickstart's walkthrough is /get-started.
 export default function Home() {
   return (
     <>
@@ -75,45 +115,53 @@ export default function Home() {
               </span>
             </h1>
             <p className="hero-lede teaser mt-5 text-balance text-center text-base text-text-secondary leading-7 md:text-lg md:leading-8">
-              {SENTENCE}
+              <Unbroken text={LINE} />
             </p>
           </div>
           <div className="teaser mt-8 flex w-full flex-col items-center gap-6">
-            <CapabilityStrip className="w-full max-w-3xl" />
+            <AskTeaser className="w-full max-w-3xl" />
             <div className="w-full max-w-3xl">
-              <QuickstartCommands placement="hero" />
+              <StartWindow placement="hero" />
             </div>
-            <SkillsLine placement="hero" className="text-balance text-center text-sm" />
             <StartButtons placement="hero" />
           </div>
         </section>
 
-        <Part id="what-you-get" title="What you get">
+        <Part id="the-work" title="From first sign-in to the audit, your agent does the work.">
+          <div className="max-w-3xl">
+            <Transcript
+              title={appPath}
+              exchanges={PHASES.map(({ slug, short, asks }) => ({
+                ...asks[0],
+                tag: short,
+                link: { href: phasePath(slug), label: `How ${short} works` },
+              }))}
+            />
+          </div>
+        </Part>
+
+        <Part
+          id="what-you-get"
+          title="What your agent can turn on."
+          line="Each piece has its own page with the details."
+        >
           <div className="flex flex-col items-start gap-8">
             <div className="w-full">
               <Capabilities />
             </div>
-            <MoreLink href={PLATFORM.path}>All of the platform</MoreLink>
+            <MoreLink href={PLATFORM.path}>See every feature</MoreLink>
           </div>
         </Part>
 
-        <Part id="what-your-agent-runs" title="What your agent runs">
-          <TitleRows
-            rows={PHASES.map(({ slug, short, title, line, asks }) => ({
-              label: short,
-              title,
-              line,
-              ask: asks[0].ask,
-              href: phasePath(slug),
-            }))}
-          />
-        </Part>
-
-        <Part id="you-decide" title="You decide">
+        <Part id="in-charge" title="You stay in charge.">
           <div className="grid items-start gap-8 lg:grid-cols-2 lg:gap-14">
             <PointList points={DECIDE} />
             <ChangeHistory changes={HISTORY} />
           </div>
+        </Part>
+
+        <Part id="questions" title="Questions">
+          <Questions questions={QUESTIONS} />
         </Part>
 
         <section

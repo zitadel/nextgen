@@ -21,6 +21,11 @@ export type Feature = {
   group: FeatureGroup;
   /** Its name in the Platform menu. */
   name: string;
+  /**
+   * The words people search for it, as in a sentence: over its title on the
+   * front page, and in the link to its page there.
+   */
+  keywords: string;
   /** The page's H1. */
   title: string;
   /** The line under it. */
@@ -52,6 +57,7 @@ export const FEATURES: readonly Feature[] = [
     slug: "sign-in",
     group: "Sign-in",
     name: "Sign-in",
+    keywords: "passkeys and passwords",
     title: "Sign-in your users finish.",
     line: "Passkeys, passwords and the accounts people already have, on screens in your app.",
     metaTitle: "Authentication with passkeys, passwords and social sign-in — Zitadel",
@@ -64,6 +70,7 @@ export const FEATURES: readonly Feature[] = [
     slug: "login-ui",
     group: "Sign-in",
     name: "Login UI",
+    keywords: "login UI components",
     title: "Your login, in your code.",
     line: "The screens live in your app and take your brand. Change a field or a step like any other code.",
     metaTitle: "Login UI components for your app — Zitadel",
@@ -76,6 +83,7 @@ export const FEATURES: readonly Feature[] = [
     slug: "single-sign-on",
     group: "Sign-in",
     name: "Single sign-on",
+    keywords: "single sign-on (SSO)",
     title: "Let every customer bring their own sign-in.",
     line: "Connect a customer's identity provider, and their people sign in with their work accounts.",
     metaTitle: "Single sign-on (SSO) for B2B apps — Zitadel",
@@ -88,6 +96,7 @@ export const FEATURES: readonly Feature[] = [
     slug: "identity-providers",
     group: "Sign-in",
     name: "Identity providers",
+    keywords: "social login and OpenID Connect",
     title: "Sign in with the accounts people already have.",
     line: "Google or any OpenID Connect provider, added in one change.",
     metaTitle: "Identity federation with any OpenID Connect provider — Zitadel",
@@ -100,6 +109,7 @@ export const FEATURES: readonly Feature[] = [
     slug: "permissions",
     group: "Access",
     name: "Permissions",
+    keywords: "roles and permissions",
     title: "Decide who can do what.",
     line: "Write access rules your team can read, and every call is checked against them.",
     metaTitle: "Authorization with roles and fine-grained permissions — Zitadel",
@@ -112,6 +122,7 @@ export const FEATURES: readonly Feature[] = [
     slug: "agents",
     group: "Access",
     name: "Agents",
+    keywords: "agent identity and MCP",
     title: "Give the agents you ship their own identity.",
     line: "Each agent signs in as itself and acts for your users only with their consent. Every action names both.",
     metaTitle: "Auth for AI agents and MCP servers — Zitadel",
@@ -124,6 +135,7 @@ export const FEATURES: readonly Feature[] = [
     slug: "users",
     group: "Access",
     name: "Users",
+    keywords: "user management",
     title: "Your user model, your fields.",
     line: "Describe the fields you need, and sign-up asks for them. Invite people, or bring them over from the system you run today.",
     metaTitle: "User management with custom fields — Zitadel",

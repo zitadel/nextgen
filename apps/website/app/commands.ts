@@ -2,11 +2,11 @@
 // it and the docs' quickstart without its optional `doctor` (AGENTS.md), in a
 // new folder for the app: start, setup for a Next.js app, the app's dev
 // server. The session the showcase was recorded from (showcase/sessions.ts)
-// ran the same, with `doctor` first. The front page's hero and /get-started's
-// walkthrough show them as numbered steps (`quickstart`), with the folder as
-// their terminal's title, and the showcase's first two steps start and setup;
-// /llms.txt hands them to agents after the folder's command; the footer
-// offers start.
+// ran the same, with `doctor` first. /get-started's walkthrough and the
+// front page's start window, in its terminal tab, show them as numbered steps
+// (`quickstart`), with the folder as their terminal's title, and the
+// showcase's first two steps start and setup; /llms.txt hands them to agents
+// after the folder's command; the footer offers start.
 export const appFolder = "myapp";
 // The folder as the windows' title bars show it.
 export const appPath = `~/${appFolder}`;
@@ -34,6 +34,17 @@ export const deployCommand = "npx @zitadel/cli@latest deploy";
 // (README.md): the router skill, the CLI's, and one per framework SDK and
 // component.
 export const skillsCommand = "npx skills add zitadel/nextgen --full-depth";
+
+// The ask that has your agent add sign-in once it has the skills, as a
+// person types it to the agent.
+export const signInAsk = "Add sign-in to my app.";
+
+// The quickstart with your agent, the front page's start window's first tab:
+// the skills, then the ask (`ask`, at the agent's prompt, not the shell's).
+export const agentQuickstart = [
+  { label: "Give your agent Zitadel's skills", command: skillsCommand },
+  { label: "Ask it", command: signInAsk, ask: true },
+] as const;
 
 // What the phase pages' Try it offers, as the docs and the CLI skill
 // (apps/cli/skills/zitadel-cli/SKILL.md) spell each command; a placeholder in

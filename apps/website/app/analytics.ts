@@ -20,6 +20,7 @@ import {
   policyTestCommand,
   rollbackCommand,
   setupCommand,
+  signInAsk,
   skillsCommand,
   startCommand,
   userEventsCommand,
@@ -29,7 +30,8 @@ import {
 
 // The website's custom events in Vercel Web Analytics, as
 // docs/product-analytics-events.yaml defines them: what page views cannot
-// show, a command copied and a call to action followed. The <Analytics /> of
+// show, a command copied, a call to action followed and a tab chosen. The
+// <Analytics /> of
 // layout.tsx sends them in production and logs them in development. They go
 // from the browser like the page views, so a blocker drops a visitor from
 // both and the ratios between them hold.
@@ -62,13 +64,17 @@ export type Target =
   | "agents"
   | "investigate";
 
+/** A tab of the front page's start window: with your agent, or in your terminal. */
+export type Tab = "with_agent" | "in_terminal";
+
 /**
  * What a copy button copied, never its text: `all` is a whole block of
  * commands, `event_list` any `event list` a page offers, `auth_method` any
- * `auth-method` command.
+ * `auth-method` command, `ask` the ask for your agent.
  */
 export type Snippet =
   | "all"
+  | "ask"
   | "start"
   | "setup"
   | "dev"
@@ -94,6 +100,7 @@ const SNIPPETS = new Map<string, Snippet>([
   [dryRunCommand, "dry_run"],
   [deployCommand, "deploy"],
   [skillsCommand, "skills"],
+  [signInAsk, "ask"],
   [policyTestCommand, "policy_test"],
   [rollbackCommand, "rollback"],
   [grantListCommand, "grant_list"],
@@ -122,6 +129,7 @@ export function snippetOf(command: string): Snippet | undefined {
 type Events = {
   copied_command: { snippet: Snippet; placement: Placement };
   clicked_link: { target: Target; placement: Placement };
+  selected_tab: { tab: Tab; placement: Placement };
 };
 
 /**

@@ -24,7 +24,8 @@ export function Words({ text }: { text: string }) {
  * (terminal-card.tsx); `end` adds a control before the copy button, and
  * `pinned` shows the copy button always, for a list of steps to copy one by
  * one. `placement` is where the line sits, which a copy reports
- * (analytics.ts).
+ * (analytics.ts). With `ask`, it is an ask at your agent's prompt (›), not a
+ * command at the shell's.
  */
 export function CommandLine({
   command,
@@ -32,19 +33,21 @@ export function CommandLine({
   children,
   end,
   pinned = false,
+  ask = false,
 }: {
   command: string;
   placement: Placement;
   children?: ReactNode;
   end?: ReactNode;
   pinned?: boolean;
+  ask?: boolean;
 }) {
   const snippet = snippetOf(command);
   return (
     <div className="group -mx-2 flex items-start gap-2 rounded-md px-2 transition-colors hover:bg-tint/[0.04]">
       <span className="flex-1 pl-[2ch] -indent-[2ch] text-text-primary">
         <span aria-hidden="true" className="select-none text-text-accent">
-          {"$ "}
+          {ask ? "› " : "$ "}
         </span>
         {children ?? <Words text={command} />}
       </span>

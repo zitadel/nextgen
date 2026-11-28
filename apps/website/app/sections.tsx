@@ -15,7 +15,7 @@ export function TopLight() {
 }
 
 /** Text with each hyphenated word on one line, so a phone never breaks it at "sign-in". */
-function Unbroken({ text }: { text: string }) {
+export function Unbroken({ text }: { text: string }) {
   return text.split(/(\S*-\S*)/).map((part, index) =>
     part.includes("-") ? (
       // biome-ignore lint/suspicious/noArrayIndexKey: the parts of a fixed text, never reordered

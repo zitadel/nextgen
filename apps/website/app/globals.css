@@ -180,8 +180,8 @@
       animation: caption-in 1.4s var(--ease) both;
     }
 
-    /* The hero's line, its commands and its ways to start (page.tsx), soon
-       after: the commands are what a visitor came to copy. */
+    /* The hero's line, its asks, its start window and its ways to start
+       (page.tsx), soon after. */
     .teaser {
       animation: teaser-in 1s var(--ease) 0.25s both;
     }

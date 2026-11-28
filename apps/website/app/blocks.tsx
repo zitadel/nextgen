@@ -8,32 +8,36 @@ import { WINDOW_FOOTER, WINDOW_INSET, Window } from "./window";
 
 // What the front page and the phase and feature pages (phase-page.tsx,
 // feature-page.tsx) show: in windows, a person asking their agent, the
-// changes and events that name who acted, a file and commands to copy as
-// numbered steps; the line for coding agents; and the questions with their
-// FAQPage data. All in the page's neutral inks: a brand color never marks who
-// acted or what is current (AGENTS.md).
+// changes and events that name who acted, a file and steps to copy; the line
+// for coding agents; and the questions with their FAQPage data. All in the
+// page's neutral inks: a brand color never marks who acted or what is
+// current (AGENTS.md).
 
 export type { Exchange };
 
 /**
- * A person asking their coding agent, and its replies, in a terminal window:
- * each ask at its prompt, the reply under it.
+ * An exchange of a transcript; on the front page with the phase it belongs
+ * to as `tag` and a `link` to that phase's page.
  */
-export function Transcript({
-  title,
-  exchanges,
-}: {
-  title: string;
-  exchanges: readonly Exchange[];
-}) {
+export type Entry = Exchange & { tag?: string; link?: { href: string; label: string } };
+
+/**
+ * A person asking their coding agent, and its replies, in a terminal window:
+ * each ask at its prompt, the reply under it; a tag over the ask and a link
+ * under the reply where the entry has them.
+ */
+export function Transcript({ title, exchanges }: { title: string; exchanges: readonly Entry[] }) {
   return (
     <Window title={title}>
       <ol className={`flex flex-col gap-7 py-6 md:py-8 ${WINDOW_INSET}`}>
-        {exchanges.map(({ ask, reply }) => (
+        {exchanges.map(({ ask, reply, tag, link }) => (
           <li key={ask} className="grid grid-cols-[1ch_minmax(0,1fr)] gap-x-3 gap-y-2">
+            {tag && (
+              <p className="col-start-2 font-mono text-text-muted text-xs leading-4">{tag}</p>
+            )}
             <span
               aria-hidden="true"
-              className="select-none font-mono text-[0.8125rem] text-text-accent leading-6"
+              className="col-start-1 select-none font-mono text-[0.8125rem] text-text-accent leading-6"
             >
               &gt;
             </span>
@@ -49,6 +53,28 @@ export function Transcript({
               <span className="sr-only">Your agent: </span>
               {reply}
             </p>
+            {link && (
+              <a
+                href={link.href}
+                className="group col-start-2 inline-flex w-fit items-center gap-1.5 text-sm text-text-secondary leading-6 transition-colors hover:text-text-primary"
+              >
+                {link.label}
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  className="size-3.5 transition-transform group-hover:translate-x-0.5"
+                >
+                  <path
+                    d="M3 8h10M9 4l4 4-4 4"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </a>
+            )}
           </li>
         ))}
       </ol>
@@ -117,14 +143,56 @@ export function CodeFile({ title, code }: { title: string; code: string }) {
   );
 }
 
-export type Step = { label: string; command: string };
+/** A step: what it does, and its command, or with `ask` what to ask your agent. */
+export type Step = { label: string; command: string; ask?: boolean };
 
 /**
- * Commands as numbered steps, each with what it does and a copy button that
- * always shows; without `numbered`, commands to pick from, each marked with
- * a dot. `copyAll` adds one button in the title bar for a sequence
- * run in order; `note` is the one prerequisite, `footer` a line under the
- * steps, and `placement` where the block sits (analytics.ts).
+ * Steps, each with what it does and its line with a copy button that always
+ * shows: numbered, or without `numbered` marked with a dot, as commands to
+ * pick from. `placement` is where they sit (analytics.ts).
+ */
+export function StepList({
+  steps,
+  placement,
+  numbered = true,
+}: {
+  steps: readonly Step[];
+  placement: Placement;
+  numbered?: boolean;
+}) {
+  const List = numbered ? "ol" : "ul";
+  return (
+    <List className={`flex flex-col gap-5 py-5 md:py-6 ${WINDOW_INSET}`}>
+      {steps.map(({ label, command, ask }, index) => (
+        <li key={command} className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-3 gap-y-1">
+          {numbered ? (
+            <span
+              aria-hidden="true"
+              className="flex size-6 items-center justify-center rounded-full border border-window-border font-mono text-[0.6875rem] text-text-secondary"
+            >
+              {index + 1}
+            </span>
+          ) : (
+            <span
+              aria-hidden="true"
+              className="size-1.5 self-center justify-self-center rounded-full bg-text-muted"
+            />
+          )}
+          <p className="self-center text-sm text-text-primary leading-6">{label}</p>
+          <div className="col-start-2 font-mono text-xs leading-6 md:text-[0.8125rem]">
+            <CommandLine command={command} placement={placement} pinned ask={ask} />
+          </div>
+        </li>
+      ))}
+    </List>
+  );
+}
+
+/**
+ * Commands as numbered steps in a window (StepList); without `numbered`,
+ * commands to pick from. `copyAll` adds one button in the title bar for a
+ * sequence run in order; `note` is the one prerequisite, `footer` a line
+ * under the steps, and `placement` where the block sits (analytics.ts).
  */
 export function NumberedCommands({
   title,
@@ -143,7 +211,6 @@ export function NumberedCommands({
   copyAll?: boolean;
   footer?: ReactNode;
 }) {
-  const List = numbered ? "ol" : "ul";
   return (
     <Window
       title={title}
@@ -163,29 +230,7 @@ export function NumberedCommands({
         )
       }
     >
-      <List className={`flex flex-col gap-5 py-5 md:py-6 ${WINDOW_INSET}`}>
-        {steps.map(({ label, command }, index) => (
-          <li key={command} className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-3 gap-y-1">
-            {numbered ? (
-              <span
-                aria-hidden="true"
-                className="flex size-6 items-center justify-center rounded-full border border-window-border font-mono text-[0.6875rem] text-text-secondary"
-              >
-                {index + 1}
-              </span>
-            ) : (
-              <span
-                aria-hidden="true"
-                className="size-1.5 self-center justify-self-center rounded-full bg-text-muted"
-              />
-            )}
-            <p className="self-center text-sm text-text-primary leading-6">{label}</p>
-            <div className="col-start-2 font-mono text-xs leading-6 md:text-[0.8125rem]">
-              <CommandLine command={command} placement={placement} pinned />
-            </div>
-          </li>
-        ))}
-      </List>
+      <StepList steps={steps} placement={placement} numbered={numbered} />
       {footer && <div className={`${WINDOW_FOOTER} px-5 py-2.5`}>{footer}</div>}
     </Window>
   );
@@ -193,9 +238,10 @@ export function NumberedCommands({
 
 /**
  * The quickstart's commands as numbered steps (commands.ts), in the app's
- * folder, with the one prerequisite and a button that copies them all: the
- * front page's hero and /get-started's walkthrough, where `footer` adds the
- * line for coding agents. `placement` is where it sits (analytics.ts).
+ * folder, with the one prerequisite and a button that copies them all:
+ * /get-started's walkthrough, where `footer` adds the line for coding agents.
+ * The front page's start window shows the same steps in its terminal tab
+ * (start-window.tsx). `placement` is where it sits (analytics.ts).
  */
 export function QuickstartCommands({
   placement,
