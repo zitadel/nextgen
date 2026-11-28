@@ -1,15 +1,19 @@
-// What Zitadel Next is, word for word from the message house: the site's
-// description for search engines and shares (layout.tsx), the summary of
-// /llms.txt and the share image (scripts/og.html) say it as `SENTENCE`, and
-// the first of the questions answers with it (`ANSWER`). Say "your agent" or
-// "the agent you already use", never "agents" alone: Zitadel ships no agent
-// of its own.
+// What Zitadel Next is, word for word from the message house: the summary of
+// /llms.txt, the share image (scripts/og.html) and the front page's closing
+// band say it as `SENTENCE`, and the first of the questions answers with it
+// (`ANSWER`). Say "your agent" or "the agent you already use", never
+// "agents" alone: Zitadel ships no agent of its own.
 const WHAT =
   "open-source auth platform your agent can run: the agent you already use sets up and changes every part, from the login screens to every policy.";
 
 export const SENTENCE = `Zitadel Next is the ${WHAT}`;
 
 export const ANSWER = `The ${WHAT}`;
+
+// The front page's description for search engines and shares (layout.tsx):
+// what it does and for which stacks, in the words people search with.
+export const DESCRIPTION =
+  "Open-source auth your agent sets up and runs: passkeys, SSO, SCIM, OAuth and agent identity for Next.js, Nuxt, SvelteKit and more. Self-host it or use our cloud.";
 
 // The questions about Zitadel Next as a whole, word for word from the message
 // house, which /llms.txt answers. The phase and feature pages keep their own.

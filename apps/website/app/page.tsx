@@ -11,7 +11,9 @@ import { DATE } from "./changelog/entry";
 import { CommandWords } from "./command-line";
 import { dryRunCommand, rollbackCommand } from "./commands";
 import { StartButtons } from "./cta";
+import { worksWith } from "./frameworks";
 import { links } from "./links";
+import { SENTENCE } from "./message";
 import { PHASES, type PhaseSlug, phasePath } from "./phases";
 import { PLATFORM } from "./platform";
 import { Part, Unbroken } from "./sections";
@@ -26,7 +28,7 @@ import { StartWindow } from "./start-window";
 const FOR = [
   {
     who: "For your coding agent",
-    what: "Set up sign-in through Zitadel's CLI, MCP and skills.",
+    what: "Set up sign-in with Zitadel's CLI and skills, from Claude Code, Cursor, Codex or any agent.",
   },
   {
     who: "For your customers",
@@ -225,6 +227,11 @@ export default function Home() {
               <HeroFan className="pointer-events-none absolute top-1/2 left-1/2 -z-10 aspect-[550/448] w-[135%] max-w-none -translate-x-1/2 -translate-y-1/2 opacity-45 lg:opacity-100" />
               <div className="teaser w-full max-w-[31.5rem]">
                 <StartWindow placement="hero" />
+                {/* On the page's own ground, so the fan behind never takes
+                    the words' contrast. */}
+                <p className="mx-auto mt-4 w-fit max-w-full text-balance rounded-lg bg-background/85 px-3 py-1 text-center text-sm text-text-secondary leading-6">
+                  {worksWith()}
+                </p>
               </div>
             </div>
           </div>
@@ -233,6 +240,7 @@ export default function Home() {
         <Part
           id="the-work"
           title="From first sign-in to the audit, your agent does the work."
+          line="One ask, or three commands: from an empty folder to working sign-in in about a minute."
           centered
           divider={<Divider number="01" tag="The work" shape="slats" />}
         >
@@ -253,7 +261,7 @@ export default function Home() {
 
         <Part
           id="what-you-get"
-          title="What your agent can turn on."
+          title="Passkeys, SSO, SCIM, OAuth: what your agent can turn on."
           line="Each piece has its own page with the details."
           divider={<Divider number="02" tag="What you get" shape="sphere" />}
         >
@@ -267,7 +275,7 @@ export default function Home() {
 
         <Part
           id="in-charge"
-          title="You stay in charge."
+          title="You stay in charge: review, audit and roll back every change."
           divider={<Divider number="03" tag="You stay in charge" shape="rosette" />}
         >
           {/* A bento: the recorded deployment history across the top on the
@@ -338,8 +346,17 @@ export default function Home() {
               style={TITLE_COLORS}
               className="text-balance text-center text-3xl leading-tight md:text-5xl"
             >
-              <span className="display-title">Open source, in our cloud or on your servers.</span>
+              {/* Balanced, "Self-host it" and "our cloud" never split, so no
+                  line starts on a stray word or ends on one. */}
+              <span className="display-title">
+                <Unbroken text={"Open source. Self-host it or use our cloud."} />
+              </span>
             </h2>
+            {/* What Zitadel Next is, the message house's sentence, the one
+                place the page's text says it (message.ts). */}
+            <p className="mt-5 max-w-2xl text-balance text-center text-base text-text-secondary leading-7 md:text-lg md:leading-8">
+              {SENTENCE}
+            </p>
             <StartButtons placement="closing" talk className="mt-9" />
           </div>
         </section>

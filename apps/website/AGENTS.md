@@ -9,7 +9,8 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 - The front page says your agent can do the auth work and shows how, in
   this order and nothing else: the hero (title, a line for each it serves,
   the asks it takes, the ways to start, beside the start window with your
-  agent's tab first), the work (each phase's first exchange, linking its
+  agent's tab first and the frameworks setup scaffolds under it, from
+  `app/frameworks.ts`), the work (each phase's first exchange, linking its
   page), What your agent can turn on (a tab per group of features, each
   feature with a window and its page), You stay in charge (four points, each
   over its command, under the deployment history), Recently shipped (the
@@ -21,8 +22,11 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   in a row.
 - A feature's window on the front page stops at the default one's height
   (`app/brand/capped.tsx`) and links its page, which shows it whole.
-- What Zitadel Next is lives in `app/message.ts`: the description, the share
-  image, `/llms.txt` and the first question's answer, not the hero's lines.
+- What Zitadel Next is lives in `app/message.ts` as `SENTENCE`: the share
+  image, `/llms.txt`, the closing band and the first question's answer, not
+  the hero's lines. Render it from there, never as a copy.
+- The front page's meta description, for search and shares, is
+  `DESCRIPTION` beside it (`app/layout.tsx`), not the sentence.
 - The questions about Zitadel Next as a whole live in `app/message.ts`, word
   for word; the phase and feature pages keep their own.
 - A front-page window renders what another page shows, from the same data or
