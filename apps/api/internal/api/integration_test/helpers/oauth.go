@@ -5,6 +5,7 @@ package helpers
 import (
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -45,6 +46,8 @@ func (h *Harness) EnsureOAuthHandlers(t testing.TB) *oauth.Handlers {
 			Settings:        oauth.NewReleaseSettings(h.EnsureRuntimeResolver(t), h.EnsureOAuthSettingsService(t)),
 			Clients:         h.EnsureApplicationService(t),
 			AuthRequests:    service.NewAuthRequestService(h.EnsureServiceDB(t), h.EnsureKeyService(t)),
+			SigningKeys:     h.EnsureKeyService(t),
+			JWKSMaxAge:      5 * time.Minute,
 		})
 	}
 	return h.oauthHandlers.value

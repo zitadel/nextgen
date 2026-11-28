@@ -350,7 +350,7 @@ func TestAuthorizeLogs(t *testing.T) {
 		{name: "clients_fail", clients: failing{errors.New("boom")}, wantLevel: "ERROR", wantCause: "boom"},
 		{name: "clients_unavailable", clients: failing{domain.ErrUnavailable()}, wantLevel: "ERROR"},
 		// The library answers an endpoint that is not built with server_error and a 404.
-		{name: "endpoint_not_built", path: "/oauth/proj_123" + JWKSPath, wantLevel: "INFO"},
+		{name: "endpoint_not_built", path: "/oauth/proj_123" + EndSessionPath, wantLevel: "INFO"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -7,6 +7,7 @@ import (
 	"crypto/rsa"
 	"testing"
 
+	"github.com/go-jose/go-jose/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/cache"
@@ -57,7 +58,7 @@ func newTestProjects(t *testing.T, pool *service.DB) (service.ProjectService, se
 	signingKeys, err := cache.NewMeteredLRU[service.SigningKeyCacheKey, domain.SigningKey](cache.NameSigningKey, 64)
 	require.NoError(t, err)
 
-	keys := service.NewKeyService(pool, *masterKeys, crypters, signingKeys)
+	keys := service.NewKeyService(pool, *masterKeys, crypters, signingKeys, cache.Disabled[service.SigningKeyCacheKey, []jose.JSONWebKey]{})
 	return service.NewProjectService(pool, testSchemaBase, schemaValidator, keys, hashers, domain.DefaultSharedHosts), keys
 }
 
