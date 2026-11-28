@@ -17623,6 +17623,9 @@ func (s *Server) handleListWebhooksRequest(args [0]string, argsEscaped bool, w h
 // Returns a lean view of the invitation for the signed-in accept page: project, role, inviter and
 // expiry.
 //
+// It also returns the access the signed-in user already has to the project as `membership`; a user
+// with access can neither accept nor decline the invitation.
+//
 // Send the plaintext token from the invitation link fragment. Every unknown or finished token answers
 // the same opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`).
 // Lookup is a read: same-origin cookie requests need no `X-Zitadel-CSRF` token (accept and reject

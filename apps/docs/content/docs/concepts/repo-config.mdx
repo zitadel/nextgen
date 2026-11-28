@@ -3,7 +3,7 @@ title: Configuration as code
 description: How your project's auth configuration lives in repo files, is deployed as a release, and becomes revisions.
 ---
 
-Configuration as code means your project's auth configuration lives in files in your repository. Repo files describe configuration; server APIs own runtime resources. Your project's user schemas, login flows, branding, and sign-in connections are files you review like code. `zitadel deploy` publishes them to the project as a release, an immutable snapshot of those files. The [deploy guide](/docs/guides/deploy) walks through a change, and [Releases and deployments](/docs/concepts/releases-and-deployments) explains releases, deployments and rollback.
+Configuration as code means your project's auth configuration lives in files in your repository. Repo files describe configuration; server APIs own runtime resources. Your project's user schemas, login flows, branding, sign-in connections, and the switch for its [OAuth authorization server](/docs/guides/enable-oauth) are files you review like code. `zitadel deploy` publishes them to the project as a release, an immutable snapshot of those files. The [deploy guide](/docs/guides/deploy) walks through a change, and [Releases and deployments](/docs/concepts/releases-and-deployments) explains releases, deployments and rollback.
 
 ## What the CLI writes
 
@@ -52,6 +52,22 @@ A preview is not an environment. It runs on a URL of an existing project and sha
   - two connection files share a slug or a project variable, which is checked across all of them.
 - **A connection's `oidc` block names no endpoint, or every one it needs.** With none, the endpoints come from the issuer's discovery document. Otherwise it names `authorization_endpoint`, `jwks_uri`, `token_endpoint`, and `userinfo_endpoint` unless `id_token_mapping` is true. The server refuses a block in between (`idp.endpoints_partial`), so `deploy` refuses it first with `E_VALIDATION`, naming the file and the missing endpoints, and a deploy never stops part-way.
 - **Connection files are also checked against the platform, and that check is never skipped.** When a `client_id` or `client_secret` names a project variable, it must exist (`E_CREDENTIAL_MISSING` when it does not). The id must be a plain variable and the secret a secret one, and one variable may not serve both (`E_VALIDATION`). The `slug`, `protocol`, `oidc.issuer`, and `subject_claim` (an absent one reads as `sub`) of a connection that was deployed cannot be edited (`E_VALIDATION`). If the platform cannot be read, the deploy stops instead of skipping them.
+- **Application files are checked before anything is uploaded.** An
+  application file, `.zitadel/applications/<slug>.json`, declares one of your
+  applications and its OAuth clients; `.zitadel/meta/application.json`
+  describes its shape, so an editor catches a misspelled key but not a missing
+  `client_id` or secret. `deploy` sends every file with the release and shows
+  an added, changed or removed file in its diff. It stops with `E_VALIDATION`
+  when:
+  - a file breaks the schema;
+  - a client has no `client_id`;
+  - a confidential client does not name its secret as a `${{ NAME }}` project
+    variable;
+  - two files share a slug, or two clients share a `client_id`;
+  - a client's secret variable is one another client or a connection names.
+
+  It also stops when a client's secret variable is not on the project
+  (`E_CREDENTIAL_MISSING`) or is not a secret (`E_VALIDATION`).
 
 ## Revisions
 

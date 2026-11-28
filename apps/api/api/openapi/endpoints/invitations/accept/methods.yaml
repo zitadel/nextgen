@@ -58,7 +58,11 @@ post:
           schema:
             $ref: ../../../components/error-details.yaml
     '409':
-      description: The project is unclaimed, or the server has no platform project.
+      description: |
+        The user already has access to the project (`inv.already_member`,
+        with their strongest role as `details.details.relation`; the
+        invitation stays pending), the project is unclaimed, or the server has
+        no platform project.
       content:
         application/json:
           schema:

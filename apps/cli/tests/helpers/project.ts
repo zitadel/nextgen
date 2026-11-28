@@ -1265,6 +1265,37 @@ export class ScaffoldedApp {
     expect(result, "origin add should have succeeded").toSucceed();
   }
 
+  /** Turn the OAuth authorization server on with `settings oauth enable`. */
+  enableOAuth(extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli(["settings", "oauth", "enable", "--json", ...extraArgs]);
+  }
+
+  /**
+   * Writes OAuth settings under `.zitadel/oauth/` by hand, as a project set up
+   * before the command existed holds them.
+   *
+   * @param name - The file's name under `.zitadel/oauth/`.
+   * @param enabled - The switch as the file states it.
+   * @returns The file's project-relative path.
+   */
+  async writeOAuthSettings(name: string, enabled: boolean): Promise<string> {
+    const path = `.zitadel/oauth/${name}`;
+    await mkdir(join(this.path, ".zitadel/oauth"), { recursive: true });
+    await this.writeProjectFile(path, `${JSON.stringify({ enabled }, null, 2)}\n`);
+    return path;
+  }
+
+  /** The kinds a release pins, as `release get` reports them. */
+  async releasePointerKinds(releaseId: string): Promise<string[]> {
+    const result = await this.cli(["release", "get", releaseId, "--json"]);
+    expect(result, "release get should have succeeded").toSucceed();
+    return this.envelopeOf<{ pointers: { kind: string }[] }>(result).data.pointers.map(
+      (pointer) => {
+        return pointer.kind;
+      },
+    );
+  }
+
   /**
    * Invite someone into the project with `invitation create`.
    *
@@ -2148,6 +2179,34 @@ export class ScaffoldedApp {
   /** Removes a committed connection file, as the developer owning it would. */
   removeConnection(slug: string): Promise<void> {
     return this.deleteProjectFile(`.zitadel/idps/${slug}.json`);
+  }
+
+  /**
+   * Declares the `shop` application, as the developer owning it would: one
+   * confidential client `web`, `shop-web`, whose secret is the project
+   * variable `secretVariable`.
+   */
+  async declareApplication(secretVariable: string): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/applications"), { recursive: true });
+    const application = {
+      $schema: "../meta/application.json",
+      slug: "shop",
+      name: "Shop",
+      clients: [
+        {
+          slug: "web",
+          type: "confidential",
+          client_id: "shop-web",
+          secret: `\${{ ${secretVariable} }}`,
+          grant_types: ["authorization_code"],
+          redirect_uris: ["https://shop.example.com/callback"],
+        },
+      ],
+    };
+    await this.writeProjectFile(
+      ".zitadel/applications/shop.json",
+      `${JSON.stringify(application, null, 2)}\n`,
+    );
   }
 
   /** Renames a committed connection file without touching its contents. */

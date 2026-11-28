@@ -22,7 +22,7 @@ func (h *Harness) EnsureInvitationService(t testing.TB) *service.InvitationServi
 			h.EnsureKeyService(t),
 			h.EnsureGrantService(t),
 			service.StatementsUserRefResolver{Pool: db},
-			api.InviterAdminCheck(platformID),
+			api.ProjectRoleCheck(platformID),
 			ConsoleOrigin+"/ui/console",
 			platformID,
 		)

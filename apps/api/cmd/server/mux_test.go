@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-jose/go-jose/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -198,6 +199,13 @@ func (notEnabled) Get(context.Context, oauth.Issuer) (oauth.Settings, error) {
 	return oauth.Settings{}, nil
 }
 
+// noKeys is a project without signing keys, as an unknown project is.
+type noKeys struct{}
+
+func (noKeys) GetProjectPublicSigningKeys(context.Context, string, domain.SigningKeyPurpose) ([]jose.JSONWebKey, error) {
+	return nil, nil
+}
+
 // With oauth.enabled, the OAuth server takes the well-known metadata paths
 // and the endpoints under its prefix ahead of the API's root alias, through
 // the request ID and logging chain only: a client's request carries no CSRF
@@ -205,7 +213,7 @@ func (notEnabled) Get(context.Context, oauth.Issuer) (oauth.Settings, error) {
 func TestBuildHTTPMuxMountsTheOAuthServer(t *testing.T) {
 	publicBase, err := url.Parse("https://api.example.com")
 	require.NoError(t, err)
-	handlers := oauth.New(oauth.Config{PublicBase: publicBase, Admission: denyAll{}, Settings: notEnabled{}})
+	handlers := oauth.New(oauth.Config{PublicBase: publicBase, Admission: denyAll{}, Settings: notEnabled{}, SigningKeys: noKeys{}})
 	mux, err := buildHTTPMux(uiConfig(false), idgen.NewULID(), doubleServers(t, echo), idpCallbackEcho(),
 		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
 		nil, nil, handlers)

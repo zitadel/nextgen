@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/go-jose/go-jose/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/oidc/v3/pkg/op"
@@ -47,7 +48,7 @@ func newFixture(tb testing.TB) fixture {
 	require.NoError(tb, err)
 	signingKeys, err := cache.NewMeteredLRU[service.SigningKeyCacheKey, domain.SigningKey](cache.NameSigningKey, 8)
 	require.NoError(tb, err)
-	keys := service.NewKeyService(harness.EnsureServiceDB(tb), *harness.EnsureMasterKey(tb), crypters, signingKeys)
+	keys := service.NewKeyService(harness.EnsureServiceDB(tb), *harness.EnsureMasterKey(tb), crypters, signingKeys, cache.Disabled[service.SigningKeyCacheKey, []jose.JSONWebKey]{})
 	secret, err := service.NewTokenService(keys, harness.EnsureServiceDB(tb)).GenerateJWE(ctx, project.Token())
 	require.NoError(tb, err)
 
