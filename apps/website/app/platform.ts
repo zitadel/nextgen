@@ -114,7 +114,7 @@ export const FEATURES: readonly Feature[] = [
     slug: "teams",
     group: "B2B",
     name: "Teams",
-    keywords: "teams for B2B (multi-tenancy)",
+    keywords: "B2B multi-tenancy",
     title: "Give every customer its own team.",
     line: "Each customer gets its own members, admins, sign-in and brand, all inside one project.",
     // The one place "organizations" stays: the word people search for.
