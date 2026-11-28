@@ -43,7 +43,9 @@ export type ConfigurationType =
   | "login_flow"
   | "identity_provider"
   | "policy"
-  | "branding";
+  | "branding"
+  | "application"
+  | "oauth";
 
 /**
  * What every step is handed. The bundle is built once by the command and shared

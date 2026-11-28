@@ -3998,6 +3998,20 @@
       ]
     },
     {
+      "id": "settings oauth enable",
+      "group": "Project settings",
+      "description": "Turn the project's OAuth authorization server on: write the switch into .zitadel/oauth/.",
+      "args": [],
+      "flags": [
+        {
+          "name": "dry-run",
+          "description": "Preview without mutating files or the platform.",
+          "type": "boolean"
+        }
+      ],
+      "examples": []
+    },
+    {
       "id": "deploy",
       "group": "Releases",
       "description": "Apply your local configuration to Zitadel.\n\nBuilds a release from .zitadel/ and deploys it to the project. Use --dry-run to preview what would change.",

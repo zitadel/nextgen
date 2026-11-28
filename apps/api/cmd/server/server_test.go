@@ -421,6 +421,52 @@ func TestLoadConfigOAuthEnabled(t *testing.T) {
 	})
 }
 
+// oauth.jwks_max_age is ADR 039's default propagation window unless the
+// environment or the file sets it, and a negative one fails the start.
+func TestLoadConfigOAuthJWKSMaxAge(t *testing.T) {
+	emptyConfig := func(t *testing.T) string {
+		t.Helper()
+		configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+		require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+		return configPath
+	}
+
+	t.Run("defaults to five minutes", func(t *testing.T) {
+		t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
+		cfg, err := loadConfig(emptyConfig(t))
+		require.NoError(t, err)
+		assert.Equal(t, 5*time.Minute, cfg.OAuth.JWKSMaxAge)
+	})
+
+	t.Run("is set from the environment", func(t *testing.T) {
+		t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
+		t.Setenv("NEXTGEN_OAUTH_JWKS_MAX_AGE", "90s")
+		cfg, err := loadConfig(emptyConfig(t))
+		require.NoError(t, err)
+		assert.Equal(t, 90*time.Second, cfg.OAuth.JWKSMaxAge)
+	})
+
+	t.Run("is set from yaml", func(t *testing.T) {
+		t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
+		configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+		require.NoError(t, os.WriteFile(configPath, []byte("oauth:\n  jwks_max_age: 1h\n"), 0o600))
+		cfg, err := loadConfig(configPath)
+		require.NoError(t, err)
+		assert.Equal(t, time.Hour, cfg.OAuth.JWKSMaxAge)
+	})
+}
+
+func TestOAuthConfigValidate(t *testing.T) {
+	assert.NoError(t, OAuthConfig{JWKSMaxAge: 0}.Validate(), "zero: verifiers revalidate every time")
+	assert.NoError(t, OAuthConfig{JWKSMaxAge: time.Minute}.Validate())
+	assert.NoError(t, OAuthConfig{JWKSMaxAge: time.Second}.Validate())
+	for _, maxAge := range []time.Duration{-time.Second, 300, 999 * time.Millisecond} {
+		err := OAuthConfig{JWKSMaxAge: maxAge}.Validate()
+		require.Error(t, err, "%s", maxAge)
+		assert.Contains(t, err.Error(), "oauth.jwks_max_age")
+	}
+}
+
 // The hashing bound is on by default and every field is left at zero, which
 // the limiter resolves itself: one hash per CPU, a budget from the process's
 // memory limit, a second's wait before a refusal.

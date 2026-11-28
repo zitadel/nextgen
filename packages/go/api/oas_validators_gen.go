@@ -11394,6 +11394,42 @@ func (s InvitationID) Validate() error {
 	return nil
 }
 
+func (s *InvitationLookupMembership) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Relation.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "relation",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s InvitationLookupMembershipRelation) Validate() error {
+	switch s {
+	case "viewer":
+		return nil
+	case "editor":
+		return nil
+	case "admin":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
 func (s *InvitationLookupProjectMemberResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -11477,6 +11513,24 @@ func (s *InvitationLookupProjectMemberResponse) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_member",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.Membership.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "membership",
 			Error: err,
 		})
 	}
