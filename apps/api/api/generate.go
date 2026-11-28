@@ -7,5 +7,7 @@ package openapi
 //go:generate go tool ogen --config .ogen.yaml --target ../internal/api/generated --clean openapi/openapi-spec.yaml
 //go:generate go tool ogen --config .ogen-client.yaml --target ../../../packages/go/api --package api --clean openapi/openapi-spec.yaml
 //go:generate go run ./cmd/gen_docs_links ../../../packages/go/api
+//go:generate go tool templ generate -path ../../../packages/go/login
+//go:generate corepack pnpm exec tsx ../../../scripts/generate-go-login-assets.ts
 // Last: Redocly-bundle the contract the binary embeds (error YAML must exist first).
 //go:generate node ../../../scripts/bundle-openapi.mjs --api
