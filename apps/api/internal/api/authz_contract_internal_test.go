@@ -111,6 +111,7 @@ var (
 	userCodes        = gateCodes{domain.ErrUserPermissionDenied().Code, domain.ErrUserNotFound().Code, domain.ErrUserInvalid().Code}
 	variableCodes    = gateCodes{domain.ErrVariablePermissionDenied().Code, domain.ErrVariableNotFound().Code, domain.ErrVariableNotFound().Code}
 	oauthSetCodes    = gateCodes{domain.ErrOAuthSettingsPermissionDenied().Code, domain.ErrOAuthSettingsNotFound().Code, domain.ErrOAuthSettingsNotFound().Code}
+	webhookCodes     = gateCodes{domain.ErrWebhookPermissionDenied().Code, domain.ErrWebhookNotFound().Code, domain.ErrWebhookNotFound().Code}
 )
 
 // Open decisions: relations the catalog (docs/design/api/system-permission-catalog.md)
@@ -278,6 +279,14 @@ var gateRows = []gateRow{
 	{op: "GetVariable", cookie: true, relation: viewer, target: onProject, denied: variableCodes.denied, miss: variableCodes.readMiss},
 	{op: "SetVariables", relation: editor, target: onProject, denied: variableCodes.denied, miss: variableCodes.writeMiss},
 	{op: "DeleteVariable", relation: editor, why: whyVariableDelete, target: onProject, denied: variableCodes.denied, miss: variableCodes.writeMiss, open: openWriteIsNotDelete},
+
+	// Webhooks.
+	{op: "ListWebhooks", cookie: true, relation: viewer, target: onProject, denied: webhookCodes.denied, miss: webhookCodes.readMiss},
+	{op: "CreateWebhook", cookie: true, relation: editor, target: onProject, denied: webhookCodes.denied, miss: webhookCodes.writeMiss},
+	{op: "GetWebhook", cookie: true, relation: viewer, target: onProject, denied: webhookCodes.denied, miss: webhookCodes.readMiss},
+	{op: "UpdateWebhook", cookie: true, relation: editor, target: onProject, denied: webhookCodes.denied, miss: webhookCodes.writeMiss},
+	{op: "DeleteWebhook", cookie: true, relation: admin, target: onProject, denied: webhookCodes.denied, miss: webhookCodes.readMiss},
+	{op: "RotateWebhookSecret", cookie: true, relation: editor, target: onProject, denied: webhookCodes.denied, miss: webhookCodes.writeMiss},
 }
 
 const (

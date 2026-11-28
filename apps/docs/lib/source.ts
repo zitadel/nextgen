@@ -286,7 +286,7 @@ export function operationTable(page: Page, links = true) {
 
   return [
     operations.length > 0 && ["| Method | Path | Summary |", "| --- | --- | --- |", ...operations],
-    webhooks.length > 0 && ["| Event type | Description |", "| --- | --- |", ...webhooks],
+    webhooks.length > 0 && ["| Webhook | Description |", "| --- | --- |", ...webhooks],
   ]
     .filter((table) => table !== false)
     .map((table) => table.join("\n"))
