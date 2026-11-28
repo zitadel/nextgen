@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { AskTeaser } from "./ask-teaser";
-import { ChangeHistory, Transcript } from "./blocks";
+import { RunWindow, Transcript } from "./blocks";
 import { Divider } from "./brand/divider";
 import footerLight from "./brand/footer-light.webp";
 import { HeroFan } from "./brand/hero-fan";
@@ -8,12 +8,14 @@ import { NotchedCard } from "./brand/notched-card";
 import { Capabilities } from "./capabilities";
 import { type Entry, entryPath, readChangelog } from "./changelog/entries";
 import { DATE } from "./changelog/entry";
+import { CommandWords } from "./command-line";
+import { dryRunCommand, rollbackCommand } from "./commands";
 import { StartButtons } from "./cta";
-import { HISTORY } from "./get-started/history";
 import { links } from "./links";
 import { PHASES, type PhaseSlug, phasePath } from "./phases";
 import { PLATFORM } from "./platform";
 import { Part, Unbroken } from "./sections";
+import { acmeSsoRuns, historyRun, type Run, setupRun } from "./showcase/runs";
 import { SiteFooter } from "./site-footer";
 import { SiteHeader } from "./site-header";
 import { StartWindow } from "./start-window";
@@ -45,20 +47,44 @@ const READ_ABOUT: Record<PhaseSlug, string> = {
 };
 
 // What stays yours, whatever your agent runs (LICENSING.md for the licenses),
-// each with its notched card's label, a word the point already says.
-const DECIDE = [
-  { label: "Review", point: "Every change is a diff you review before it goes live." },
+// each with its notched card's label, a word the point already says, and
+// what is behind it: the command that does it, or for Named the fields every
+// event names who acted with (apps/api/api/openapi/endpoints/events/
+// event-base.yaml). Open source has no command to show.
+const DECIDE: readonly {
+  label: string;
+  point: string;
+  command?: string;
+  fields?: readonly string[];
+}[] = [
+  {
+    label: "Review",
+    point: "Every change is a diff you review before it goes live.",
+    command: dryRunCommand,
+  },
   {
     label: "Named",
     point: "Each change names who made it: a person, or an agent acting for one.",
+    fields: ["actor_id", "actor_type", "user_id", "delegation_type"],
   },
-  { label: "Roll back", point: "You can roll back to the release before." },
+  {
+    label: "Roll back",
+    point: "You can roll back to the release before.",
+    command: rollbackCommand,
+  },
   {
     label: "Open source",
     point:
       "It's open source: the server under AGPL-3.0, the SDKs under MIT. Run it in our cloud or on your servers.",
   },
 ];
+
+// What your agent ran for a phase's first ask, where a run was recorded
+// (showcase/runs.ts); Investigate and Govern keep their words alone.
+const RUNS: Partial<Record<PhaseSlug, readonly Run[]>> = {
+  "get-started": [setupRun],
+  operate: acmeSsoRuns,
+};
 
 // The newest entries the changelog shows on the front page.
 const SHIPPED = 3;
@@ -211,6 +237,7 @@ export default function Home() {
                 exchanges={PHASES.map(({ slug, short, asks }) => ({
                   ...asks[0],
                   tag: short,
+                  runs: RUNS[slug],
                   link: { href: phasePath(slug), label: READ_ABOUT[slug] },
                 }))}
               />
@@ -237,17 +264,36 @@ export default function Home() {
           title="You stay in charge."
           divider={<Divider number="03" tag="You stay in charge" shape="rosette" />}
         >
-          {/* A bento: the change history as the large card on the section's
-              one light, the four points around it as notched cards. */}
+          {/* A bento: the recorded deployment history across the top on the
+              section's one light, wide enough for its table, the four points
+              under it as notched cards, each over what is behind it. */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <div className="brand-stage brand-noise flex items-center rounded-[1.25rem] p-4 sm:p-6 md:col-span-2 lg:row-span-2">
-              <div className="w-full">
-                <ChangeHistory changes={HISTORY} />
+            <div className="brand-stage brand-noise flex justify-center rounded-[1.25rem] px-4 py-8 sm:px-8 md:col-span-2 md:py-12 lg:col-span-4">
+              <div className="w-full min-w-0 max-w-[44rem]">
+                <RunWindow run={historyRun} placement="decide" />
               </div>
             </div>
-            {DECIDE.map(({ label, point }) => (
+            {DECIDE.map(({ label, point, command, fields }) => (
               <NotchedCard key={label} label={label}>
                 <p className="text-pretty text-lg text-text-primary leading-7">{point}</p>
+                {command && (
+                  <p className="mt-4 pl-[2ch] -indent-[2ch] font-mono text-[0.6875rem] text-text-primary leading-5">
+                    <span aria-hidden="true" className="select-none text-text-muted">
+                      ${" "}
+                    </span>
+                    <CommandWords command={command} />
+                  </p>
+                )}
+                {fields && (
+                  <p className="mt-4 font-mono text-[0.6875rem] text-text-muted leading-5">
+                    {fields.map((field, index) => (
+                      <span key={field}>
+                        {index > 0 && " · "}
+                        <span className="text-(--zl-shiki-token-keyword)">{field}</span>
+                      </span>
+                    ))}
+                  </p>
+                )}
               </NotchedCard>
             ))}
           </div>

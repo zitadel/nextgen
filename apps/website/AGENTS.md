@@ -11,8 +11,9 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   the asks it takes, the ways to start, beside the start window with your
   agent's tab first), the work (each phase's first exchange, linking its
   page), What your agent can turn on (a tab per group of features, each
-  feature with a window and its page), You stay in charge (four points around
-  the change history), Recently shipped (the changelog's three newest
+  feature with a window and its page), You stay in charge (four points, each
+  over its command, around the deployment history), Recently shipped (the
+  changelog's three newest
   entries), and a closing band with the ways to start and Talk to us. No
   questions: `/llms.txt` answers those.
 - The ways to start (`app/cta.tsx`) are two buttons, Start in our cloud and
@@ -153,6 +154,9 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 - Steps 1 to 4 replay a recorded session (`app/showcase/sessions.ts`).
   Re-record rather than edit when what the CLI prints, the files setup writes
   or the flow format change.
+- CLI output on the front page and in the change history comes from recorded
+  runs (`app/showcase/runs.ts`): cut lines, never reword them; re-record
+  rather than edit when the CLI's output changes.
 - `login-preview.tsx` draws each login screen from `@zitadel/components`'
   atoms in the default template's English copy. When that copy or a step's
   fields change, change the screens.

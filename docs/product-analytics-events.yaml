@@ -88,13 +88,14 @@ properties:
       `in_terminal` are the website front page's start window.
   placement:
     type: string
-    values: [header, hero, showcase, try_it, closing, footer]
+    values: [header, hero, showcase, try_it, decide, closing, footer]
     description: >-
       Where on its page a copy button or a call to action sits: `header` is
       the bar over every website page, `showcase` the quickstart's
       walkthrough on /get-started, `try_it` the Try it section of a website
-      phase or feature page, which `page` names, and `closing` the website
-      front page's closing band.
+      phase or feature page, which `page` names, `decide` the change history
+      under the front page's You stay in charge or a phase page's You
+      decide, and `closing` the website front page's closing band.
   target:
     type: string
     values:
@@ -153,6 +154,7 @@ properties:
       - skills
       - policy_test
       - rollback
+      - deployment_list
       - grant_list
       - grant_create
       - grant_delete
@@ -172,7 +174,8 @@ properties:
     description: >-
       What a copy button copied, never its text: the CLI command it runs
       (`start`, `setup`, `dry_run` for `deploy --dry-run`, `deploy`,
-      `policy_test`, `rollback` for `deployment rollback`, `grant_list`,
+      `policy_test`, `rollback` for `deployment rollback`,
+      `deployment_list`, `grant_list`,
       `grant_create`, `grant_delete`, `members` for `api listProjectMembers`,
       `event_list` for any `event list`, `auth_method` for any `auth-method`
       command, `idp_list`, `user_list`, `invitation_create`, `team_create`,

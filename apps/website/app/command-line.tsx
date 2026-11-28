@@ -18,24 +18,38 @@ export function Words({ text }: { text: string }) {
 }
 
 // A command's words, quietly told apart: the program and its subcommands in
-// the line's own ink, a flag (and `&&`) a step back, and what the reader
-// passes, a flag's value or a <placeholder>, in the strings' colour of the
-// docs' syntax theme (globals.css, code.tsx).
+// the line's own ink, a flag and the shell's `&&` and `<` a step back, and
+// what the reader passes, a flag's value, a quoted string or a
+// <placeholder>, in the strings' colour of the docs' syntax theme
+// (globals.css, code.tsx).
 const FLAG = "text-text-secondary";
 const VALUE = "text-(--zl-shiki-token-string)";
+const OPERATOR = new Set(["&&", "<", ">", "|"]);
 
-/** A command, its words coloured by what they are; wraps as Words does. */
+/**
+ * A command, its words coloured by what they are; wraps as Words does, a
+ * quoted string as one word, and a list of values after its commas.
+ */
 export function CommandWords({ command }: { command: string }) {
   let afterFlag = false;
-  return command.split(" ").map((word, index) => {
-    const flag = word.startsWith("-") || word === "&&";
-    const value = !flag && (afterFlag || /^<.+>$/.test(word));
-    afterFlag = flag && word !== "&&" && !word.includes("=");
+  return (command.match(/'[^']*'|"[^"]*"|\S+/g) ?? []).map((word, index) => {
+    const operator = OPERATOR.has(word);
+    const flag = word.startsWith("-") || operator;
+    const value = !flag && (afterFlag || /^<.+>$/.test(word) || /^["']/.test(word));
+    afterFlag = flag && !operator && !word.includes("=");
     return (
       // biome-ignore lint/suspicious/noArrayIndexKey: the words of a fixed command, never reordered
       <Fragment key={index}>
         {index > 0 && " "}
-        <span className={`whitespace-nowrap ${flag ? FLAG : value ? VALUE : ""}`}>{word}</span>
+        <span className={flag ? FLAG : value ? VALUE : undefined}>
+          {word.split(/(?<=,)/).map((part, at) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: the parts of a fixed word, never reordered
+            <Fragment key={at}>
+              {at > 0 && <wbr />}
+              <span className="whitespace-nowrap">{part}</span>
+            </Fragment>
+          ))}
+        </span>
       </Fragment>
     );
   });

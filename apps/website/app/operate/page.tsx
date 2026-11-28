@@ -1,4 +1,4 @@
-import { ChangeHistory, CodeFile, NumberedCommands } from "../blocks";
+import { CodeFile, NumberedCommands, RunWindow } from "../blocks";
 import {
   appPath,
   deployCommand,
@@ -8,6 +8,7 @@ import {
   rollbackCommand,
 } from "../commands";
 import { PhasePage, phaseMetadata } from "../phase-page";
+import { historyRun } from "../showcase/runs";
 
 export const metadata = phaseMetadata("operate");
 
@@ -33,16 +34,7 @@ export default function OperatePage() {
         },
         decide: {
           line: "Every change is a diff you read before it goes live. A dry run shows it against what is live, each release records who built it and from which commit, and a rollback puts the release before back.",
-          block: (
-            <ChangeHistory
-              changes={[
-                { change: "Connect a customer's single sign-on", agent: true },
-                { change: "Require 12-character passwords", agent: true },
-                { change: "Give support viewer access", agent: true },
-                { change: "Roll back the login flow change", agent: false },
-              ]}
-            />
-          ),
+          block: <RunWindow run={historyRun} placement="decide" />,
         },
         tryIt: {
           line: "Run them in your app's folder, once setup has run.",

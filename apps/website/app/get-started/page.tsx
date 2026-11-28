@@ -1,7 +1,7 @@
-import { ChangeHistory, QuickstartCommands, SkillsLine } from "../blocks";
+import { QuickstartCommands, RunWindow, SkillsLine } from "../blocks";
 import { PhasePage, phaseMetadata } from "../phase-page";
+import { historyRun } from "../showcase/runs";
 import { Showcase } from "../showcase/showcase";
-import { HISTORY } from "./history";
 
 export const metadata = phaseMetadata("get-started");
 
@@ -30,7 +30,7 @@ export default function GetStartedPage() {
         },
         decide: {
           line: "What setup writes lands in your repo as files: the pages, the user model and the login flow. You read the diff and commit it, and each deploy records who made it, from which commit and why.",
-          block: <ChangeHistory changes={HISTORY} />,
+          block: <RunWindow run={historyRun} placement="decide" />,
         },
         questions: [
           {

@@ -89,3 +89,12 @@ export const apiListCommand = "npx @zitadel/cli@latest api ls";
 export const applicationPublishCommand =
   "npx @zitadel/cli@latest api publishApplication --file application.json";
 export const applicationGetCommand = "npx @zitadel/cli@latest api getApplication <application_id>";
+
+// What the front page's recorded runs ran (showcase/runs.ts), as they ran
+// them: a customer's OpenID Connect provider, the client secret piped in as
+// the CLI asks; its deploy; and the deployments since setup, with why.
+export const acmeSsoCommand =
+  "npx @zitadel/cli@latest auth-method sso enable --provider custom --slug acme-sso --display-name 'Acme SSO' --issuer https://sso.acme.example --client-id abc123 --non-interactive < secret.txt";
+export const acmeDeployCommand = `npx @zitadel/cli@latest deploy -m "Connect Acme's single sign-on"`;
+export const deploymentHistoryCommand =
+  "npx @zitadel/cli@latest deployment list --fields metadata.reason,metadata.message,deployed_at";

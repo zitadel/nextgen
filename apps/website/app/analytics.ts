@@ -1,11 +1,14 @@
 import { track } from "@vercel/analytics";
 
 import {
+  acmeDeployCommand,
+  acmeSsoCommand,
   actorEventsCommand,
   agentPrompt,
   correlationEventsCommand,
   customSsoCommand,
   deployCommand,
+  deploymentHistoryCommand,
   devCommand,
   dryRunCommand,
   failedRequestsCommand,
@@ -49,9 +52,10 @@ import {
  * bar over every page, `showcase` the quickstart's walkthrough on
  * /get-started, `try_it` the Try it of a phase or a feature page
  * (phase-page.tsx, feature-page.tsx), whose page the event's `page` names,
- * and `closing` the front page's closing band.
+ * `decide` the change history under You stay in charge (the front page) or
+ * You decide (a phase page), and `closing` the front page's closing band.
  */
-export type Placement = "header" | "hero" | "showcase" | "try_it" | "closing" | "footer";
+export type Placement = "header" | "hero" | "showcase" | "try_it" | "decide" | "closing" | "footer";
 
 /**
  * Where a call to action leads, as a stable name, never a URL: `get_started`
@@ -96,6 +100,7 @@ export type Snippet =
   | "skills"
   | "policy_test"
   | "rollback"
+  | "deployment_list"
   | "grant_list"
   | "grant_create"
   | "grant_delete"
@@ -124,6 +129,9 @@ const SNIPPETS = new Map<string, Snippet>([
   [agentPrompt, "agent_prompt"],
   [policyTestCommand, "policy_test"],
   [rollbackCommand, "rollback"],
+  [deploymentHistoryCommand, "deployment_list"],
+  [acmeSsoCommand, "auth_method"],
+  [acmeDeployCommand, "deploy"],
   [grantListCommand, "grant_list"],
   [grantDeleteCommand, "grant_delete"],
   [userEventsCommand, "event_list"],

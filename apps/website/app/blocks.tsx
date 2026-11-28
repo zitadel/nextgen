@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import type { Placement } from "./analytics";
 import { Json } from "./code";
-import { CommandLine, Words } from "./command-line";
+import { CommandLine, CommandWords, Words } from "./command-line";
 import { appPath, quickstart, skillsCommand } from "./commands";
 import { CopyButton } from "./copy-button";
 import type { Exchange } from "./phases";
+import type { Run } from "./showcase/runs";
 import { WINDOW_FOOTER, WINDOW_INSET, Window } from "./window";
 
 // What the front page and the phase and feature pages (phase-page.tsx,
@@ -18,20 +19,26 @@ export type { Exchange };
 
 /**
  * An exchange of a transcript; on the front page with the phase it belongs
- * to as `tag` and a `link` to that phase's page.
+ * to as `tag`, a `link` to that phase's page and, where one was recorded,
+ * what your agent ran (`runs`, showcase/runs.ts).
  */
-export type Entry = Exchange & { tag?: string; link?: { href: string; label: string } };
+export type Entry = Exchange & {
+  tag?: string;
+  link?: { href: string; label: string };
+  runs?: readonly Run[];
+};
 
 /**
  * A person asking their coding agent, and its replies, in a terminal window:
- * each ask at its prompt, the reply under it; a tag over the ask and a link
- * under the reply where the entry has them.
+ * each ask at its prompt, the reply under it; a tag over the ask, the
+ * commands it ran with a line or two of what they printed, and a link under
+ * the reply where the entry has them.
  */
 export function Transcript({ title, exchanges }: { title: string; exchanges: readonly Entry[] }) {
   return (
     <Window title={title}>
       <ol className={`flex flex-col gap-7 py-6 md:py-8 ${WINDOW_INSET}`}>
-        {exchanges.map(({ ask, reply, tag, link }) => (
+        {exchanges.map(({ ask, reply, tag, link, runs }) => (
           <li key={ask} className="grid grid-cols-[1ch_minmax(0,1fr)] gap-x-3 gap-y-2">
             {tag && (
               <p className="col-start-2 font-mono text-text-muted text-xs leading-4">{tag}</p>
@@ -54,6 +61,26 @@ export function Transcript({ title, exchanges }: { title: string; exchanges: rea
               <span className="sr-only">Your agent: </span>
               {reply}
             </p>
+            {runs && (
+              <div className="col-start-2 flex flex-col gap-2 overflow-x-auto rounded-lg bg-window-sunken px-3 py-2.5 font-mono text-xs leading-5">
+                <span className="sr-only">What it ran:</span>
+                {runs.map(({ command, output }) => (
+                  <div key={command}>
+                    <p className="pl-[2ch] -indent-[2ch] text-text-primary">
+                      <span aria-hidden="true" className="select-none text-text-muted">
+                        ${" "}
+                      </span>
+                      <CommandWords command={command} />
+                    </p>
+                    {output.map((line) => (
+                      <p key={line} className="text-text-muted">
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
             {link && (
               <a
                 href={link.href}
@@ -83,26 +110,21 @@ export function Transcript({ title, exchanges }: { title: string; exchanges: rea
   );
 }
 
-export type Change = { change: string; agent: boolean };
-
-/** A change history, each entry naming who made it: you, or your agent acting for you. */
-export function ChangeHistory({ changes }: { changes: readonly Change[] }) {
+/**
+ * A recorded command (showcase/runs.ts) in a terminal window titled with the
+ * app's folder: the command at its prompt with its copy button, and what it
+ * printed as it printed it, scrolling sideways where a table is wider than
+ * the window. `placement` is where it sits (analytics.ts).
+ */
+export function RunWindow({ run, placement }: { run: Run; placement: Placement }) {
   return (
-    <Window title="Change history">
-      <ol className="divide-y divide-window-border">
-        {changes.map(({ change, agent }) => (
-          <li
-            key={change}
-            className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 py-3.5 ${WINDOW_INSET}`}
-          >
-            <span className="text-sm text-text-primary leading-6">{change}</span>
-            <span className="rounded-full bg-tint/[0.07] px-2.5 font-mono text-text-secondary text-xs leading-6">
-              <span className="sr-only">Made by </span>
-              {agent ? "Your agent, for you" : "You"}
-            </span>
-          </li>
-        ))}
-      </ol>
+    <Window title={appPath} className="min-w-0">
+      <div className={`py-4 font-mono text-xs leading-6 ${WINDOW_INSET}`}>
+        <CommandLine command={run.command} placement={placement} pinned />
+        <pre className="mt-2 overflow-x-auto text-[0.6875rem] text-text-secondary leading-5">
+          {run.output.join("\n")}
+        </pre>
+      </div>
     </Window>
   );
 }
