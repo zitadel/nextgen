@@ -25,8 +25,8 @@ func TestRequestContextMiddlewareRequestID(t *testing.T) {
 		want     string
 	}{
 		{name: "no header configured", sent: []string{"sfo1::fra1::2vxlh-1792820352212-3ce3eb4ad630"}, want: "req_minted"},
-		{name: "Vercel's ID after its regions", idHeader: "x-vercel-id", sent: []string{"sfo1::fra1::2vxlh-1792820352212-3ce3eb4ad630"}, want: "2vxlh-1792820352212-3ce3eb4ad630"},
-		{name: "an ID without hops", idHeader: "x-vercel-id", sent: []string{"2vxlh-1792820352212-3ce3eb4ad630"}, want: "2vxlh-1792820352212-3ce3eb4ad630"},
+		{name: "Vercel's ID after its regions", idHeader: "x-vercel-id", sent: []string{"sfo1::fra1::2vxlh-1792820352212-3ce3eb4ad630"}, want: "req_2vxlh-1792820352212-3ce3eb4ad630"},
+		{name: "an ID without hops", idHeader: "x-vercel-id", sent: []string{"2vxlh-1792820352212-3ce3eb4ad630"}, want: "req_2vxlh-1792820352212-3ce3eb4ad630"},
 		{name: "the header missing", idHeader: "x-vercel-id", want: "req_minted"},
 		{name: "nothing after the hops", idHeader: "x-vercel-id", sent: []string{"sfo1::fra1::"}, want: "req_minted"},
 		{name: "text that is no ID", idHeader: "x-vercel-id", sent: []string{"<script>alert(1)</script>"}, want: "req_minted"},

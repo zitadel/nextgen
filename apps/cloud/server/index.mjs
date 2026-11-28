@@ -48,7 +48,7 @@ import net from "node:net";
 import { fileURLToPath } from "node:url";
 
 import { collectorHandler } from "./collector.mjs";
-import { LogRelay, vercelRequestId } from "./logs.mjs";
+import { LogRelay, serverRequestId } from "./logs.mjs";
 import { deploymentAttributes, MetricQueue } from "./metrics.mjs";
 import { decodeMetricsRequest, decodeTraceRequest } from "./otlp.mjs";
 import { sendsToVercel } from "./sink.mjs";
@@ -239,7 +239,7 @@ export default async function handler(req, res) {
   // The server's log lines for this request are printed in its context, and
   // the lines of the server starting in the context of the request that
   // started it.
-  const requestId = vercelRequestId(req.headers["x-vercel-id"]);
+  const requestId = serverRequestId(req.headers["x-vercel-id"]);
   logs.open(requestId, AsyncLocalStorage.snapshot());
   let port;
   try {

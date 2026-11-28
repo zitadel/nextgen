@@ -119,8 +119,8 @@ describe("eventFields", () => {
         team_id: null,
         entity_type: "user",
         entity_id: "user_2",
-        request_id: "0af7651916cd43dd8448eb211c80319c",
-        correlation_id: "6c1f0d2be4a94c0f9a3d5b7e8f102a4c",
+        request_id: "req_01KB2QY6C3M4N5P6Q7R8S9T0VW",
+        correlation_id: "corr_6c1f0d2be4a94c0f9a3d5b7e8f102a4c",
       }),
     );
     expect(fields).toEqual([
@@ -129,8 +129,8 @@ describe("eventFields", () => {
       { label: "Actor type", value: "human" },
       { label: "Resource type", value: "user" },
       { label: "Resource ID", value: "user_2", id: true },
-      { label: "Request ID", value: "0af7651916cd43dd8448eb211c80319c", id: true },
-      { label: "Correlation ID", value: "6c1f0d2be4a94c0f9a3d5b7e8f102a4c", id: true },
+      { label: "Request ID", value: "req_01KB2QY6C3M4N5P6Q7R8S9T0VW", id: true },
+      { label: "Correlation ID", value: "corr_6c1f0d2be4a94c0f9a3d5b7e8f102a4c", id: true },
     ]);
   });
 });
@@ -539,10 +539,10 @@ describe("narrowing by one value", () => {
     ).toEqual(["type", "resource_type", "client", "device"]);
     // An event of a sign-in, an invitation or a claim leads to its chain.
     expect(
-      eventFilterValues(event({ correlation_id: "6c1f0d2be4a94c0f9a3d5b7e8f102a4c" })).map(
+      eventFilterValues(event({ correlation_id: "corr_6c1f0d2be4a94c0f9a3d5b7e8f102a4c" })).map(
         ({ filter, value }) => [filter.key, value],
       ),
-    ).toContainEqual(["chain", "6c1f0d2be4a94c0f9a3d5b7e8f102a4c"]);
+    ).toContainEqual(["chain", "corr_6c1f0d2be4a94c0f9a3d5b7e8f102a4c"]);
   });
 
   it("follows a request, a session, a login flow or a chain through every view", () => {
@@ -786,9 +786,9 @@ describe("olderUnmatched", () => {
     ).toBe(
       "Events recorded before the server had the user, operation and status filters are not matched.",
     );
-    expect(olderUnmatched(parseEventsSearch({ chain: "0af7651916cd43dd8448eb211c80319c" }))).toBe(
-      "Events recorded before the server had the chain filter are not matched.",
-    );
+    expect(
+      olderUnmatched(parseEventsSearch({ chain: "corr_0af7651916cd43dd8448eb211c80319c" })),
+    ).toBe("Events recorded before the server had the chain filter are not matched.");
   });
 
   it("says nothing under the filters every event is matched by", () => {
@@ -810,8 +810,11 @@ describe("searchMeanings", () => {
     expect(meanings("evt_01ABC")).toEqual(["event evt_01ABC"]);
   });
 
-  it("reads a request, a session and a login flow by their prefix", () => {
+  it("reads a request, a chain, a session and a login flow by their prefix", () => {
     expect(meanings("req_1")).toEqual(["request req_1"]);
+    expect(meanings("corr_0af7651916cd43dd8448eb211c80319c")).toEqual([
+      "chain corr_0af7651916cd43dd8448eb211c80319c",
+    ]);
     expect(meanings("sess_1")).toEqual(["session sess_1"]);
     expect(meanings("flow_1")).toEqual(["flow flow_1"]);
     expect(meanings("app_1")).toEqual(["client app_1"]);
@@ -840,15 +843,6 @@ describe("searchMeanings", () => {
     ]);
     // A name the search does not know is no name: the term is read whole.
     expect(meanings("owner:user_1")).toEqual(["actor owner:user_1", "resource owner:user_1"]);
-  });
-
-  it("reads 32 hex digits as a chain or a request, and leaves the choice to the person", () => {
-    // The server mints a chain's ID in that shape, and a proxy may assign a
-    // request ID in it: the search cannot tell them apart.
-    expect(meanings("0af7651916cd43dd8448eb211c80319c")).toEqual([
-      "chain 0af7651916cd43dd8448eb211c80319c",
-      "request 0af7651916cd43dd8448eb211c80319c",
-    ]);
   });
 
   it("reads words joined by dots as an event type", () => {

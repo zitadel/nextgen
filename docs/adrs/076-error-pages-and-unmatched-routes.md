@@ -20,6 +20,10 @@
 > instead (§2). Routing by name, rejected below, works now: one rule covers
 > the API, and the root names of its resources that released clients call
 > are a fixed list.
+>
+> **Amendment (2026-11-27):** a request ID the proxy gave is prefixed like a
+> minted one: `req_` and the proxy's ID (§3), so every request ID says what it
+> is.
 
 ## Context
 
@@ -79,14 +83,15 @@ Vercel's.
 ### 3. One request ID, the proxy's when there is one
 
 - `server.request_id_header` names a header a proxy in front of the server sets
-  to its own ID for each request. The server then uses that ID as the request
-  ID, instead of minting a `req_…` one: in every log line, in `X-Request-Id`,
-  on audit events and on the error page. A value that lists hops before the ID
-  gives the part after its last `::`.
+  to its own ID for each request. The server then uses `req_` and that ID as
+  the request ID, instead of minting a `req_…` one of its own: in every log
+  line, in `X-Request-Id`, on audit events and on the error page. A value that
+  lists hops before the ID gives the part after its last `::`.
 - The cloud's launcher sets it to `x-vercel-id`
   (`sfo1::fra1::2vxlh-1792820352212-3ce3eb4ad630`), so the reference a person
-  quotes from an error page is the Request ID Vercel's dashboard shows, and
-  finds the request and the server's log lines for it there. Vercel replaces an
+  quotes from an error page, `req_2vxlh-1792820352212-3ce3eb4ad630`, holds the
+  Request ID Vercel's dashboard shows, and the part after `req_` finds the
+  request and the server's log lines for it there. Vercel replaces an
   `x-vercel-id` a client sends, so a client cannot choose its own.
 - Empty, the default, the server mints its own. A header no proxy overwrites
   would let a client choose its request ID, so the setting is for a deployment
@@ -138,8 +143,8 @@ logic a second frontend needs moves there, not into a new package.
 
 - The CLI tells a server without the operation (`req.not_found`: "different
   versions") from a server that is not a Zitadel API (no envelope).
-- On the cloud, request IDs on audit events are Vercel's, not `req_…`; they
-  are opaque strings either way.
+- On the cloud, request IDs on audit events are `req_` and Vercel's; they are
+  opaque strings either way.
 - The server's page inlines about 7 KB of tokens, so it renders with no second
   request, which on a path nothing serves would only fail again.
 

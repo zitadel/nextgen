@@ -4,7 +4,7 @@ import { once } from "node:events";
 import { PassThrough } from "node:stream";
 import { test } from "node:test";
 
-import { LogRelay, vercelRequestId } from "./logs.mjs";
+import { LogRelay, serverRequestId } from "./logs.mjs";
 
 // Stands in for Vercel's request context: what a console call sees is the
 // request Vercel files the line under.
@@ -111,15 +111,16 @@ test("the output is read a line at a time, however it is chunked", async () => {
   );
 });
 
-test("the request ID is the last part of x-vercel-id", () => {
+test("the request ID is req_ and the last part of x-vercel-id", () => {
   assert.equal(
-    vercelRequestId("sfo1::fra1::2vxlh-1792820352212-3ce3eb4ad630"),
-    "2vxlh-1792820352212-3ce3eb4ad630",
+    serverRequestId("sfo1::fra1::2vxlh-1792820352212-3ce3eb4ad630"),
+    "req_2vxlh-1792820352212-3ce3eb4ad630",
   );
   assert.equal(
-    vercelRequestId("2vxlh-1792820352212-3ce3eb4ad630"),
-    "2vxlh-1792820352212-3ce3eb4ad630",
+    serverRequestId("2vxlh-1792820352212-3ce3eb4ad630"),
+    "req_2vxlh-1792820352212-3ce3eb4ad630",
   );
-  assert.equal(vercelRequestId(undefined), "");
-  assert.equal(vercelRequestId(["a", "b"]), "");
+  assert.equal(serverRequestId("sfo1::fra1::"), "");
+  assert.equal(serverRequestId(undefined), "");
+  assert.equal(serverRequestId(["a", "b"]), "");
 });

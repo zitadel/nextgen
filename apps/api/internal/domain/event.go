@@ -297,15 +297,20 @@ const (
 	EventFieldCorrelationID
 )
 
-// NewCorrelationID mints the ID of a chain: 16 random bytes as 32 hex digits,
-// the shape of a W3C trace ID, so an export can use it as one. It names no
-// resource, so it is no managed ID of ADR 047 and takes no prefix.
+// CorrelationIDPrefix starts the ID of a chain, as req starts a request's
+// (ADR 047 §5): it names no resource, but the ID says what it is.
+const CorrelationIDPrefix = "corr"
+
+// NewCorrelationID mints the ID of a chain: corr_ and 16 random bytes as 32
+// hex digits. The digits have the shape of a W3C trace ID, so an export can
+// use them as one; the prefix tells the ID from the request's own trace ID in
+// metadata.trace_id, which has that shape too.
 func NewCorrelationID() (string, error) {
 	var id [16]byte
 	if _, err := rand.Read(id[:]); err != nil {
 		return "", ErrInternal(err).WithMessage("failed to mint a correlation id")
 	}
-	return hex.EncodeToString(id[:]), nil
+	return CorrelationIDPrefix + "_" + hex.EncodeToString(id[:]), nil
 }
 
 func ErrEventNotFound() Error {

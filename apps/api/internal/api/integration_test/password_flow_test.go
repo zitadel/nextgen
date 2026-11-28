@@ -156,7 +156,7 @@ func TestPasswordLoginFlow(t *testing.T) {
 	require.NotEmpty(t, page.Items)
 	require.NotNil(t, page.Items[0].CorrelationID, "an event of the flow names no chain")
 	chain := *page.Items[0].CorrelationID
-	require.Regexp(t, `^[0-9a-f]{32}$`, chain)
+	require.Regexp(t, `^corr_[0-9a-f]{32}$`, chain)
 	opts = events.ListOptions(project.ID, 100)
 	opts.Filter = database.And(opts.Filter, database.Equal(database.Col(domain.EventFieldCorrelationID), chain))
 	page, err = harness.EnsureServiceDB(t).Statements().ListEvents(t.Context(), opts)

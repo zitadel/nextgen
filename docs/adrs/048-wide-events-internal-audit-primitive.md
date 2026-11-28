@@ -43,6 +43,11 @@
 > or a claim challenge. See
 > [the amendment](#amendment-2026-11-26-a-correlation-id-that-requests-inherit).
 >
+> **Amendment (2026-11-27):** a new correlation ID is `corr_` and 32 hex
+> digits, so it says what it is and is not mistaken for the request's trace
+> ID in `metadata.trace_id`, which has the shape of its digits. See
+> [the ID](#amendment-2026-11-26-a-correlation-id-that-requests-inherit).
+>
 > **Proposed amendment — [ADR 053 §8](053-cross-project-principals.md#8-audit-events-are-written-in-the-protected-project):**
 > if ADR 053 is accepted, the emit-time rule for `team_id` changes. Today the
 > column captures the resolved credential's `ScopeContext` team, which for a
@@ -1033,10 +1038,13 @@ authorization code, an invitation link, a claim challenge, each a secret, or
 the `auth_request_id` a login page was opened with, which is a handle. A
 flow created with someone else's handle joins that sign-in's chain. It names
 no resource, so it is not a managed ID of
-[ADR 047](047-dialect-id-generation.md) and takes no prefix. A new ID is 16
-random bytes as 32 hex digits, the shape of a W3C trace ID
-(`domain.NewCorrelationID`). An invitation's stored `journey_id` keeps its
-value; a new invitation's is a new ID of that shape.
+[ADR 047](047-dialect-id-generation.md), but it says what it is, as a request
+ID's `req_` does (ADR 047 §5). A new ID is `corr_` and 16 random bytes as 32
+hex digits (`domain.NewCorrelationID`). The digits have the shape of a W3C
+trace ID; the prefix tells the ID from the request's own trace ID in
+`metadata.trace_id`, which has that shape too. A stored ID of another shape,
+an invitation's older `journey_id` or one minted before the prefix, keeps its
+value; a new one has this shape.
 
 **OpenTelemetry.** The model is a trace's: the chain is the trace, a request
 a span in it, and a carrier is trace context kept at rest. The ID is still
@@ -1056,9 +1064,9 @@ What the two share:
   `metadata.trace_id`, so an event leads to its trace in the operator's
   backend. It is observed context, as `metadata.client` is: not indexed, not
   a filter, and on Path A only.
-- §9's export is to take `correlation_id` for the trace ID of an event that
-  has one, and `request_id` as before of one that has none; an ID that is not
-  32 hex digits is mapped to one, as a `request_id` is. Nothing projects
+- §9's export is to take the digits of `correlation_id` after `corr_` for the
+  trace ID of an event that has one, and `request_id` as before of one that
+  has none; an ID of another shape is mapped to one, as a `request_id` is. Nothing projects
   events to OTEL yet, so this is not built.
 
 **Index.**

@@ -691,11 +691,12 @@ the root admin.
   one, which for the server's startup lines is the request that started the
   instance: Vercel keeps a level only for what a request prints. The
   launcher's first line names the database host and database it serves
-  from. Add a log drain for retention. A line's `request_id` is Vercel's
-  Request ID for the request (the launcher sets `server.request_id_header`
-  to `x-vercel-id`), the one an error page and `X-Request-Id` quote: search
-  for it. On a protected preview the response's `x-vercel-id` names an outer
-  hop that Vercel does not log; search for `X-Request-Id` instead.
+  from. Add a log drain for retention. A line's `request_id` is `req_` and
+  Vercel's Request ID for the request (the launcher sets
+  `server.request_id_header` to `x-vercel-id`), the one an error page and
+  `X-Request-Id` quote: search for the part after `req_`. On a protected
+  preview the response's `x-vercel-id` names an outer hop that Vercel does
+  not log; search for `X-Request-Id`, without `req_`, instead.
 - **Errors:** the dashboard's level filter finds the server's `WARN` and
   `ERROR` lines, and so does the CLI:
 

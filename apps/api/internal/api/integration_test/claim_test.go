@@ -245,7 +245,7 @@ func TestClaimHappyPath(t *testing.T) {
 	challenge, err := harness.EnsureServiceDB(t).Statements().GetChallengeByID(t.Context(), project.ID,
 		domain.HashClaimChallengeToken(string(initOK.ChallengeID)))
 	require.NoError(t, err)
-	require.Regexp(t, `^[0-9a-f]{32}$`, challenge.CorrelationID)
+	require.Regexp(t, `^corr_[0-9a-f]{32}$`, challenge.CorrelationID)
 	opts := events.ListOptions(project.ID, 100)
 	opts.Filter = database.And(opts.Filter, database.Equal(database.Col(domain.EventFieldCorrelationID), challenge.CorrelationID))
 	inChain, err := harness.EnsureServiceDB(t).Statements().ListEvents(t.Context(), opts)

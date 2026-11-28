@@ -8,7 +8,9 @@
 > [ADR 012](012-ephemeral-id-api-representation.md) (prefixed API ids);
 > completes the open checklist item in [ADR 028](028-storage-v2-statements-and-dialects.md)
 > **Amended by:** [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md) (§2 and §5: a schema's resource id is always dialect-minted; a declared `$id` stays a document property),
-> [ADR 065](065-background-jobs.md) (§2: `job` prefix)
+> [ADR 065](065-background-jobs.md) (§2: `job` prefix),
+> [ADR 048's amendment of 2026-11-27](048-wide-events-internal-audit-primitive.md) and
+> [ADR 076's](076-error-pages-and-unmatched-routes.md) (§5: `corr_*`, and `req_*` on a proxy's request ID too)
 
 ## Context
 
@@ -124,7 +126,8 @@ the forbid; handlers enforce it where ogen cannot (e.g. create-user).
 |---|---|
 | JSON Schema `$id` | Client URI when set; else dialect `sch_*` |
 | SSO provider `id` in flow definitions | Config key, not a storage PK |
-| Middleware `req_*` | Correlation only; local `RequestIDGenerator` |
+| Request ID `req_*` | Correlation only: minted by the local `RequestIDGenerator`, or `req_` and the ID a proxy gave the request ([ADR 076](076-error-pages-and-unmatched-routes.md) §3) |
+| Correlation ID `corr_*` | A chain of requests ([ADR 048](048-wide-events-internal-audit-primitive.md#amendment-2026-11-26-a-correlation-id-that-requests-inherit)): `corr_` and 32 random hex digits, `domain.NewCorrelationID` |
 | Secrets (`sk_*`, handoff, session token material) | Cryptographic secrets, not row PKs |
 | Application client `client_id` | A column of the client row, not its primary key. It holds the value the document supplied or, when the document supplied none, a copy of the row's minted `client_*` primary key. Unique per project. The API, the OAuth endpoints and error details identify a client by `client_id` or slug; the primary key stays inside storage. `client_` and `dcr_` are reserved for server-generated values |
 

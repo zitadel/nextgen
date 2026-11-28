@@ -39,10 +39,9 @@ type Option = { kind: "meaning"; meaning: SearchMeaning } | { kind: "mine" };
  * search, so nothing here searches as you type.
  *
  * What the term means is listed under the field. One meaning applies on
- * Enter. An id that may be an actor or a resource, a user's that may be the
- * account or the actor, or 32 hex digits that may be a chain or a request,
- * lists both and waits for a choice: guessing would show an empty list for
- * the other reading. The empty
+ * Enter. An id that may be an actor or a resource, or a user's that may be
+ * the account or the actor, lists both and waits for a choice: guessing would
+ * show an empty list for the other reading. The empty
  * field offers **My activity**, the list narrowed to what the signed-in
  * person did, whose chip reads `actor: me`.
  */
