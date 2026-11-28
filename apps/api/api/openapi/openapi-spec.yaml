@@ -95,7 +95,7 @@ tags:
       Applications authenticate their users via Zitadel, each through its
       OAuth clients. A registered application is written through the API as
       one revisioned document. These operations create or revise a registered
-      application and read one by ID.
+      application, query applications and read one by ID.
   - name: Policies
     description: |
       A policy holds the settings an operation is checked against, such as a
@@ -290,6 +290,8 @@ paths:
     $ref: endpoints/idps/revisions/by_id/methods.yaml
   /applications:
     $ref: endpoints/applications/methods.yaml
+  /applications/query:
+    $ref: endpoints/applications/query/methods.yaml
   /applications/{application_id}:
     $ref: endpoints/applications/by_id/methods.yaml
   /applications/revisions/{revision_id}:

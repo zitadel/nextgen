@@ -91,6 +91,7 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 		t.Run("idp_connections", func(t *testing.T) { battleIDPConnections(t, d) })
 		t.Run("idp_connection_revisions", func(t *testing.T) { battleIDPConnectionRevisions(t, d) })
 		t.Run("idp_identity_links", func(t *testing.T) { battleIDPIdentityLinks(t, d) })
+		t.Run("applications", func(t *testing.T) { battleApplications(t, d) })
 		t.Run("flow_definitions", func(t *testing.T) { battleFlowDefinitions(t, d) })
 		t.Run("json_schemas", func(t *testing.T) { battleJSONSchemas(t, d) })
 		t.Run("json_schemas_latest", func(t *testing.T) { battleJSONSchemasLatest(t, d) })
@@ -975,6 +976,56 @@ func battleIDPConnections(t *testing.T, d dialect) {
 				Filter: filter, Pagination: page,
 			})
 		}, func(c *domain.IDPConnection) string { return c.ID }, 2)
+	})
+}
+
+// battleApplications pages the application list in both orders the contract
+// offers. Each application is revised once, so a row that the join repeated
+// per revision would show up as a duplicate id.
+func battleApplications(t *testing.T, d dialect) {
+	t.Helper()
+	projectID := ensureProject(t, d.stmts)
+	suffix := uniqueSuffix(t)
+	created := make([]*domain.Application, 0, 5)
+	for i := range 5 {
+		// Slugs run against creation order, so the two drains differ.
+		entity := createApplication(t, d.stmts, projectID, "battle-"+suffix+"-"+string(rune('e'-i)))
+		entity.Document = applicationDocument(entity.Slug, &domain.ApplicationClient{Slug: "web"})
+		require.NoError(t, d.stmts.ReviseApplication(t.Context(), entity, nil))
+		created = append(created, entity)
+	}
+	ids := func(compare func(a, b *domain.Application) int) []string {
+		sorted := slices.SortedFunc(slices.Values(created), compare)
+		out := make([]string, 0, len(sorted))
+		for _, entity := range sorted {
+			out = append(out, entity.ID)
+		}
+		return out
+	}
+	list := func(page database.Page[domain.ApplicationField]) (*database.ListResult[*domain.Application], error) {
+		return d.stmts.ListApplications(unfilteredListCtx(t), &database.ListOptions[domain.ApplicationField]{
+			Filter: database.Equal(database.Col(domain.ApplicationFieldProjectID), projectID), Pagination: page,
+		})
+	}
+	id := func(a *domain.Application) string { return a.ID }
+
+	drainIncarnation(t, ids(func(a, b *domain.Application) int {
+		return cmp.Or(a.CreatedAt.Compare(b.CreatedAt), cmp.Compare(a.ID, b.ID))
+	}), database.OrderBy[domain.ApplicationField]{
+		Columns: []database.Column[domain.ApplicationField]{
+			database.Col(domain.ApplicationFieldCreatedAt),
+			database.Col(domain.ApplicationFieldID),
+		},
+		Direction: database.OrderAsc,
+	}, list, id, 2)
+
+	t.Run("slug_order", func(t *testing.T) {
+		drainIncarnation(t, ids(func(a, b *domain.Application) int {
+			return strings.Compare(a.Slug, b.Slug)
+		}), database.OrderBy[domain.ApplicationField]{
+			Columns:   []database.Column[domain.ApplicationField]{database.Col(domain.ApplicationFieldSlug)},
+			Direction: database.OrderAsc,
+		}, list, id, 2)
 	})
 }
 

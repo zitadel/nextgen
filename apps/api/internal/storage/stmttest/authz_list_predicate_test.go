@@ -310,3 +310,43 @@ func TestAuthzListPredicate_Policies(t *testing.T) {
 		assert.Empty(t, revisions.Items)
 	})
 }
+
+// The application list joins each application to its newest revision under
+// the alias a, so the predicate correlates on a.id: a grant on one application
+// shows that application, at its newest revision, and no other.
+func TestAuthzListPredicate_Applications(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, userSchemaURL := ensureUserTestProject(t, d.stmts)
+		suffix := uniqueSuffix(t)
+		granted := createApplication(t, d.stmts, projectID, "granted-"+suffix)
+		granted.Document = applicationDocument(granted.Slug, &domain.ApplicationClient{Slug: "web"})
+		require.NoError(t, d.stmts.ReviseApplication(t.Context(), granted, nil))
+		createApplication(t, d.stmts, projectID, "hidden-"+suffix)
+
+		principal := "usr-application-viewer-" + suffix
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, userSchemaURL, principal, principal+"@example.com", "Application Viewer")))
+
+		catalogID, err := d.stmts.ActiveSystemCatalogID(t.Context())
+		require.NoError(t, err)
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
+			newTestAssignment(projectID, "asgn-"+suffix, domain.AuthzPrincipalTypeUser, principal, "project", "viewer", domain.NewResourceAssignmentScope(granted.ID))))
+
+		ctx := service.WithAuthzListFilter(t.Context(), service.AuthzListFilter{
+			AuthzCheckParams: domain.AuthzCheckParams{
+				CatalogID: catalogID, ProjectID: projectID, PrincipalHomeProjectID: projectID,
+				PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: principal,
+				ObjectType: "project", Relation: "viewer",
+			},
+			ResourceKind: domain.ResourceKindApplication,
+		})
+
+		applications, err := d.stmts.ListApplications(ctx, &database.ListOptions[domain.ApplicationField]{
+			Filter:     database.Equal(database.Col(domain.ApplicationFieldProjectID), projectID),
+			Pagination: database.Page[domain.ApplicationField]{Limit: 10},
+		})
+		require.NoError(t, err)
+		require.Len(t, applications.Items, 1)
+		assert.Equal(t, granted.ID, applications.Items[0].ID)
+		assert.Equal(t, granted.RevisionID, applications.Items[0].RevisionID)
+	})
+}

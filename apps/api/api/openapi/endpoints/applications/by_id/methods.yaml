@@ -1,5 +1,6 @@
 get:
   operationId: getApplication
+  x-zitadel-cli: application get
   summary: Get an application by ID
   description: |
     Returns an application that authenticates its users via Zitadel, by ID

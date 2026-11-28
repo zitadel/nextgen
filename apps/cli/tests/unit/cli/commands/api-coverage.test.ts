@@ -53,9 +53,6 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   // history is that command's to read. Registry CRUD would offer a `create`
   // that skips the release construction the command exists to do.
   deployments: "created and read through `zitadel deploy` orchestration, not registry CRUD (#529)",
-  // Registered applications are written through the API by other systems,
-  // not from `.zitadel/`; the CLI has no command for them yet (#2788).
-  applications: "registered applications are written through the API, not the CLI (#2788)",
   search: "finds resources across types (ADR 087); a `zitadel search` command is not built yet",
   // OAuth settings are written only through a release, so there is nothing to
   // create or update here; reading them is `zitadel oauth`'s, which comes with
@@ -125,6 +122,10 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   // listing (`idp revisions <id>`) and inventing verbs for one resource is
   // what ADR 064 §4 rules out, so these wait for that shape to be decided.
   listIdpRevisions: "sub-resource listing; the CLI has no grammar for it yet (ADR 063)",
+  // `application create` writes `.zitadel/applications/<slug>.json` instead of
+  // calling the API, so it is a command of its own and not built yet.
+  publishApplication: "not yet exposed; `application create` is not built (ADR 082 §3)",
+  getApplicationRevision: "reads one revision by revision id; same shape question as above",
   // Policies are written from .zitadel/policies/ by `deploy` (ADR 066).
   publishPolicy: "configuration: `deploy` publishes .zitadel/policies/ in the release bundle",
   listPolicyRevisions: "sub-resource listing; same grammar question as `listIdpRevisions`",

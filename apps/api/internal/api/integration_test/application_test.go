@@ -117,6 +117,7 @@ func TestApplicationAccess(t *testing.T) {
 		notFound := domain.ErrApplicationNotFound().Code
 		assertAuthzError(t, outsider.put(t, shopApplication(webClient("web", ""))), notFound)
 		assertAuthzError(t, outsider.get(t, app.ID), notFound)
+		assertAuthzError(t, outsider.query(t, &api.QueryApplicationsRequest{}), notFound)
 	})
 
 	t.Run("a viewer reads but cannot write", func(t *testing.T) {
@@ -126,6 +127,8 @@ func TestApplicationAccess(t *testing.T) {
 
 		resp := viewer.get(t, own.ID)
 		require.IsType(t, &api.ApplicationResponse{}, resp, helpers.MustMarshal(t, resp))
+		listed := viewer.query(t, &api.QueryApplicationsRequest{})
+		require.IsType(t, &api.QueryApplicationsResponse{}, listed, helpers.MustMarshal(t, listed))
 
 		denied := viewer.put(t, shopApplication(webClient("web", "")))
 		require.IsType(t, &api.PublishApplicationForbidden{}, denied, helpers.MustMarshal(t, denied))
@@ -142,6 +145,11 @@ func TestApplicationAccess(t *testing.T) {
 		resp := admin.get(t, app.ID)
 		require.IsType(t, &api.ApplicationResponse{}, resp, helpers.MustMarshal(t, resp))
 		assert.Equal(t, app.ID, resp.(*api.ApplicationResponse).ID)
+
+		listed := admin.query(t, &api.QueryApplicationsRequest{})
+		require.IsType(t, &api.QueryApplicationsResponse{}, listed, helpers.MustMarshal(t, listed))
+		require.Len(t, listed.(*api.QueryApplicationsResponse).Applications, 1)
+		assert.Equal(t, app.ID, listed.(*api.QueryApplicationsResponse).Applications[0].ID)
 	})
 
 	t.Run("a session without access to the project gets 404", func(t *testing.T) {
@@ -149,6 +157,7 @@ func TestApplicationAccess(t *testing.T) {
 		stranger := applicationFixture{project: owner.project, client: sessionClientForUser(t, strangerID)}
 
 		assertAuthzError(t, stranger.get(t, app.ID), domain.ErrApplicationNotFound().Code)
+		assertAuthzError(t, stranger.query(t, &api.QueryApplicationsRequest{}), domain.ErrApplicationNotFound().Code)
 	})
 
 	t.Run("unauthenticated calls are rejected", func(t *testing.T) {
@@ -159,6 +168,75 @@ func TestApplicationAccess(t *testing.T) {
 		unauthorized := domain.ErrAuthUnauthorized(nil).Code
 		assertAuthzError(t, f.put(t, shopApplication(webClient("web", ""))), unauthorized)
 		assertAuthzError(t, f.get(t, app.ID), unauthorized)
+		assertAuthzError(t, f.query(t, &api.QueryApplicationsRequest{}), unauthorized)
+	})
+}
+
+// TestQueryApplications lists a project holding one application a release
+// declares and one registered through the API.
+func TestQueryApplications(t *testing.T) {
+	t.Parallel()
+	release := newDeploymentFixture(t)
+	built := release.build(t, shopApplication(declaredClient("web", "shop-web", "SHOP_WEB_SECRET")))
+	require.IsType(t, &api.BuildReleaseCreated{}, built, helpers.MustMarshal(t, built))
+	f := applicationFixture{project: &domain.Project{ID: release.project}, client: release.client}
+	registered := f.create(t, api.Application{Slug: "crm", Name: "CRM", Clients: []api.ApplicationClient{webClient("web", "")}})
+	require.Len(t, registered.ClientSecrets, 1)
+
+	queryOK := func(t *testing.T, req *api.QueryApplicationsRequest) *api.QueryApplicationsResponse {
+		t.Helper()
+		resp := f.query(t, req)
+		require.IsType(t, &api.QueryApplicationsResponse{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.QueryApplicationsResponse)
+	}
+
+	t.Run("declared and registered applications both appear, marked as such", func(t *testing.T) {
+		listed := queryOK(t, &api.QueryApplicationsRequest{})
+		require.Len(t, listed.Applications, 2)
+		// The default order is created_at ascending.
+		assert.Equal(t, "shop", listed.Applications[0].Slug)
+		assert.True(t, listed.Applications[0].Declared)
+		assert.Equal(t, registered.ID, listed.Applications[1].ID)
+		assert.False(t, listed.Applications[1].Declared)
+		assert.False(t, listed.NextPageToken.Set)
+	})
+
+	t.Run("no client secret is returned", func(t *testing.T) {
+		body := helpers.MustMarshal(t, queryOK(t, &api.QueryApplicationsRequest{}))
+		assert.NotContains(t, body, registered.ClientSecrets[0].Secret)
+		assert.NotContains(t, body, "client_secrets")
+	})
+
+	t.Run("a limit pages through the applications", func(t *testing.T) {
+		first := queryOK(t, &api.QueryApplicationsRequest{Limit: api.NewOptLimit(1)})
+		require.Len(t, first.Applications, 1)
+		assert.Equal(t, "shop", first.Applications[0].Slug)
+		require.True(t, first.NextPageToken.Set)
+
+		second := queryOK(t, &api.QueryApplicationsRequest{Limit: api.NewOptLimit(1), PageToken: first.NextPageToken})
+		require.Len(t, second.Applications, 1)
+		assert.Equal(t, registered.ID, second.Applications[0].ID)
+		assert.False(t, second.NextPageToken.Set)
+	})
+
+	t.Run("a slug filter selects one application", func(t *testing.T) {
+		listed := queryOK(t, &api.QueryApplicationsRequest{Filter: []api.QueryApplicationsRequestFilterItem{{
+			Field:     api.ApplicationFilterFieldSlug,
+			Operation: api.FilterOperationEquals,
+			Value:     api.NewOptFilterValue(api.NewStringFilterValue("crm")),
+		}}})
+		require.Len(t, listed.Applications, 1)
+		assert.Equal(t, registered.ID, listed.Applications[0].ID)
+	})
+
+	t.Run("descending by slug reverses the order", func(t *testing.T) {
+		listed := queryOK(t, &api.QueryApplicationsRequest{Sorting: api.NewOptQueryApplicationsRequestSorting(api.QueryApplicationsRequestSorting{
+			Field:     api.ApplicationSortFieldSlug,
+			Direction: api.SortDirectionDesc,
+		})})
+		require.Len(t, listed.Applications, 2)
+		assert.Equal(t, "shop", listed.Applications[0].Slug)
+		assert.Equal(t, "crm", listed.Applications[1].Slug)
 	})
 }
 
@@ -353,6 +431,13 @@ func (f applicationFixture) revise(t *testing.T, app api.Application) api.Create
 func (f applicationFixture) get(t *testing.T, id string) api.GetApplicationRes {
 	t.Helper()
 	resp, err := f.client.GetApplication(t.Context(), api.GetApplicationParams{ProjectID: api.ProjectID(f.project.ID), ApplicationID: id})
+	require.NoError(t, err)
+	return resp
+}
+
+func (f applicationFixture) query(t *testing.T, req *api.QueryApplicationsRequest) api.QueryApplicationsRes {
+	t.Helper()
+	resp, err := f.client.QueryApplications(t.Context(), req, api.QueryApplicationsParams{ProjectID: api.ProjectID(f.project.ID)})
 	require.NoError(t, err)
 	return resp
 }

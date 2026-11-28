@@ -17,6 +17,7 @@ import {
   ListFlowDefinitionsRevisions,
   ListSchemasRevisions,
   QueryGrantsBodyFilterItemOperation,
+  QueryApplicationsBodyFilterItemOperation,
   QueryIdpsBodyFilterItemOperation,
   QueryProjectsBodyFilterItemOperation,
   QuerySessionsBodyFilterItemOperation,
@@ -31,6 +32,7 @@ import {
   GetBrandingResponse,
   GetFlowDefinitionResponse,
   GetGrantResponse,
+  GetApplicationResponse,
   GetIdpResponse,
   GetPolicyResponse,
   GetProjectResponse,
@@ -53,6 +55,8 @@ import {
   PublishPolicyBody,
   QueryGrantsBody,
   QueryGrantsResponse,
+  QueryApplicationsBody,
+  QueryApplicationsResponse,
   QueryIdpsBody,
   QueryIdpsResponse,
   QueryProjectsBody,
@@ -387,6 +391,7 @@ const TEAM_OPERATIONS = general(QueryTeamsBodyFilterItemOperation);
 const SESSION_OPERATIONS = general(QuerySessionsBodyFilterItemOperation);
 const GRANT_OPERATIONS = general(QueryGrantsBodyFilterItemOperation);
 const IDP_OPERATIONS = general(QueryIdpsBodyFilterItemOperation);
+const APPLICATION_OPERATIONS = general(QueryApplicationsBodyFilterItemOperation);
 const PROJECT_OPERATIONS = general(QueryProjectsBodyFilterItemOperation);
 
 /** A filter operation any of the API's structured queries takes. */
@@ -396,6 +401,7 @@ type Operation =
   | QuerySessionsBodyFilterItemOperation
   | QueryGrantsBodyFilterItemOperation
   | QueryIdpsBodyFilterItemOperation
+  | QueryApplicationsBodyFilterItemOperation
   | QueryProjectsBodyFilterItemOperation;
 
 /** Every filter operation the API knows, so `--filter` tells one from a value. */
@@ -406,6 +412,7 @@ const OPERATIONS: readonly Operation[] = [
     ...Object.values(QuerySessionsBodyFilterItemOperation),
     ...Object.values(QueryGrantsBodyFilterItemOperation),
     ...Object.values(QueryIdpsBodyFilterItemOperation),
+    ...Object.values(QueryApplicationsBodyFilterItemOperation),
     ...Object.values(QueryProjectsBodyFilterItemOperation),
   ]),
 ];
@@ -474,6 +481,10 @@ const POLICY_OPERATIONS = PublishPolicyBody.options.flatMap(
  * than duplicated. The generated schema makes the `oidc` block optional because
  * it cannot say that the protocol requires it, so the create example spells it
  * out.
+ *
+ * Applications are only read here. A declared application is a file,
+ * `.zitadel/applications/<slug>.json`, that `deploy` ships (ADR 082 §3), so
+ * this entry declares no create.
  *
  * A schema, a flow definition and a policy are addressed by a name as well as
  * by an id (object type, flow name, operation), so their argument is named for
@@ -910,6 +921,42 @@ export const RESOURCES = {
           "--slug acme-sso --protocol oidc --display-name 'Acme SSO' --oidc-issuer https://sso.acme.example --oidc-client-id <client_id> --oidc-client-secret '${{ ACME_SSO_CLIENT_SECRET }}' --oidc-scopes openid --oidc-scopes profile --oidc-scopes email",
       },
     ),
+  }),
+
+  application: resource({
+    group: CommandGroups.signIn,
+    groupOrder: 7,
+    singular: "application",
+    idField: "id",
+    columns: ["id", "slug", "definition.name", "declared", "created_at"],
+    heading: "slug",
+    detail: ["id", "revision_id", "slug", "declared", "created_at", "updated_at"],
+    list: list({
+      body: QueryApplicationsBody,
+      item: QueryApplicationsResponse.shape.applications.element,
+      filters: [
+        {
+          field: "slug",
+          operations: APPLICATION_OPERATIONS,
+        },
+        {
+          field: "created_at",
+          operations: APPLICATION_OPERATIONS,
+        },
+      ],
+      sorts: ["slug", "created_at"],
+      call: ({ client, projectId }, body) => {
+        return client.queryApplications(body, { project_id: projectId });
+      },
+      items: pagedFunctions.queryApplications.items,
+      next: pagedFunctions.queryApplications.next,
+    }),
+    get: get({
+      call: ({ client, projectId }, id) => {
+        return client.getApplication(id, { project_id: projectId });
+      },
+      response: GetApplicationResponse,
+    }),
   }),
 
   project: resource({

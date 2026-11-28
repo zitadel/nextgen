@@ -408,6 +408,97 @@ func TestApplicationService_Get(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrApplicationNotFound())
 }
 
+func TestApplicationService_List(t *testing.T) {
+	t.Parallel()
+
+	col := func(fields ...domain.ApplicationField) []database.Column[domain.ApplicationField] {
+		columns := make([]database.Column[domain.ApplicationField], len(fields))
+		for i, field := range fields {
+			columns[i] = database.Col(field)
+		}
+		return columns
+	}
+	tests := []struct {
+		name      string
+		input     service.ListApplicationsInput
+		listErr   error
+		wantOrder database.OrderBy[domain.ApplicationField]
+		wantLimit uint32
+		wantErr   error
+	}{
+		{
+			name:      "no sorting orders by created_at ascending, then id",
+			input:     service.ListApplicationsInput{PageToken: "token"},
+			wantOrder: database.OrderBy[domain.ApplicationField]{Columns: col(domain.ApplicationFieldCreatedAt, domain.ApplicationFieldID), Direction: database.OrderAsc},
+			wantLimit: 20,
+		},
+		{
+			name: "slug equals, a created_at range and a slug sort are accepted",
+			input: service.ListApplicationsInput{
+				Filters: []service.Filter{{Field: "slug", Operation: "equals", Value: "shop"}, {Field: "created_at", Operation: "greater_than", Value: "2026-01-01T00:00:00Z"}},
+				Sorting: &service.Sorting{Field: "slug", Direction: "desc"},
+				Limit:   500,
+			},
+			wantOrder: database.OrderBy[domain.ApplicationField]{Columns: col(domain.ApplicationFieldSlug, domain.ApplicationFieldID), Direction: database.OrderDesc},
+			wantLimit: 100,
+		},
+		{
+			name:    "not_equals on slug is not implemented",
+			input:   service.ListApplicationsInput{Filters: []service.Filter{{Field: "slug", Operation: "not_equals", Value: "shop"}}},
+			wantErr: domain.ErrNotImplemented(),
+		},
+		{
+			name:    "a range on slug is invalid",
+			input:   service.ListApplicationsInput{Filters: []service.Filter{{Field: "slug", Operation: "less_than", Value: "shop"}}},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name:    "an unknown filter field is invalid",
+			input:   service.ListApplicationsInput{Filters: []service.Filter{{Field: "name", Operation: "equals", Value: "Shop"}}},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name:    "an unknown sort field is invalid",
+			input:   service.ListApplicationsInput{Sorting: &service.Sorting{Field: "name", Direction: "asc"}},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name:    "a page token issued for another sorting is invalid",
+			input:   service.ListApplicationsInput{PageToken: "token"},
+			listErr: database.ErrCursorOrderMismatch(),
+			wantErr: domain.ErrRequestInvalid(),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			f := newApplicationFixture(t)
+			stored := []*domain.Application{{ID: "app_1"}}
+			if tt.wantErr == nil || tt.listErr != nil {
+				f.pool.EXPECT().ListApplications(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(_ context.Context, opts *database.ListOptions[domain.ApplicationField]) (*database.ListResult[*domain.Application], error) {
+						if tt.listErr != nil {
+							return nil, tt.listErr
+						}
+						assert.Equal(t, tt.wantOrder, opts.Pagination.OrderBy)
+						assert.Equal(t, tt.wantLimit, opts.Pagination.Limit)
+						assert.Equal(t, []byte(tt.input.PageToken), opts.Pagination.Cursor)
+						return &database.ListResult[*domain.Application]{Items: stored, NextCursor: []byte("next")}, nil
+					})
+			}
+			tt.input.ProjectID = appProjectID
+			got, err := f.svc.List(t.Context(), tt.input)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, stored, got.Items)
+			assert.Equal(t, "next", got.NextPageToken)
+		})
+	}
+}
+
 func TestApplicationService_Client(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

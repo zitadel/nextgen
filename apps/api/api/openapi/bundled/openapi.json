@@ -71,7 +71,7 @@
     },
     {
       "name": "Applications",
-      "description": "Applications authenticate their users via Zitadel, each through its\nOAuth clients. A registered application is written through the API as\none revisioned document. These operations create or revise a registered\napplication and read one by ID.\n"
+      "description": "Applications authenticate their users via Zitadel, each through its\nOAuth clients. A registered application is written through the API as\none revisioned document. These operations create or revise a registered\napplication, query applications and read one by ID.\n"
     },
     {
       "name": "Policies",
@@ -7248,9 +7248,223 @@
         }
       }
     },
+    "/applications/query": {
+      "post": {
+        "operationId": "queryApplications",
+        "x-zitadel-cli": "application list",
+        "summary": "Query applications",
+        "description": "Returns the applications of a project, paginated with a cursor. Each\napplication appears once, at its newest revision, with each client's\n`client_id` in `definition`.\n\nThe list holds both the applications a release declares and the ones\nregistered through `publishApplication` (`POST /applications`). An entry\nwith `declared: true` comes from a release: to change it, edit its file\nunder `.zitadel/applications/` and deploy. An entry with\n`declared: false` is registered: to change it, call `publishApplication`.\n\nIt never returns a client secret. A registered client's secret is only\nin the response of the `publishApplication` call that creates the client.\nA declared client's `secret` is the `${{ NAME }}` reference from its\nfile, which names the variable holding the secret.\n",
+        "tags": [
+          "Applications"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "application.read"
+            ]
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project-id"
+          }
+        ],
+        "requestBody": {
+          "description": "Request to query the applications of a project.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/query-applications-request"
+              },
+              "examples": {
+                "firstPage": {
+                  "summary": "The first page, newest application first",
+                  "value": {
+                    "limit": 2,
+                    "sorting": {
+                      "field": "created_at",
+                      "direction": "desc"
+                    }
+                  }
+                },
+                "bySlug": {
+                  "summary": "Resolve a single slug",
+                  "description": "A slug is unique within the project, so `equals` on it matches\nat most one row.\n",
+                  "value": {
+                    "filter": [
+                      {
+                        "field": "slug",
+                        "operation": "equals",
+                        "value": "shop"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A page of applications.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/query-applications-response"
+                },
+                "examples": {
+                  "firstPage": {
+                    "summary": "A page with more results behind it",
+                    "value": {
+                      "applications": [
+                        {
+                          "id": "app_01KWHG09JXA7F0N9WD3P2E4YM5",
+                          "revision_id": "apprev_01KWHG3B72K7M7F0N9WD3P2E4Y",
+                          "slug": "partner_portal",
+                          "declared": false,
+                          "created_at": "2026-11-07T11:02:00Z",
+                          "updated_at": "2026-11-07T11:02:00Z",
+                          "definition": {
+                            "slug": "partner_portal",
+                            "name": "Partner portal",
+                            "clients": [
+                              {
+                                "slug": "web",
+                                "client_id": "client_01KWHG09JXA7F0N9WD3P2E4YM6",
+                                "type": "confidential",
+                                "grant_types": [
+                                  "authorization_code"
+                                ],
+                                "redirect_uris": [
+                                  "https://partners.example.com/callback"
+                                ]
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "id": "app_01KWH3B72K7M7F0N9WD3P2E4YM",
+                          "revision_id": "apprev_01KWHF2XY6RN7F0N9WD3P2E4YM",
+                          "slug": "shop",
+                          "declared": true,
+                          "created_at": "2026-11-06T09:11:00Z",
+                          "updated_at": "2026-11-08T14:20:00Z",
+                          "definition": {
+                            "slug": "shop",
+                            "name": "Shop",
+                            "clients": [
+                              {
+                                "slug": "web",
+                                "client_id": "shop-web",
+                                "type": "confidential",
+                                "secret": "${{ SHOP_WEB_CLIENT_SECRET }}",
+                                "grant_types": [
+                                  "authorization_code",
+                                  "refresh_token"
+                                ],
+                                "redirect_uris": [
+                                  "https://shop.example.com/callback",
+                                  "http://localhost:3000/callback"
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      ],
+                      "next_page_token": "v1.dGhpcyBpcyBvcGFxdWU.SflKxwRJSMeKKF2QT4fw"
+                    }
+                  },
+                  "lastPage": {
+                    "summary": "The final page",
+                    "description": "`next_page_token` is absent when there are no further results.\n",
+                    "value": {
+                      "applications": [
+                        {
+                          "id": "app_01KWH1P4MYS7F0N9WD3P2E4YM5",
+                          "revision_id": "apprev_01KWH8Q5NZTA7F0N9WD3P2E4YM",
+                          "slug": "backoffice",
+                          "declared": false,
+                          "created_at": "2026-11-05T08:00:00Z",
+                          "updated_at": "2026-11-05T08:00:00Z",
+                          "definition": {
+                            "slug": "backoffice",
+                            "name": "Backoffice",
+                            "clients": [
+                              {
+                                "slug": "web",
+                                "client_id": "client_01KWH1P4MYS7F0N9WD3P2E4YM6",
+                                "type": "confidential",
+                                "grant_types": [
+                                  "authorization_code"
+                                ],
+                                "redirect_uris": [
+                                  "https://backoffice.example.com/callback"
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request was not valid, for example it has invalid query parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/queryApplications-error-response"
+          }
+        }
+      }
+    },
     "/applications/{application_id}": {
       "get": {
         "operationId": "getApplication",
+        "x-zitadel-cli": "application get",
         "summary": "Get an application by ID",
         "description": "Returns an application that authenticates its users via Zitadel, by ID\nat its newest revision, with each client's `client_id` in `definition`. It\nnever returns a client secret: `publishApplication` (`POST /applications`)\nshows one once, when it creates the client.\n\nThe lookup is scoped to the project in `project_id`.\n",
         "tags": [
@@ -20762,7 +20976,7 @@
           },
           "declared": {
             "type": "boolean",
-            "description": "True when a release declares the application, from a file under\n`.zitadel/applications/`, and only a deploy revises it. False when it\nwas registered through `createApplication` (`POST /applications`).\n",
+            "description": "True when a release declares the application, from a file under\n`.zitadel/applications/`, and only a deploy revises it. False when it\nwas registered through `publishApplication` (`POST /applications`).\n",
             "example": false
           },
           "created_at": {
@@ -20828,6 +21042,109 @@
             }
           }
         ]
+      },
+      "application-sort-field": {
+        "type": "string",
+        "description": "The field to sort applications by.",
+        "enum": [
+          "slug",
+          "created_at"
+        ]
+      },
+      "application-filter-field": {
+        "type": "string",
+        "description": "The field to filter applications by, one of:\n- `slug`: unique within the project. `equals` returns the newest revision\n  of that application\n- `created_at`: RFC3339 timestamp\n",
+        "enum": [
+          "slug",
+          "created_at"
+        ]
+      },
+      "query-applications-request": {
+        "type": "object",
+        "description": "Request to query the applications of a project.",
+        "properties": {
+          "limit": {
+            "$ref": "#/components/schemas/limit"
+          },
+          "page_token": {
+            "description": "Token to retrieve the next page of results. Send the same `sorting` as\nthe request that issued the token.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/page-token"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sorting": {
+            "type": "object",
+            "description": "Sort order. Defaults to `created_at` ascending; `id` breaks ties either way.",
+            "required": [
+              "field",
+              "direction"
+            ],
+            "properties": {
+              "field": {
+                "$ref": "#/components/schemas/application-sort-field",
+                "description": "The field to sort by."
+              },
+              "direction": {
+                "$ref": "#/components/schemas/sort-direction",
+                "description": "The direction to sort by."
+              }
+            }
+          },
+          "filter": {
+            "type": "array",
+            "description": "Filter criteria for querying applications. Combined with AND.",
+            "items": {
+              "type": "object",
+              "required": [
+                "field",
+                "operation"
+              ],
+              "properties": {
+                "field": {
+                  "$ref": "#/components/schemas/application-filter-field",
+                  "description": "The field to filter by."
+                },
+                "value": {
+                  "$ref": "#/components/schemas/filter-value"
+                },
+                "operation": {
+                  "$ref": "#/components/schemas/filter-operation"
+                }
+              }
+            }
+          }
+        }
+      },
+      "query-applications-response": {
+        "type": "object",
+        "description": "Paginated list of applications.\n",
+        "required": [
+          "applications"
+        ],
+        "properties": {
+          "applications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/application-response"
+            }
+          },
+          "next_page_token": {
+            "description": "Token to pass as `page_token` in the next request to fetch the following page.\nAbsent when there are no more results. The follow-up request must repeat the\nsame `sorting` that produced this token (omit only when both pages use the default).\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/page-token"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
       },
       "application-revision-id": {
         "type": "string",
@@ -34963,6 +35280,80 @@
               },
               "evt.invalid": {
                 "$ref": "#/components/examples/evt-invalid"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
+      "queryApplications-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/app-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/app-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/auth-csrf_invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "app.not_found": "#/components/schemas/app-not_found",
+                  "app.permission_denied": "#/components/schemas/app-permission_denied",
+                  "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable"
+                }
+              }
+            },
+            "examples": {
+              "app.not_found": {
+                "$ref": "#/components/examples/app-not_found"
+              },
+              "app.permission_denied": {
+                "$ref": "#/components/examples/app-permission_denied"
+              },
+              "auth.csrf_invalid": {
+                "$ref": "#/components/examples/auth-csrf_invalid"
+              },
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
               },
               "internal": {
                 "$ref": "#/components/examples/internal"

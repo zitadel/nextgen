@@ -8,6 +8,14 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
+// The permission check of a list compares the application's id, not the
+// revision's. Both tables have an id column, so it names the application
+// table by the alias every dialect's query gives it.
+const (
+	TableAlias = "a"
+	IDColumn   = "id"
+)
+
 // Schema binds application filter fields for all dialects. The names are
 // qualified because the read joins the application table `a` to the revision
 // table `r`, and project_id, id and created_at exist on both.

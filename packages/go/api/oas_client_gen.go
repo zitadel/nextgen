@@ -1415,6 +1415,22 @@ type Invoker interface {
 	//
 	// POST /schemas
 	PublishSchema(ctx context.Context, request PublishSchemaReq, params PublishSchemaParams) (PublishSchemaRes, error)
+	// QueryApplications invokes queryApplications operation.
+	//
+	// Returns the applications of a project, paginated with a cursor. Each application appears once, at
+	// its newest revision, with each client's `client_id` in `definition`.
+	//
+	// The list holds both the applications a release declares and the ones registered through
+	// `publishApplication` (`POST /applications`). An entry with `declared: true` comes from a release: to
+	// change it, edit its file under `.zitadel/applications/` and deploy. An entry with `declared: false`
+	// is registered: to change it, call `publishApplication`.
+	//
+	// It never returns a client secret. A registered client's secret is only in the response of the
+	// `publishApplication` call that creates the client. A declared client's `secret` is the `${{ NAME }}`
+	// reference from its file, which names the variable holding the secret.
+	//
+	// POST /applications/query
+	QueryApplications(ctx context.Context, request *QueryApplicationsRequest, params QueryApplicationsParams) (QueryApplicationsRes, error)
 	// QueryGrants invokes queryGrants operation.
 	//
 	// Returns a page of a project's grants.
@@ -16950,6 +16966,174 @@ func (c *Client) sendPublishSchema(ctx context.Context, request PublishSchemaReq
 
 	stage = "DecodeResponse"
 	result, err := decodePublishSchemaResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// QueryApplications invokes queryApplications operation.
+//
+// Returns the applications of a project, paginated with a cursor. Each application appears once, at
+// its newest revision, with each client's `client_id` in `definition`.
+//
+// The list holds both the applications a release declares and the ones registered through
+// `publishApplication` (`POST /applications`). An entry with `declared: true` comes from a release: to
+// change it, edit its file under `.zitadel/applications/` and deploy. An entry with `declared: false`
+// is registered: to change it, call `publishApplication`.
+//
+// It never returns a client secret. A registered client's secret is only in the response of the
+// `publishApplication` call that creates the client. A declared client's `secret` is the `${{ NAME }}`
+// reference from its file, which names the variable holding the secret.
+//
+// POST /applications/query
+func (c *Client) QueryApplications(ctx context.Context, request *QueryApplicationsRequest, params QueryApplicationsParams) (QueryApplicationsRes, error) {
+	res, err := c.sendQueryApplications(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendQueryApplications(ctx context.Context, request *QueryApplicationsRequest, params QueryApplicationsParams) (res QueryApplicationsRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("queryApplications"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/applications/query"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, QueryApplicationsOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/applications/query"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeQueryApplicationsRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, QueryApplicationsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, QueryApplicationsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeQueryApplicationsResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

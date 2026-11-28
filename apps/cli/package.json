@@ -124,6 +124,9 @@
       "policy": {
         "description": "View and test policies."
       },
+      "application": {
+        "description": "View applications."
+      },
       "env": {
         "description": "Show and bind environments."
       },

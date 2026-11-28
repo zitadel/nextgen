@@ -5771,6 +5771,45 @@ func (c *MockAllStatementsListApplicationRevisionsCall) DoAndReturn(f func(conte
 	return c
 }
 
+// ListApplications mocks base method.
+func (m *MockAllStatements) ListApplications(ctx context.Context, opts *database.ListOptions[domain.ApplicationField]) (*database.ListResult[*domain.Application], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListApplications", ctx, opts)
+	ret0, _ := ret[0].(*database.ListResult[*domain.Application])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListApplications indicates an expected call of ListApplications.
+func (mr *MockAllStatementsMockRecorder) ListApplications(ctx, opts any) *MockAllStatementsListApplicationsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListApplications", reflect.TypeOf((*MockAllStatements)(nil).ListApplications), ctx, opts)
+	return &MockAllStatementsListApplicationsCall{Call: call}
+}
+
+// MockAllStatementsListApplicationsCall wrap *gomock.Call
+type MockAllStatementsListApplicationsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsListApplicationsCall) Return(arg0 *database.ListResult[*domain.Application], arg1 error) *MockAllStatementsListApplicationsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsListApplicationsCall) Do(f func(context.Context, *database.ListOptions[domain.ApplicationField]) (*database.ListResult[*domain.Application], error)) *MockAllStatementsListApplicationsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsListApplicationsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.ApplicationField]) (*database.ListResult[*domain.Application], error)) *MockAllStatementsListApplicationsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ListAuthorizedProjects mocks base method.
 func (m *MockAllStatements) ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
 	m.ctrl.T.Helper()
@@ -19231,6 +19270,45 @@ func (c *MockApplicationServiceGetRevisionCall) Do(f func(context.Context, strin
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockApplicationServiceGetRevisionCall) DoAndReturn(f func(context.Context, string, string) (*domain.Application, error)) *MockApplicationServiceGetRevisionCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// List mocks base method.
+func (m *MockApplicationService) List(ctx context.Context, input service.ListApplicationsInput) (*service.ListApplicationsOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "List", ctx, input)
+	ret0, _ := ret[0].(*service.ListApplicationsOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// List indicates an expected call of List.
+func (mr *MockApplicationServiceMockRecorder) List(ctx, input any) *MockApplicationServiceListCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockApplicationService)(nil).List), ctx, input)
+	return &MockApplicationServiceListCall{Call: call}
+}
+
+// MockApplicationServiceListCall wrap *gomock.Call
+type MockApplicationServiceListCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockApplicationServiceListCall) Return(arg0 *service.ListApplicationsOutput, arg1 error) *MockApplicationServiceListCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockApplicationServiceListCall) Do(f func(context.Context, service.ListApplicationsInput) (*service.ListApplicationsOutput, error)) *MockApplicationServiceListCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockApplicationServiceListCall) DoAndReturn(f func(context.Context, service.ListApplicationsInput) (*service.ListApplicationsOutput, error)) *MockApplicationServiceListCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

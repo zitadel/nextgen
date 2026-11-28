@@ -1394,6 +1394,22 @@ type Handler interface {
 	//
 	// POST /schemas
 	PublishSchema(ctx context.Context, req PublishSchemaReq, params PublishSchemaParams) (PublishSchemaRes, error)
+	// QueryApplications implements queryApplications operation.
+	//
+	// Returns the applications of a project, paginated with a cursor. Each application appears once, at
+	// its newest revision, with each client's `client_id` in `definition`.
+	//
+	// The list holds both the applications a release declares and the ones registered through
+	// `publishApplication` (`POST /applications`). An entry with `declared: true` comes from a release: to
+	// change it, edit its file under `.zitadel/applications/` and deploy. An entry with `declared: false`
+	// is registered: to change it, call `publishApplication`.
+	//
+	// It never returns a client secret. A registered client's secret is only in the response of the
+	// `publishApplication` call that creates the client. A declared client's `secret` is the `${{ NAME }}`
+	// reference from its file, which names the variable holding the secret.
+	//
+	// POST /applications/query
+	QueryApplications(ctx context.Context, req *QueryApplicationsRequest, params QueryApplicationsParams) (QueryApplicationsRes, error)
 	// QueryGrants implements queryGrants operation.
 	//
 	// Returns a page of a project's grants.
