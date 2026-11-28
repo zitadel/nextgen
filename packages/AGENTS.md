@@ -43,8 +43,8 @@ change needs a changeset, and the whole train versions together.
   declared by hand in `sdk-core`, never re-exported from the generated client.
 - **Never put the codename "nextgen" in a public name, header, configuration
   key or text;** use Zitadel. The one exception is the `/__nextgen` proxy path.
-- **Build an SDK with Vite**: `vite build` with `unplugin-dts`, from a
-  `vite.config.ts` that lists the package's entries; an SDK not moved yet keeps its tool.
+- **Give a server SDK and `sdk-core` the same `vite.config.ts`** as the others built
+  with it; it reads the entries and externals from `package.json`, so never edit one copy.
 - **Keep `sdk-next` on its per-file `tsc` build**: bundlers merge `"use client"`
   modules into shared chunks and strip the directive; re-test the App Router
   client/server split before moving it.
