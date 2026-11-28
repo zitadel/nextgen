@@ -112,22 +112,25 @@ describe("check-changesets-status", () => {
     expect(report.nextAction).toContain("No changeset required");
   });
 
-  it("fails when publishable package paths changed without a changeset", async () => {
-    const { checkChangesetsStatus } = await loadModule();
-    const report = await checkChangesetsStatus({
-      entries: [{ status: "M", file: "apps/cli/src/commands/start.ts" }],
-      config: validConfig(),
-    });
+  it.each(["apps/cli/src/commands/start.ts", "packages/vite/src/vite.shared.mjs"])(
+    "fails when %s changed without a changeset",
+    async (file) => {
+      const { checkChangesetsStatus } = await loadModule();
+      const report = await checkChangesetsStatus({
+        entries: [{ status: "M", file }],
+        config: validConfig(),
+      });
 
-    expect(report.ok).toBe(false);
-    expect(report.errors).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          code: "missing-changeset",
-        }),
-      ]),
-    );
-  });
+      expect(report.ok).toBe(false);
+      expect(report.errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: "missing-changeset",
+          }),
+        ]),
+      );
+    },
+  );
 
   it("passes when a valid changeset is present", async () => {
     const { checkChangesetsStatus } = await loadModule();

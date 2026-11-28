@@ -23,6 +23,9 @@ export const publicPackages = PUBLIC_RELEASE_PACKAGES.map((pkg) => ({
 // or published, it only makes a changeset mandatory. See
 // `.changeset/README.md#when-a-change-needs-a-changeset`.
 export const embeddedServerSurfaces = [{ name: "@zitadel/server", root: "apps/console/" }];
+// The shared library build publishes nothing itself, but every SDK built with it
+// ships its output, so a change there needs a changeset listing those SDKs.
+export const sharedBuildSurfaces = [{ name: "@zitadel/sdk-*", root: "packages/vite/" }];
 
 const publicPackageNames = publicPackages.map((pkg) => pkg.name);
 const publicPackageNameSet = new Set(publicPackageNames);
@@ -162,7 +165,9 @@ export function packageForFile(file) {
   if (file.endsWith(".md")) {
     return undefined;
   }
-  return embeddedServerSurfaces.find((surface) => file.startsWith(surface.root));
+  return [...embeddedServerSurfaces, ...sharedBuildSurfaces].find((surface) =>
+    file.startsWith(surface.root),
+  );
 }
 
 export function parseChangesetPackages(source) {

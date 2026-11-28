@@ -14,12 +14,12 @@
  * @module
  */
 
-export { createZitadelOnRequest, getAuth } from "./request-handler";
+export { createZitadelOnRequest, getAuth } from "./request-handler.js";
 export type {
   ZitadelQwikRequestEvent,
   ZitadelQwikCookieValue,
   ZitadelQwikCookieOptions,
-} from "./request-handler";
+} from "./request-handler.js";
 export type {
   ZitadelMiddlewareOptions,
   ZitadelAuthResult,

@@ -43,10 +43,11 @@ change needs a changeset, and the whole train versions together.
   declared by hand in `sdk-core`, never re-exported from the generated client.
 - **Never put the codename "nextgen" in a public name, header, configuration
   key or text;** use Zitadel. The one exception is the `/__nextgen` proxy path.
-- **Keep each package's build tool** (its `build` script). `sdk-next` builds
-  per file with `tsc` because bundlers merge `"use client"` modules into shared
-  chunks and strip the directive. Never unify the builds without re-testing
-  the App Router client/server split.
+- **Build an SDK with `libraryConfig()` from `@zitadel/vite`**, the whole of its
+  `vite.config.ts`; an SDK not moved to it yet keeps its own build tool.
+- **Keep `sdk-next` on its per-file `tsc` build**: bundlers merge `"use client"`
+  modules into shared chunks and strip the directive; re-test the App Router
+  client/server split before moving it.
 - **The same-origin proxy is the shared concept**: every SDK fronts the API
   through `/__nextgen/*` on the app's own origin
   ([ADR 036](../docs/adrs/036-api-credential-planes.md), ADR 005). Server SDKs

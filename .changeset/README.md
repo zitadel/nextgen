@@ -26,6 +26,10 @@ user-visible change there ships too and needs a changeset listing
 `@zitadel/server`. It publishes no npm package of its own — that is why it sits
 in the `ignore` list — but a customer still receives the change.
 
+The shared library build (`packages/vite/**`) publishes nothing itself, but it
+builds the SDKs, so a change there needs a changeset listing the SDKs whose
+output changes.
+
 Skip a changeset **only** when the change is *exclusively*:
 
 - tests (`*_test.go`, `*.spec.ts`, …)

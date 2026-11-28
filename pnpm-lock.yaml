@@ -578,6 +578,9 @@ catalogs:
     ufo:
       specifier: ^1.6.4
       version: 1.6.4
+    unplugin-dts:
+      specifier: ^1.1.2
+      version: 1.1.2
     vite:
       specifier: ^8.3.6
       version: 8.3.8
@@ -2365,15 +2368,15 @@ importers:
       '@zitadel/components':
         specifier: workspace:*
         version: link:../components
+      '@zitadel/vite':
+        specifier: workspace:*
+        version: link:../vite
       '@zitadel/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
       jsdom:
         specifier: 'catalog:'
         version: 29.1.1(@noble/hashes@1.8.0)
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.23.0(@arethetypeswrong/core@0.18.5)(@tsdown/css@0.23.0)(@volar/typescript@2.4.30(typescript@6.0.3))(@vue/language-core@3.3.14)(oxc-resolver@11.21.2)(publint@0.3.25)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.3.14(typescript@6.0.3))
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -2588,12 +2591,12 @@ importers:
       '@zitadel/server-sdk-contract':
         specifier: workspace:*
         version: link:../server-sdk-contract
+      '@zitadel/vite':
+        specifier: workspace:*
+        version: link:../vite
       '@zitadel/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
-      tsup:
-        specifier: 'catalog:'
-        version: 8.5.1(@microsoft/api-extractor@7.58.9(@types/node@24.19.2))(@swc/core@1.15.3(@swc/helpers@0.5.23))(jiti@2.7.0)(postcss@8.5.32)(supports-color@10.2.2)(tsx@4.23.15)(typescript@6.0.3)(yaml@2.9.1)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -2759,15 +2762,15 @@ importers:
       '@zitadel/server-sdk-contract':
         specifier: workspace:*
         version: link:../server-sdk-contract
+      '@zitadel/vite':
+        specifier: workspace:*
+        version: link:../vite
       '@zitadel/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
       solid-js:
         specifier: ^1.9.18
         version: 1.9.19
-      tsup:
-        specifier: 'catalog:'
-        version: 8.5.1(@microsoft/api-extractor@7.58.9(@types/node@24.19.2))(@swc/core@1.15.3(@swc/helpers@0.5.23))(jiti@2.7.0)(postcss@8.5.32)(supports-color@10.2.2)(tsx@4.23.15)(typescript@6.0.3)(yaml@2.9.1)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -2863,15 +2866,15 @@ importers:
       '@zitadel/server-sdk-contract':
         specifier: workspace:*
         version: link:../server-sdk-contract
+      '@zitadel/vite':
+        specifier: workspace:*
+        version: link:../vite
       '@zitadel/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
       svelte:
         specifier: ^5.57.3
         version: 5.57.3(@typescript-eslint/types@8.59.3)
-      tsup:
-        specifier: 'catalog:'
-        version: 8.5.1(@microsoft/api-extractor@7.58.9(@types/node@24.19.2))(@swc/core@1.15.3(@swc/helpers@0.5.23))(jiti@2.7.0)(postcss@8.5.32)(supports-color@10.2.2)(tsx@4.23.15)(typescript@6.0.3)(yaml@2.9.1)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -3041,6 +3044,25 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.12(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.19.2)(@vitest/browser-playwright@4.1.12)(@vitest/coverage-v8@4.1.12)(jsdom@29.1.1(@noble/hashes@1.8.0))(msw@2.15.0(@types/node@24.19.2)(typescript@6.0.3))(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/vite:
+    dependencies:
+      unplugin-dts:
+        specifier: 'catalog:'
+        version: 1.1.2(@microsoft/api-extractor@7.58.9(@types/node@24.19.2))(@vue/language-core@3.3.14)(esbuild@0.28.2)(rolldown@1.2.19)(rollup@4.67.4)(supports-color@10.2.2)(typescript@6.0.3)(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(webpack@5.106.2(@swc/core@1.15.3(@swc/helpers@0.5.23))(cssnano@9.9.0(postcss@8.5.32))(csso@5.0.5)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.32)(uglify-js@3.19.3))
+    devDependencies:
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vite:
+        specifier: 'catalog:'
+        version: 8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)
       vitest:
         specifier: 'catalog:'
         version: 4.1.12(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.19.2)(@vitest/browser-playwright@4.1.12)(@vitest/coverage-v8@4.1.12)(jsdom@29.1.1(@noble/hashes@1.8.0))(msw@2.15.0(@types/node@24.19.2)(typescript@6.0.3))(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))

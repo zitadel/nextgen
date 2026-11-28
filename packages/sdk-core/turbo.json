@@ -5,10 +5,14 @@
     // contract.spec.ts imports @zitadel/components/events from its dist, and
     // the edge specs import this package's built dist.
     "typecheck": {
-      "dependsOn": ["@zitadel/components#build", "build"]
+      "dependsOn": ["@zitadel/components#build", "build"],
+      "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/packages/vite/src/vite.shared.d.mts"]
     },
+    // vite.config.ts builds with @zitadel/vite's libraryConfig(), which has no build of
+    // its own to depend on, so its source is an input here.
     "build": {
-      "dependsOn": ["@zitadel/api#build"]
+      "dependsOn": ["@zitadel/api#build"],
+      "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/packages/vite/src/vite.shared.mjs"]
     },
     // contract.spec.ts reads these SDK specs to check that each still runs
     // @zitadel/client-sdk-contract, the client entries, every edge project's

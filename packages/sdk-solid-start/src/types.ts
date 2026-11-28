@@ -14,6 +14,5 @@ export type {
   ZitadelAuthResult,
   ZitadelMiddlewareOptions,
   ZitadelClientSession,
-  ZitadelClientAuthState,
   ZitadelClientAuthResult,
 } from "@zitadel/sdk-core/middleware";

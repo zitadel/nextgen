@@ -147,6 +147,9 @@ beforeAll(() => {
       readFileSync(join(repo, "packages/vitest-config/src", file)),
     );
   }
+  for (const file of ["vite.shared.mjs", "vite.shared.d.mts"]) {
+    write(`packages/vite/src/${file}`, readFileSync(join(repo, "packages/vite/src", file)));
+  }
   run("git", ["init", "-q", "-b", "main"]);
   run("git", ["add", "."]);
   run("git", [
@@ -300,6 +303,37 @@ describe.sequential("task graph cache and ordering contracts", () => {
         "@zitadel/sdk-core#test",
         "@zitadel/components#typecheck",
       ]) {
+        expect(next.get(id).hash, id).not.toBe(baseline.get(id).hash);
+      }
+    });
+  });
+
+  test("shared Vite build changes invalidate the SDKs built with it, not unrelated builds", () => {
+    const users = [
+      "@zitadel/sdk-core",
+      "@zitadel/sdk-qwik-router",
+      "@zitadel/sdk-solid-start",
+      "@zitadel/sdk-sveltekit",
+    ];
+    changed("packages/vite/src/vite.shared.mjs", "export const minify = {};\n", () => {
+      const next = dry();
+      for (const user of users) {
+        const id = `${user}#build`;
+        expect(next.get(id).hash, id).not.toBe(baseline.get(id).hash);
+      }
+      for (const id of [
+        "@zitadel/api#build",
+        "@zitadel/components#build",
+        "@zitadel/config#build",
+        "@zitadel/design-tokens#build",
+      ]) {
+        expect(next.get(id).hash, id).toBe(baseline.get(id).hash);
+      }
+    });
+    changed("packages/vite/src/vite.shared.d.mts", "export {};\n", () => {
+      const next = dry();
+      for (const user of users) {
+        const id = `${user}#typecheck`;
         expect(next.get(id).hash, id).not.toBe(baseline.get(id).hash);
       }
     });

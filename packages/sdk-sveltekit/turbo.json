@@ -6,15 +6,19 @@
     // edge specs run the cases of @zitadel/server-sdk-contract, whose
     // typecheck edge puts its source in this task's hash.
     "typecheck": {
-      "dependsOn": ["build", "@zitadel/server-sdk-contract#typecheck"]
+      "dependsOn": ["build", "@zitadel/server-sdk-contract#typecheck"],
+      "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/packages/vite/src/vite.shared.d.mts"]
     },
+    // vite.config.ts builds with @zitadel/vite's libraryConfig(), which has no build of
+    // its own to depend on, so its source is an input here.
     "build": {
-      "dependsOn": ["@zitadel/sdk-core#build", "@zitadel/sdk-svelte#build"]
+      "dependsOn": ["@zitadel/sdk-core#build", "@zitadel/sdk-svelte#build"],
+      "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/packages/vite/src/vite.shared.mjs"]
     },
     "test": {
       "dependsOn": ["build", "@zitadel/server-sdk-contract#typecheck"]
     },
-    // tsup's declaration pass resolves the workspace packages, which need
+    // The declaration pass resolves the workspace packages, which need
     // api's generated client and the built dependencies.
     "dev": {
       "dependsOn": ["@zitadel/sdk-core#build", "@zitadel/sdk-svelte#build"]
