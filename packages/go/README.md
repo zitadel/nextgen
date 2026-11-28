@@ -51,6 +51,58 @@ successful one, or an error response the API documents, which is why the
 example asserts the type. The same code runs as `api/example_test.go` against a
 test server.
 
+## Mounting the login
+
+The `login` package renders and drives the Zitadel login flow server-side,
+with [templ](https://templ.guide) components: mount it at a route and a Go
+web app has a working sign-in, every step a plain form that works with
+JavaScript off. The configuration is what `zitadel setup` writes to
+`.env.local`.
+
+```go
+import (
+	"net/http"
+	"os"
+
+	"go.zitadel.com/zitadel/v5/login"
+)
+
+func main() {
+	mux := http.NewServeMux()
+	err := login.Mount(mux, "/login", login.Config{
+		ServerURL:     os.Getenv("ZITADEL_URL"),
+		ProjectID:     os.Getenv("ZITADEL_PROJECT_ID"),
+		ProjectSecret: os.Getenv("ZITADEL_PROJECT_SECRET"),
+		PublicOrigin:  "http://localhost:8080",
+		PostSignInURL: "/",
+	})
+	if err != nil {
+		panic(err)
+	}
+	http.ListenAndServe(":8080", mux)
+}
+```
+
+`PublicOrigin` is the origin browsers reach the app on, such as
+`https://app.example.com`: the API matches it against the project's origins
+literally, and an `https` one makes every cookie `Secure`. It is configured,
+not read off the request, which behind a proxy says neither.
+
+`GET /login/` renders the current step and `POST /login/` submits it; a
+signed-in user gets the session cookie the Zitadel SDKs read
+(`__Host-zitadel_session_<project id>`, or `zitadel_session_<project id>` on a
+plain `http` origin) and lands on the flow's redirect, else on
+`PostSignInURL`. Failures are logged in full to `Config.Logger` and told to the
+browser only in general. The same code runs as `login/example_test.go`
+against a test server. The copy comes in `en`, `de` and `it`
+(`Config.Locale`).
+
+A sign-in provider's button sends the browser to the provider, but the
+sign-in cannot complete yet: the API binds the attempt to the browser with a
+cookie of its own, which lands on this server instead, so the provider's
+callback does not find it. That needs a same-origin callback proxy, which this
+package does not have.
+
 The client is generated from the OpenAPI source in
 [`apps/api/api/openapi`](../../apps/api/api/openapi) by `turbo run generate
 --filter=@zitadel/server`, with ogen. Do not edit the `*_gen.go` files: change the
