@@ -60,24 +60,9 @@ export type Placement = "header" | "hero" | "showcase" | "try_it" | "decide" | "
 /**
  * Where a call to action leads, as a stable name, never a URL: `get_started`
  * is /get-started, `sign_up` the cloud's sign-up and `contact` zitadel.com's
- * contact page; `sign_in`, `organizations`, `single_sign_on`, `permissions`,
- * `oauth_server`, `scim` and `agents` are those feature pages and
- * `investigate` that phase page, from the hero's capabilities.
+ * contact page.
  */
-export type Target =
-  | "quickstart"
-  | "github"
-  | "get_started"
-  | "sign_up"
-  | "contact"
-  | "sign_in"
-  | "organizations"
-  | "single_sign_on"
-  | "permissions"
-  | "oauth_server"
-  | "scim"
-  | "agents"
-  | "investigate";
+export type Target = "quickstart" | "github" | "get_started" | "sign_up" | "contact";
 
 /** A tab of the front page's start window: with your agent, or in your terminal. */
 export type Tab = "with_agent" | "in_terminal";
@@ -85,8 +70,8 @@ export type Tab = "with_agent" | "in_terminal";
 /**
  * What a copy button copied, never its text: `all` is a whole block of
  * commands, `event_list` any `event list` a page offers, `auth_method` any
- * `auth-method` command, `ask` the ask for your agent, `agent_prompt` the
- * front page's prompt for your agent.
+ * `auth-method` command, `ask` an ask for your agent (the start window's,
+ * whichever it shows), `agent_prompt` the front page's prompt for your agent.
  */
 export type Snippet =
   | "all"

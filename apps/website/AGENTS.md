@@ -7,11 +7,12 @@ guide to choosing it or Zitadel v4 at `/choose-version`.
 Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 - The front page says your agent can do the auth work and shows how, in
-  this order and nothing else: the hero (title, a line for each it serves,
-  the asks it takes, the ways to start, beside the start window with your
-  agent's tab first and the frameworks setup scaffolds under it, from
-  `app/frameworks.ts`), the work (each phase's first exchange, linking its
-  page), What your agent can turn on (a tab per group of features, each
+  this order and nothing else: the hero (on the left only the title, one
+  line and the ways to start; on the right the start window, your agent's
+  tab first with its ask typing through the asks, and the frameworks setup
+  scaffolds under it, from `app/frameworks.ts`), a strip of whom it serves
+  (three tags and lines between hairlines), the work (each phase's first
+  exchange, linking its page), What your agent can turn on (a tab per group of features, each
   feature with a window and its page), You stay in charge (four points, each
   over its command, under the deployment history), Recently shipped (the
   changelog's three newest entries, each its date and title), and a closing

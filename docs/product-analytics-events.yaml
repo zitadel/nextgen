@@ -104,20 +104,10 @@ properties:
       - get_started
       - sign_up
       - contact
-      - sign_in
-      - organizations
-      - single_sign_on
-      - permissions
-      - oauth_server
-      - scim
-      - agents
-      - investigate
     description: >-
       Where a link leads, as a stable name, never a URL: `get_started` is the
       website's /get-started page, `sign_up` the cloud's sign-up page and
-      `contact` zitadel.com's contact page; `sign_in`, `organizations`,
-      `single_sign_on`, `permissions`, `oauth_server`, `scim` and `agents`
-      are those website feature pages and `investigate` that phase page.
+      `contact` zitadel.com's contact page.
 
   # Attribution
   utm_source:
@@ -182,7 +172,8 @@ properties:
       `team_list`, `team_get`, `team_deactivate`, `api_ls` for `api ls`,
       `application_publish` and `application_get` for those `api`
       operations), `dev` for the app's dev server, `skills` for the coding
-      agents' skills, `ask` for the ask that has your agent add sign-in,
+      agents' skills, `ask` for an ask for your agent (the front page's start
+      window types through several; it is whichever it shows),
       `agent_prompt` for the front page's prompt that has your agent set
       Zitadel up, or `all` for a whole block of commands.
 
@@ -853,8 +844,8 @@ components:
         status: emitted
         trigger: >-
           A call to action is clicked: the front page's Start in our cloud,
-          Run it yourself and Talk to us, a linked capability in its hero, the
-          walkthrough's quickstart and GitHub, or the header's Get started.
+          Run it yourself and Talk to us, the walkthrough's quickstart and
+          GitHub, or the header's Get started.
         destinations: [vercel]
         properties: [page, target, placement]
       selected_tab:

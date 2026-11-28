@@ -44,11 +44,26 @@ export const signInAsk = "Add sign-in to my app.";
 // setup to the CLI's, then the ask.
 export const agentPrompt = `Set up Zitadel in this app. Run \`${skillsCommand}\`, then use the Zitadel skill to add sign-in.`;
 
+// What the start window's ask types through, the sign-in first: an ask for
+// each thing your agent can turn on, as a person types it.
+export const agentAsks = [
+  signInAsk,
+  "Add passkeys to sign-up.",
+  "Connect Acme's Okta for single sign-on.",
+  "Give each customer its own organization and admins.",
+  "Let support read users, but not change them.",
+  "Protect our MCP server with OAuth.",
+  "Sync Acme's people from Entra with SCIM.",
+  "Let our booking agent act for a user, with their consent.",
+  "Who changed the password policy last week?",
+] as const;
+
 // The quickstart with your agent, the front page's start window's first tab:
-// the skills, then the ask (`ask`, at the agent's prompt, not the shell's).
+// the skills, then the ask (`ask`, at the agent's prompt, not the shell's),
+// which types through `asks`.
 export const agentQuickstart = [
   { label: "Give your agent Zitadel's skills", command: skillsCommand },
-  { label: "Ask it", command: signInAsk, ask: true },
+  { label: "Ask it", command: signInAsk, ask: true, asks: agentAsks },
 ] as const;
 
 // What the phase pages' Try it offers, as the docs and the CLI skill

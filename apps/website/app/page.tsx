@@ -1,5 +1,4 @@
 import type { CSSProperties } from "react";
-import { AskTeaser } from "./ask-teaser";
 import { RunWindow, Transcript } from "./blocks";
 import { Divider } from "./brand/divider";
 import footerLight from "./brand/footer-light.webp";
@@ -23,13 +22,16 @@ import { SiteHeader } from "./site-header";
 import { StartWindow } from "./start-window";
 import { StructuredData } from "./structured-data";
 
-// Under the title, whom it serves, each in a line: who it is for as a tag,
-// and what it gives them. What Zitadel Next is, in the message house's
-// words, stays the site's description (message.ts).
+// The line under the title, from the message house's "Use the agent you
+// already have." What Zitadel Next is stays message.ts's sentence.
+const LINE = "Use the agent you already have: Claude Code, Cursor, Codex or any other.";
+
+// Whom it serves, the strip under the hero: who it is for as a tag, and what
+// it gives them.
 const FOR = [
   {
     who: "For your coding agent",
-    what: "Set up sign-in with Zitadel's CLI and skills, from Claude Code, Cursor, Codex or any agent.",
+    what: "Set up sign-in with Zitadel's CLI and skills.",
   },
   {
     who: "For your customers",
@@ -203,22 +205,10 @@ export default function Home() {
                   your agent can run.
                 </span>
               </h1>
-              <ul className="teaser mt-6 flex max-w-[34rem] flex-col gap-3.5 text-center lg:text-left">
-                {FOR.map(({ who, what }) => (
-                  <li key={who} className="flex flex-col gap-0.5">
-                    <span className="font-heading text-text-muted text-xs uppercase leading-5 tracking-[0.08em]">
-                      {who}
-                    </span>
-                    <span className="text-pretty text-base text-text-secondary leading-7">
-                      <Unbroken text={what} />
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <div className="teaser mt-7 flex w-full flex-col items-center gap-6 lg:items-start">
-                <AskTeaser start className="w-full max-w-3xl" />
-                <StartButtons placement="hero" className="lg:justify-start" />
-              </div>
+              <p className="teaser mt-6 max-w-[34rem] text-pretty text-center text-lg text-text-secondary leading-8 lg:text-left">
+                <Unbroken text={LINE} />
+              </p>
+              <StartButtons placement="hero" className="teaser mt-10 lg:justify-start" />
             </div>
             {/* The start window on the blade fan; below a laptop the fan's
                 first frame is a soft ground behind it. */}
@@ -234,6 +224,25 @@ export default function Home() {
               </div>
             </div>
           </div>
+        </section>
+
+        {/* Whom it serves, a column each from a tablet up, between hairlines. */}
+        <section aria-label="Whom it serves" className="px-6">
+          <ul className="mx-auto grid max-w-6xl border-border-primary border-y md:grid-cols-3">
+            {FOR.map(({ who, what }) => (
+              <li
+                key={who}
+                className="flex flex-col gap-1 border-border-primary py-6 not-first:border-t md:px-8 md:py-8 md:not-first:border-t-0 md:not-first:border-l md:first:pl-0 md:last:pr-0"
+              >
+                <span className="font-heading text-text-muted text-xs uppercase leading-5 tracking-[0.08em]">
+                  {who}
+                </span>
+                <span className="text-pretty text-base text-text-secondary leading-7">
+                  <Unbroken text={what} />
+                </span>
+              </li>
+            ))}
+          </ul>
         </section>
 
         <Part

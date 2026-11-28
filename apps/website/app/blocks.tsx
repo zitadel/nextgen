@@ -6,6 +6,7 @@ import { appPath, quickstart, skillsCommand } from "./commands";
 import { CopyButton } from "./copy-button";
 import type { Exchange } from "./phases";
 import type { Run } from "./showcase/runs";
+import { TypedAsk } from "./typed-ask";
 import { WINDOW_FOOTER, WINDOW_INSET, Window } from "./window";
 
 // What the front page and the phase and feature pages (phase-page.tsx,
@@ -171,8 +172,11 @@ export function CodeFile({ title, code }: { title: string; code: string }) {
   );
 }
 
-/** A step: what it does, and its command, or with `ask` what to ask your agent. */
-export type Step = { label: string; command: string; ask?: boolean };
+/**
+ * A step: what it does, and its command, or with `ask` what to ask your
+ * agent; with `asks`, the ask types through them (typed-ask.tsx).
+ */
+export type Step = { label: string; command: string; ask?: boolean; asks?: readonly string[] };
 
 /**
  * Steps, each with what it does and its line with a copy button that always
@@ -191,7 +195,7 @@ export function StepList({
   const List = numbered ? "ol" : "ul";
   return (
     <List className={`flex flex-col gap-5 py-5 md:py-6 ${WINDOW_INSET}`}>
-      {steps.map(({ label, command, ask }, index) => (
+      {steps.map(({ label, command, ask, asks }, index) => (
         <li key={command} className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-3 gap-y-1">
           {numbered ? (
             <span
@@ -208,7 +212,11 @@ export function StepList({
           )}
           <p className="self-center text-sm text-text-primary leading-6">{label}</p>
           <div className="col-start-2 font-mono text-xs leading-6 md:text-[0.8125rem]">
-            <CommandLine command={command} placement={placement} pinned ask={ask} />
+            {asks ? (
+              <TypedAsk asks={asks} placement={placement} />
+            ) : (
+              <CommandLine command={command} placement={placement} pinned ask={ask} />
+            )}
           </div>
         </li>
       ))}
