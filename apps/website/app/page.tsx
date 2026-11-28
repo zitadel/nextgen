@@ -359,7 +359,7 @@ export default function Home() {
               {/* Balanced, "Self-host it" and "our cloud" never split, so no
                   line starts on a stray word or ends on one. */}
               <span className="display-title">
-                <Unbroken text={"Open source. Self-host it or use our cloud."} />
+                <Unbroken text={"Self-host it or use our cloud."} />
               </span>
             </h2>
             {/* What Zitadel Next is, the message house's sentence, the one
