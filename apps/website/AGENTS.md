@@ -12,10 +12,10 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   agent's tab first), the work (each phase's first exchange, linking its
   page), What your agent can turn on (a tab per group of features, each
   feature with a window and its page), You stay in charge (four points, each
-  over its command, around the deployment history), Recently shipped (the
-  changelog's three newest
-  entries), and a closing band with the ways to start and Talk to us. No
-  questions: `/llms.txt` answers those.
+  over its command, under the deployment history), Recently shipped (the
+  changelog's three newest entries, each its date and title), and a closing
+  band with the ways to start and Talk to us. No questions: `/llms.txt`
+  answers those.
 - The ways to start (`app/cta.tsx`) are two buttons, Start in our cloud and
   Copy prompt for your agent, and quiet links; never more than three buttons
   in a row.

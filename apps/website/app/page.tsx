@@ -123,35 +123,41 @@ function MoreLink({ href, children }: { href: string; children: string }) {
 }
 
 /**
- * The changelog's newest entries as notched cards, each labelled with the
- * day it landed, its title linking the entry's page (the whole card answers
- * a click), its summary and the release that carries it, once one does. Read
- * when the site builds (changelog/entries.ts), so a new entry reaches the
- * front page with the deploy that brings it.
+ * The changelog's newest entries as rows between hairlines, the site's row
+ * style (sections.tsx): the day each landed and its title, linking the
+ * entry's page. Read when the site builds (changelog/entries.ts), so a new
+ * entry reaches the front page with the deploy that brings it.
  */
 function Shipped({ entries }: { entries: readonly Entry[] }) {
   return (
-    <ul className="grid w-full gap-4 md:grid-cols-3">
+    <ul className="w-full border-border-primary border-b">
       {entries.map((entry) => (
-        <li key={entry.slug} className="flex">
-          <NotchedCard label={DATE.format(new Date(entry.date))}>
-            <h3 className="font-heading text-lg text-text-primary leading-7 tracking-[-0.01em]">
-              <a
-                href={entryPath(entry.slug)}
-                className="decoration-border-secondary underline-offset-4 after:absolute after:inset-0 after:content-[''] hover:underline focus-visible:underline focus-visible:outline-none"
-              >
-                {entry.title}
-              </a>
-            </h3>
-            <p className="mt-2 text-pretty text-sm text-text-secondary leading-6">
-              {entry.summary}
-            </p>
-            {entry.release && (
-              <p className="mt-3 font-mono text-text-muted text-xs leading-5">
-                {entry.release.tag}
-              </p>
-            )}
-          </NotchedCard>
+        <li key={entry.slug} className="border-border-primary border-t">
+          <a
+            href={entryPath(entry.slug)}
+            className="group grid gap-x-10 gap-y-1 py-5 md:grid-cols-[10rem_minmax(0,1fr)_auto] md:items-center"
+          >
+            <time dateTime={entry.date} className="font-mono text-text-muted text-xs leading-7">
+              {DATE.format(new Date(entry.date))}
+            </time>
+            <span className="text-balance font-heading text-lg text-text-primary leading-7 tracking-[-0.01em]">
+              {entry.title}
+            </span>
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 16 16"
+              fill="none"
+              className="hidden size-4 text-text-muted transition-transform group-hover:translate-x-0.5 group-hover:text-text-primary md:block"
+            >
+              <path
+                d="M3 8h10M9 4l4 4-4 4"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </a>
         </li>
       ))}
     </ul>
