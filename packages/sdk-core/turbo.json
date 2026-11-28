@@ -10,6 +10,10 @@
     "build": {
       "dependsOn": ["@zitadel/api#build"]
     },
+    // The declaration pass resolves @zitadel/api, which needs its generated client.
+    "dev": {
+      "dependsOn": ["@zitadel/api#build"]
+    },
     // contract.spec.ts reads these SDK specs to check that each still runs
     // @zitadel/client-sdk-contract, the client entries, every edge project's
     // config, every SDK's manifest, docs, public-api.json and sources (the public API standard,

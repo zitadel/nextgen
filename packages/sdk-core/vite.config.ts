@@ -1,41 +1,40 @@
 import dts from "unplugin-dts/vite";
 import { defineConfig } from "vite";
 
+import pkg from "./package.json" with { type: "json" };
+
+// The files the exports publish, each built from the source file of the same name.
+const targets = Object.values(pkg.exports).map((target) => target.import);
+const names = targets.map((target) => target.replace(/^\.\/dist\/|\.m?js$/g, ""));
+const extension = targets.every((target) => target.endsWith(".mjs")) ? ".mjs" : ".js";
+
 export default defineConfig({
   build: {
     sourcemap: true,
     lib: {
-      entry: {
-        index: "src/index.ts",
-        types: "src/types.ts",
-        config: "src/config.ts",
-        jwt: "src/jwt.ts",
-        middleware: "src/middleware.ts",
-        session: "src/session.ts",
-      },
+      entry: Object.fromEntries(names.map((name) => [name, `src/${name}.ts`])),
       formats: ["es"],
     },
     rolldownOptions: {
       // Only this package's own files are bundled; every package it imports stays an import.
       external: [/^[^./]/],
-      // Minified without Vite's kept whitespace; names stay so errors and components read right.
       output: {
+        entryFileNames: `[name]${extension}`,
+        chunkFileNames: `[name]-[hash]${extension}`,
+        // Minified without Vite's kept whitespace; names stay so errors and components read right.
         minify: {
           compress: { keepNames: { function: true, class: true } },
           mangle: { keepNames: true },
           codegen: { removeWhitespace: true },
         },
-        // The exports name `.mjs` files.
-        entryFileNames: "[name].mjs",
-        chunkFileNames: "[name]-[hash].mjs",
       },
     },
   },
   plugins: [
     dts({
       tsconfigPath: "./tsconfig.lib.json",
-      // The exports name `.d.mts` declarations.
-      outDirs: { dir: "dist", moduleFormat: "esm" },
+      // `.d.mts` declarations beside `.mjs` files, `.d.ts` beside `.js` files.
+      outDirs: { dir: "dist", moduleFormat: extension === ".mjs" ? "esm" : undefined },
     }),
   ],
 });
