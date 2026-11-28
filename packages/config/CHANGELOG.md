@@ -1,5 +1,24 @@
 # @zitadel/config
 
+## 0.10.0
+
+### Minor Changes
+
+- [#3378](https://github.com/zitadel/nextgen/pull/3378) [`074a400`](https://github.com/zitadel/nextgen/commit/074a400c74c8929a5b3359fab0fb827c7ed2a8b6) - `zitadel settings oauth enable` turns the project's OAuth authorization server on: it writes `.zitadel/oauth/oauth.json`, the one settings file beside the branding descriptor, and `zitadel deploy` ships it as the release's `oauth` resource. A release without the file leaves the authorization server off. `@zitadel/config` exports the file's `oauthConfigSchema`, its `oauth-settings.json` meta-schema and `OAUTH_FILE_SCHEMA_REF`, and the OpenAPI description of the OAuth settings names the file.
+
+- [#3201](https://github.com/zitadel/nextgen/pull/3201) [`1bae790`](https://github.com/zitadel/nextgen/commit/1bae7903716aa288e1985239190d870753a5b2e8) - A release can declare applications: `POST /releases/build` takes `applications`, served by the deployments of that release ([docs](https://preview.zitadel.com/docs/reference/api/releases/buildRelease)), and a deploy is refused while a declared client's `${{ NAME }}` secret variable has no value, holds a plain value, or holds a secret that is empty or not a string. `GET /applications/revisions/{revision_id}` reads what a release pins, and the console's release detail lists the applications and OAuth settings it pins.
+  
+  `zitadel deploy` sends the applications under `.zitadel/applications/<slug>.json` with the release, and `deploy --dry-run` shows an added, changed or removed application in its diff. Before anything is uploaded, a deploy refuses a file that breaks the application schema, a client without a `client_id`, a confidential client that does not name its secret as a `${{ NAME }}` variable, two files with one slug, two clients with one `client_id`, and a secret variable another client or a connection names, and it refuses a secret variable the project lacks or holds as a plain value. `setup` copies the schema to `.zitadel/meta/application.json`, so editors check the file's shape. `@zitadel/config` exports `applicationConfigSchema` and `declaredApplicationIssues`.
+
+- [#3386](https://github.com/zitadel/nextgen/pull/3386) [`7c699e1`](https://github.com/zitadel/nextgen/commit/7c699e18cef5a6806a2aea0b690573bcace19d89) - `<zitadel-login>` now loads only what a page uses: the template engine, the HTML sanitiser and the German or Italian texts load when a page first needs them, so every SDK's app stays under the bundlers' 500 kB chunk warning. `standalone.mjs` is now minified. `@zitadel/config/template-tags` holds the template tag names without the validator.
+  
+  **Breaking:** `de`, `it` and `builtinLocales` are no longer exported from the package root or `@zitadel/components/orchestrator`. Import them from `@zitadel/components/locales`; the widget still picks the translation for the page's language by itself.
+
+### Patch Changes
+
+- Updated dependencies [[`e96a106`](https://github.com/zitadel/nextgen/commit/e96a1064af04ce779f288a806ede9aca19937c3b), [`938e678`](https://github.com/zitadel/nextgen/commit/938e6787b788e8a61dae7b88ffde01f6e7a57cc1), [`ac5e295`](https://github.com/zitadel/nextgen/commit/ac5e2955e230bc45339b3d8293f43ad6832ef1eb)]:
+  - @zitadel/api@0.10.0
+
 ## 0.9.0
 
 ### Patch Changes

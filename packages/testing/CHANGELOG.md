@@ -1,5 +1,20 @@
 # @zitadel/testing
 
+## 0.10.0
+
+### Minor Changes
+
+- [#3392](https://github.com/zitadel/nextgen/pull/3392) [`e96a106`](https://github.com/zitadel/nextgen/commit/e96a1064af04ce779f288a806ede9aca19937c3b) - Every `@zitadel/api` request now takes its settings from one immutable `ZitadelClient`, so two clients on a page, such as an app's own and the sign-in widget's, can no longer leak a timeout, abort signal or token into each other's requests.
+  
+  **Breaking:** every generated operation takes its client as the first argument (`getProject(client, projectId)`), and calling one without it does not compile. `createZitadelClient(options)` is replaced by `createZitadelApi(new ZitadelClient({ baseUrl, token }))`, which binds every operation to one client. `pagedFunctions[name].withToken` takes and returns the generated function's full arguments, its client first. `getApi(project)` still binds every operation to the project's client, and `getClient(project)` returns that client. `setProxyPath`, `getProxyPath`, `getApiBaseUrl`, `setRequestPolicy`, `createApi` and the `@zitadel/api/runtime/auth` entry (`setApiAuthToken`, `setApiCsrfToken`, `setApiCsrfRejectionHandler` and their getters) are removed, and so is `CSRF_HEADER` from `@zitadel/api/runtime/fetch`: the client knows nothing of CSRF, and an app that needs the header passes its own `fetch` to the client. A client's `onRequest` runs before every request with a `ZitadelRequest` (the operation's name, URL and request), and stops the request by throwing. The generated `get…Url` builders are no longer exported; call the operation, which builds its own URL. `getApi(project)`, in `@zitadel/api/config` and re-exported by `@zitadel/sdk-core`, therefore no longer carries them, and it gains a `client` property holding the `ZitadelClient` every operation runs against. In `@zitadel/testing`, `ConnectedZitadel.api` and the seeding helpers take the bound `ZitadelApi` type, which `@zitadel/api/client` no longer calls `ZitadelClient`.
+
+### Patch Changes
+
+- Updated dependencies [[`e96a106`](https://github.com/zitadel/nextgen/commit/e96a1064af04ce779f288a806ede9aca19937c3b), [`b07fbe5`](https://github.com/zitadel/nextgen/commit/b07fbe54c36479ff585006c4ff512bcd5983861d), [`53b5bc6`](https://github.com/zitadel/nextgen/commit/53b5bc6000b45984906002bdc2a77934e915d840), [`2383162`](https://github.com/zitadel/nextgen/commit/2383162fef0f009e47b2fd59849b76a700d2617c), [`229660e`](https://github.com/zitadel/nextgen/commit/229660e3c0865c97e5eee46eb2fd7af624dc5844), [`53b5bc6`](https://github.com/zitadel/nextgen/commit/53b5bc6000b45984906002bdc2a77934e915d840), [`074a400`](https://github.com/zitadel/nextgen/commit/074a400c74c8929a5b3359fab0fb827c7ed2a8b6), [`c7da794`](https://github.com/zitadel/nextgen/commit/c7da79472009113cfdfe0de49cd51cbcdf71834e), [`1bae790`](https://github.com/zitadel/nextgen/commit/1bae7903716aa288e1985239190d870753a5b2e8), [`9765b76`](https://github.com/zitadel/nextgen/commit/9765b76066bc46b9100bf87671d7e427a47f4d50), [`7c699e1`](https://github.com/zitadel/nextgen/commit/7c699e18cef5a6806a2aea0b690573bcace19d89), [`938e678`](https://github.com/zitadel/nextgen/commit/938e6787b788e8a61dae7b88ffde01f6e7a57cc1), [`bb0bb9a`](https://github.com/zitadel/nextgen/commit/bb0bb9a14729e7026d476f9564560c54ab0ca742), [`ac5e295`](https://github.com/zitadel/nextgen/commit/ac5e2955e230bc45339b3d8293f43ad6832ef1eb), [`8328cfa`](https://github.com/zitadel/nextgen/commit/8328cfa0bab9b539bad5371575051b91bf6ab2c7), [`5b51643`](https://github.com/zitadel/nextgen/commit/5b51643162a614f5cde798bd7a138f607624f78f)]:
+  - @zitadel/api@0.10.0
+  - @zitadel/cli@0.10.0
+  - @zitadel/config@0.10.0
+
 ## 0.9.0
 
 ### Patch Changes
