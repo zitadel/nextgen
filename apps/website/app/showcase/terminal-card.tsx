@@ -6,7 +6,7 @@ import type { Recording } from "./types";
 import { printedClass, ReplayButton, TypedCommand, useTyping } from "./typing";
 
 /**
- * One of the hero's commands and what it printed, in a terminal window. Once
+ * One of the quickstart's commands and what it printed, in a terminal window. Once
  * it is on screen it types the command and prints the output line by line,
  * and Replay plays it again (typing.tsx).
  */

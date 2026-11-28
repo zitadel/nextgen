@@ -1,26 +1,107 @@
 import { track } from "@vercel/analytics";
 
 import {
+  acmeDeployCommand,
+  acmeSsoCommand,
+  actorEventsCommand,
+  agentPrompt,
+  correlationEventsCommand,
+  customSsoCommand,
   deployCommand,
+  deploymentHistoryCommand,
   devCommand,
   dryRunCommand,
+  failedRequestsCommand,
+  googleDisableCommand,
+  googleEnableCommand,
+  grantCreateCommand,
+  grantDeleteCommand,
+  grantListCommand,
+  idpListCommand,
+  invitationCommand,
+  membersCommand,
+  passkeyEnableCommand,
+  policyTestCommand,
+  rollbackCommand,
   setupCommand,
+  signInAsk,
   skillsCommand,
   startCommand,
+  userEventsCommand,
+  userListCommand,
+  userSignInsCommand,
+  teamCreateCommand,
+  teamListCommand,
+  teamGetCommand,
+  teamDeactivateCommand,
+  apiListCommand,
+  applicationPublishCommand,
+  applicationGetCommand,
 } from "./commands";
 
 // The website's custom events in Vercel Web Analytics, as
 // docs/product-analytics-events.yaml defines them: what page views cannot
-// show, a command copied and a call to action followed. The <Analytics /> of
+// show, a command copied, a call to action followed and a tab chosen. The
+// <Analytics /> of
 // layout.tsx sends them in production and logs them in development. They go
 // from the browser like the page views, so a blocker drops a visitor from
 // both and the ratios between them hold.
 
-/** Where on its page a copy button or a call to action sits. */
-export type Placement = "hero" | "showcase" | "footer";
+/**
+ * Where on its page a copy button or a call to action sits: `header` is the
+ * bar over every page, `showcase` the quickstart's walkthrough on
+ * /get-started, `try_it` the Try it of a phase or a feature page
+ * (phase-page.tsx, feature-page.tsx), whose page the event's `page` names,
+ * `decide` the change history under You stay in charge (the front page) or
+ * You decide (a phase page), and `closing` the front page's closing band.
+ */
+export type Placement = "header" | "hero" | "showcase" | "try_it" | "decide" | "closing" | "footer";
 
-/** What a copy button copied, never its text: `all` is the hero's whole block. */
-export type Snippet = "all" | "start" | "setup" | "dev" | "dry_run" | "deploy" | "skills";
+/**
+ * Where a call to action leads, as a stable name, never a URL: `get_started`
+ * is /get-started, `sign_up` the cloud's sign-up and `contact` zitadel.com's
+ * contact page.
+ */
+export type Target = "quickstart" | "github" | "get_started" | "sign_up" | "contact";
+
+/** A tab of the front page's start window: with your agent, or in your terminal. */
+export type Tab = "with_agent" | "in_terminal";
+
+/**
+ * What a copy button copied, never its text: `all` is a whole block of
+ * commands, `event_list` any `event list` a page offers, `auth_method` any
+ * `auth-method` command, `ask` an ask for your agent (the start window's,
+ * whichever it shows), `agent_prompt` the front page's prompt for your agent.
+ */
+export type Snippet =
+  | "all"
+  | "ask"
+  | "agent_prompt"
+  | "start"
+  | "setup"
+  | "dev"
+  | "dry_run"
+  | "deploy"
+  | "skills"
+  | "policy_test"
+  | "rollback"
+  | "deployment_list"
+  | "grant_list"
+  | "grant_create"
+  | "grant_delete"
+  | "members"
+  | "event_list"
+  | "auth_method"
+  | "idp_list"
+  | "user_list"
+  | "invitation_create"
+  | "team_create"
+  | "team_list"
+  | "team_get"
+  | "team_deactivate"
+  | "api_ls"
+  | "application_publish"
+  | "application_get";
 
 const SNIPPETS = new Map<string, Snippet>([
   [startCommand, "start"],
@@ -29,6 +110,36 @@ const SNIPPETS = new Map<string, Snippet>([
   [dryRunCommand, "dry_run"],
   [deployCommand, "deploy"],
   [skillsCommand, "skills"],
+  [signInAsk, "ask"],
+  [agentPrompt, "agent_prompt"],
+  [policyTestCommand, "policy_test"],
+  [rollbackCommand, "rollback"],
+  [deploymentHistoryCommand, "deployment_list"],
+  [acmeSsoCommand, "auth_method"],
+  [acmeDeployCommand, "deploy"],
+  [grantListCommand, "grant_list"],
+  [grantDeleteCommand, "grant_delete"],
+  [userEventsCommand, "event_list"],
+  [userSignInsCommand, "event_list"],
+  [actorEventsCommand, "event_list"],
+  [correlationEventsCommand, "event_list"],
+  [failedRequestsCommand, "event_list"],
+  [passkeyEnableCommand, "auth_method"],
+  [googleEnableCommand, "auth_method"],
+  [googleDisableCommand, "auth_method"],
+  [customSsoCommand, "auth_method"],
+  [idpListCommand, "idp_list"],
+  [grantCreateCommand, "grant_create"],
+  [membersCommand, "members"],
+  [userListCommand, "user_list"],
+  [invitationCommand, "invitation_create"],
+  [teamCreateCommand, "team_create"],
+  [teamListCommand, "team_list"],
+  [teamGetCommand, "team_get"],
+  [teamDeactivateCommand, "team_deactivate"],
+  [apiListCommand, "api_ls"],
+  [applicationPublishCommand, "application_publish"],
+  [applicationGetCommand, "application_get"],
 ]);
 
 /** The snippet `command` is, or `undefined` for a command the catalog has no name for. */
@@ -38,12 +149,20 @@ export function snippetOf(command: string): Snippet | undefined {
 
 type Events = {
   copied_command: { snippet: Snippet; placement: Placement };
-  clicked_link: { target: "quickstart" | "github"; placement: Placement };
+  clicked_link: { target: Target; placement: Placement };
+  selected_tab: { tab: Tab; placement: Placement };
 };
 
-/** A page's stable name: `home` for `/`, else its first path segment. */
+/**
+ * A page's stable name: `home` for `/`, a feature page's two segments
+ * (`platform/teams`), else its first path segment.
+ */
 export function pageOf(pathname: string): string {
-  return pathname.split("/")[1] || "home";
+  const [, first = "", second] = pathname.split("/");
+  if (first === "platform" && second) {
+    return `platform/${second}`;
+  }
+  return first || "home";
 }
 
 /**

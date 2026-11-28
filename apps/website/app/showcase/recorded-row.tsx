@@ -75,6 +75,7 @@ export function RecordedRow({
       count={count}
       label={session.label}
       description={session.description}
+      ask={session.ask}
       artifact={
         (artifact && (
           <FileCard

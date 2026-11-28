@@ -60,17 +60,19 @@ export type Page = { url: string; screens: Screen[] };
  */
 export type Result = Page & { before?: Screen[] };
 
-/** A command of the hero and the lines it printed, in a terminal window titled `title`. */
+/** A command of the quickstart and the lines it printed, in a terminal window titled `title`. */
 export type Recording = { title: string; command: string; output: string[] };
 
 /**
  * One step of the showcase: what a command printed, what setup wrote, or the
  * changed files, beside the result when there is a page to show. In
- * `description`, text between backticks is code.
+ * `description`, text between backticks is code; `ask` is what a person
+ * would tell their agent to get the same change.
  */
 export type Session = {
   label: string;
   description: string;
+  ask?: string;
   recording?: Recording;
   scaffold?: Scaffold;
   artifact?: Artifact;

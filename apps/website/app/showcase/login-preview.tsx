@@ -215,3 +215,18 @@ export function LoginPreview({
     </div>
   );
 }
+
+/**
+ * A page of the login on its own, the visitor walking its flow: each action
+ * shows the next screen, and the last one's the first again.
+ */
+export function LoginFlow({ screens }: { screens: Screen[] }) {
+  const [index, setIndex] = useState(0);
+  return (
+    <LoginPreview
+      screens={screens}
+      index={index}
+      onAdvance={() => setIndex((current) => (current + 1) % screens.length)}
+    />
+  );
+}

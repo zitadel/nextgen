@@ -46,8 +46,8 @@ const signInWithPassword: Screen = { ...signIn, fields: [email, password] };
 const done: Screen = { title: "You're signed in", fields: [], action: "Sign out" };
 
 // The default login flow, identifier → password → done, at the URL setup's
-// login page serves it.
-const login: Page = { url: "localhost:3000/login", screens: [signIn, enterPassword, done] };
+// login page serves it; the front page's Sign-in shows it too.
+export const login: Page = { url: "localhost:3000/login", screens: [signIn, enterPassword, done] };
 
 const registration: Page = { url: "localhost:3000/register", screens: [register] };
 
@@ -57,7 +57,7 @@ export const loginAfterFlowChange: Page = { url: login.url, screens: [signInWith
 
 // The showcase's recorded steps, from zitadel/new-website's narrative redesign
 // (its homepage's terminalSection), re-recorded on 10 November 2026 with
-// @zitadel/cli 0.5.0, the hero's commands: the first step is what that
+// @zitadel/cli 0.5.0, the quickstart's commands: the first step is what that
 // session's start printed; the second the files its setup wrote (the rest it
 // summed up as "env, project config, the editable user schema and login
 // flow"); the next two its recorded diffs and command output, each change
@@ -103,6 +103,7 @@ export const sessions: Session[] = [
     label: "Add a field",
     description:
       "Add a property to the user schema, ask for it on the registration step, commit, do a dry run, deploy. The form shows it.",
+    ask: "Ask for the company at sign-up.",
     artifact: {
       files: [
         {
@@ -149,6 +150,7 @@ export const sessions: Session[] = [
     label: "Change the flow",
     description:
       "Change what a step asks for and where it goes next, commit, do a dry run, deploy. The login follows.",
+    ask: "Ask for email and password on one screen.",
     artifact: {
       // After the change the identifier step asks for the password too: its
       // pill shows it, or the flow would look like it lost the password.
@@ -190,10 +192,10 @@ export const sessions: Session[] = [
   },
 ];
 
-// The last step, live (brand-row.tsx): no recording, only its words, here so
-// the hero can point to it by name.
+// The last step, live (brand-row.tsx): no recording, only its words.
 export const brandStep = {
   label: "Match your brand",
   description:
     "Set the login's design tokens in your own stylesheet. The look follows your app. Try it here.",
+  ask: "Make the login match our brand.",
 };

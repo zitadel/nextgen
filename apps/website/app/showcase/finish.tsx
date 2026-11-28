@@ -6,7 +6,8 @@ import { RAIL, Sentences, stepColor } from "./step";
 const order = (index: number) => ({ "--i": index }) as CSSProperties;
 
 /**
- * The end of the steps: the login is live, and the way on is the quickstart.
+ * The end of the steps: the whole loop ran, your agent can run it, and the
+ * way on is the quickstart.
  * Its dot on the spine is a check in the stepper's last color, green; as the
  * spine's fill reaches it (spine.tsx sets data-reached), the check pops with
  * a ring, the card lights in green from above, and its lines rise in one
@@ -51,17 +52,17 @@ export function Finish({ index, count }: { index: number; count: number }) {
         <p className="finish-reveal font-mono text-(--step) text-xs leading-4" style={order(0)}>
           That's the whole loop
         </p>
-        <h2
+        <h3
           className="finish-reveal mx-auto mt-4 max-w-xl text-balance text-3xl leading-tight md:text-5xl"
           style={order(1)}
         >
-          <span className="display-title">Get started with Zitadel now.</span>
-        </h2>
+          <span className="display-title">Your agent can run all of it.</span>
+        </h3>
         <p
           className="finish-reveal mx-auto mt-4 max-w-lg text-balance text-lg text-text-secondary leading-7"
           style={order(2)}
         >
-          <Sentences text="From the first command to a login that is yours in a minute. The quickstart walks you through it." />
+          <Sentences text="Start with the quickstart, by hand or with your agent." />
         </p>
         <div className="finish-reveal" style={order(3)}>
           <CallToAction placement="showcase" className="mt-7" />

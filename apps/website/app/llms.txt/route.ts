@@ -1,20 +1,38 @@
 import { commands, deployCommand, dryRunCommand, folderCommand, skillsCommand } from "../commands";
+import { QUESTIONS, SENTENCE } from "../message";
+import { PHASES, phasePath } from "../phases";
+import { FEATURES, featurePath, PLATFORM } from "../platform";
 import { sessions } from "../showcase/sessions";
 
 // The host's llms.txt (llmstxt.org): what the preview is, the commands, what
-// they leave behind and how to change it, then where an agent reads on. The
-// files come from the showcase's data (showcase/sessions.ts), so the page and
-// this file never disagree. The docs keep the index of their own pages at
-// /docs/llms.txt. Served at /llms.txt through a rewrite of its own in the
-// repo-root vercel.json (AGENTS.md).
+// they leave behind and how to change it, the questions about it, the site's
+// phase and feature pages, then where an agent reads on. The files come from the showcase's data
+// (showcase/sessions.ts) and the pages from theirs (phases.ts, platform.ts),
+// so the pages and this file never disagree. The docs keep the index of their
+// own pages at /docs/llms.txt. Served at /llms.txt through a rewrite of its
+// own in the repo-root vercel.json (AGENTS.md).
 const files = sessions
   .flatMap(({ scaffold }) => scaffold?.entries ?? [])
   .map(({ path, note }) => `- \`${path}\`: ${note}`)
   .join("\n");
 
+// A phase's line follows its title, as on its page: alone, Govern's "Each
+// signs in as itself" would name no one.
+const phasePages = PHASES.map(
+  ({ slug, name, title, line }) => `- [${name}](${phasePath(slug)}): ${title} ${line}`,
+);
+
+const featurePages = [
+  `- [${PLATFORM.name}](${PLATFORM.path}): ${PLATFORM.line}`,
+  ...FEATURES.map(({ slug, name, line }) => `- [${name}](${featurePath(slug)}): ${line}`),
+];
+
+// The questions about Zitadel Next as a whole, word for word (message.ts).
+const questions = QUESTIONS.map(({ question, answer }) => `- **${question}** ${answer}`);
+
 const body = `# Zitadel (developer preview)
 
-> Your login in one minute. Zitadel is open-source auth for users, services, and AI agents that lives in the app's repo: one terminal session gives an app a local Zitadel with login, registration, and profile pages, and the user model, the login flow, and the styling are files in the repo. This is the preview of the next Zitadel: APIs, CLI flags and packages still change.
+> ${SENTENCE} One terminal session gives an app a local Zitadel with login, registration, and profile pages, and the user model, the login flow, and the styling are files in the app's repo. This is the preview of the next Zitadel: APIs, CLI flags and packages still change.
 
 Run it locally with the published CLI (Node.js 24 or newer), in a new folder for a Next.js app. Every Zitadel command takes \`--non-interactive --json\` and prints one JSON envelope on stdout:
 
@@ -34,6 +52,18 @@ Install the Zitadel skills into a skills-compatible agent: \`${skillsCommand}\`.
 
 - Account linking: a social sign-in never links to an existing account. A user with a password account who signs in with Google lands on "You already have an account" every time.
 - Password recovery: the login has no "forgot password" step, because the server sends no email yet (the dev inbox, ADR 050, and recovery, ADR 038, are still proposals).
+
+## Questions
+
+${questions.join("\n")}
+
+## How it works
+
+${phasePages.join("\n")}
+
+## Platform
+
+${featurePages.join("\n")}
 
 ## Docs
 

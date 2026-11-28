@@ -2,13 +2,20 @@ import { track } from "@vercel/analytics";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { pageOf, snippetOf, trackEvent } from "./analytics";
-import { commands, deployCommand, dryRunCommand, skillsCommand } from "./commands";
+import * as offered from "./commands";
 
 vi.mock("@vercel/analytics", () => ({ track: vi.fn() }));
 
 describe("snippetOf", () => {
   it("names every command the website offers to copy", () => {
-    for (const command of [...commands, dryRunCommand, deployCommand, skillsCommand]) {
+    // Every exported command but the folder's, which only /llms.txt shows.
+    const commands = Object.entries(offered).flatMap(([name, value]) =>
+      name.endsWith("Command") && name !== "folderCommand" && typeof value === "string"
+        ? [value]
+        : [],
+    );
+    expect(commands.length).toBeGreaterThan(10);
+    for (const command of commands) {
       expect(snippetOf(command), command).toBeDefined();
     }
   });
@@ -23,6 +30,11 @@ describe("pageOf", () => {
     expect(pageOf("/")).toBe("home");
     expect(pageOf("/changelog")).toBe("changelog");
     expect(pageOf("/changelog/zitadel-deploy")).toBe("changelog");
+  });
+
+  it("calls a feature page by its two segments", () => {
+    expect(pageOf("/platform/passkeys-and-passwords")).toBe("platform/passkeys-and-passwords");
+    expect(pageOf("/platform")).toBe("platform");
   });
 });
 
@@ -39,24 +51,24 @@ describe("trackEvent", () => {
 
   it("sends the header, the page and the event's properties", () => {
     vi.stubEnv("WEBSITE_VERSION", "fa1eade");
-    trackEvent("copied_command", { snippet: "setup", placement: "hero" });
+    trackEvent("copied_command", { snippet: "skills", placement: "hero" });
     expect(track).toHaveBeenCalledWith("copied_command", {
       surface: "website",
       website_version: "fa1eade",
       page: "home",
-      snippet: "setup",
+      snippet: "skills",
       placement: "hero",
     });
   });
 
   it("leaves the version out where the build knew no commit", () => {
     vi.stubEnv("WEBSITE_VERSION", "");
-    trackEvent("clicked_link", { target: "github", placement: "showcase" });
+    trackEvent("clicked_link", { target: "sign_up", placement: "hero" });
     expect(track).toHaveBeenCalledWith("clicked_link", {
       surface: "website",
       page: "home",
-      target: "github",
-      placement: "showcase",
+      target: "sign_up",
+      placement: "hero",
     });
   });
 });

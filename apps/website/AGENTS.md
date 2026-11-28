@@ -1,14 +1,69 @@
 # Agent Instructions — `apps/website`
 
-The hosted cloud's front page at `/`, its changelog at `/changelog`, with a
-page per entry and a feed under it, and the guide to choosing it or Zitadel v4
-at `/choose-version`.
+The hosted cloud's front page at `/`, a page per phase (`/get-started`,
+`/operate`, `/investigate`, `/govern`) and per feature (`/platform/*`), its
+changelog at `/changelog`, with a page per entry and a feed under it, and the
+guide to choosing it or Zitadel v4 at `/choose-version`.
 Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
-- The front page says the benefit, then proves it, and nothing else: the
-  hero with the commands, then the showcase's steps, ending on the
-  quickstart. Feature lists, ways in and roadmaps belong on the docs and
+- The front page says your agent can do the auth work and shows how, in
+  this order and nothing else: the hero (on the left only the title, one
+  line and the ways to start; on the right the start window, your agent's
+  tab first with its ask typing through the asks, and the frameworks setup
+  scaffolds under it, from `app/frameworks.ts`), a strip of whom it serves
+  (three tags and lines between hairlines), the work (each phase's first
+  exchange, linking its page), What your agent can turn on (a tab per group of features, each
+  feature with a window and its page), You stay in charge (four points, each
+  over its command, under the deployment history), Recently shipped (the
+  changelog's three newest entries, each its date and title), and a closing
+  band with the ways to start and Talk to us. No questions: `/llms.txt`
+  answers those.
+- The ways to start (`app/cta.tsx`) are two buttons, Start in our cloud and
+  Copy prompt for your agent, and quiet links; never more than three buttons
+  in a row.
+- A feature's window on the front page stops at the default one's height
+  (`app/brand/capped.tsx`) and links its page, which shows it whole.
+- What Zitadel Next is lives in `app/message.ts` as `SENTENCE`: the share
+  image, `/llms.txt`, the closing band and the first question's answer, not
+  the hero's lines. Render it from there, never as a copy.
+- The front page's meta description, for search and shares, is
+  `DESCRIPTION` beside it (`app/layout.tsx`), not the sentence.
+- The front page's JSON-LD is `app/structured-data.tsx`, built from
+  `message.ts`, `links.ts` and the CLI's and server's `package.json`; never
+  add offers or ratings.
+- The questions about Zitadel Next as a whole live in `app/message.ts`, word
+  for word; the phase and feature pages keep their own.
+- A front-page window renders what another page shows, from the same data or
+  component, never a copy: a feature's is its Under the hood
+  (`app/hoods.tsx`), Passkeys & passwords' the live login.
+- Keep the showcase's walkthrough, logos, badges and star counts off the front
+  page: the walkthrough is `/get-started`; roadmaps belong on the docs and
   zitadel.com.
+- Every phase page (`app/phases.ts`, which holds its asks) has the same parts
+  (`app/phase-page.tsx`): the title with the phases' stepper and what your
+  agent does, Ask it, Under the hood, You decide, Try it, Questions, and the
+  phase after it. `/get-started` shows the quickstart's walkthrough, the
+  hero's commands then the showcase, in place of Under the hood and Try it.
+- Every feature page (`app/platform.ts`) has the same seven parts
+  (`app/feature-page.tsx`): its group, title and line, What you get, Ask your
+  agent, Under the hood, Try it, Questions, and Related.
+- Under the hood shows one real thing from this repo, taken from code or
+  docs; Try it only commands that work now (README, the CLI skill, `--help`).
+- Your agent's replies (`app/phases.ts`, the feature pages' Ask your agent)
+  answer like a colleague in chat: the outcome first, in the first person,
+  two sentences at most, no field or resource names; the same ask, the same
+  reply.
+- Break a code window's objects and arrays, never a value, so its lines fit
+  the window at 1440px (`app/hoods.tsx` says how far).
+- "Solutions" is kept for use-case pages (B2B SaaS, consumer apps, agents and
+  MCP); a feature goes under Platform.
+- Say "team", never "organization" ([glossary](../../docs/design/glossary.md)
+  §9–10), except in the Teams page's title tag, where people search for it.
+- "Sign-in" is what a user does; "login" is the component (`<zitadel-login>`,
+  embedded login).
+- The header's links and menus of groups come from `app/nav.ts`: add a menu,
+  a group or a link there, never in `site-header.tsx`.
+- The footer's menu columns, `/platform` and `/llms.txt` read the same data.
 - It ports `zitadel/new-website`'s narrative redesign
   (`docs/narrative-ia-proposal.md` on that repo's
   `claude/zitadel-narrative-redesign-377a49` branch) and follows that repo's
@@ -53,6 +108,33 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 - Dark and light share one set of names in `app/globals.css`: add a color as
   a token with a value on both sides, never a `white`/`black` literal.
+- Build from the site's own pieces (windows, command blocks, the steps' labels
+  and hairlines, the display title) and the brand's graphic pieces, never a
+  color per section or phase.
+- The brand's pieces are its gradient shapes (the hero's blade fan, the
+  dividers'), orange light falling to black or the paper, the noise grain
+  and the notched cards: components and assets in `app/brand/`.
+- Their classes and tokens are `app/globals.css`' brand block and the
+  `--color-brand*`, `--color-notch-*` and `--fan-*` tokens.
+- At most one glowing element on any screen at 1440px: drop a glow rather
+  than add one.
+- Zitadel's orange is the only color for buttons, links and state; no brand
+  color marks state, such as the current page.
+- No colored card borders: the notched cards' hairline (`.notch-edge`) is the
+  theme's neutral ink.
+- Play a Lottie only with `lottie-web`'s light player (`lottie_light`), after
+  the first paint (`app/brand/lottie-icon.tsx`): the full player needs
+  `'unsafe-eval'`. Give reduced motion its first frame.
+- The hero's fan is the agency's animation as an H.264 video over its first
+  frame (`app/brand/hero-fan.tsx`), loaded from 1024px when idle, never for
+  reduced motion or Save-Data. It beat the Lottie, an animated WebP and a
+  WebM on size and looks.
+- Keep the fan's first frame under 0.05 bits a pixel at 550×448, so the title
+  stays the largest paint. Remake both from the agency's frames a shade darker
+  (`lutrgb` minus 3), the video with `libx264 -crf 19 -tune animation`.
+- Colour code where the page is built: JSON with Shiki and the docs' theme
+  (`app/code.tsx`), a command's words in `app/command-line.tsx`; never ship a
+  highlighter. The `--zl-shiki-*` tokens copy the docs': change both.
 - `app/theme.ts` sets `data-theme` before the first paint, from the header
   toggle's choice or the system's; the login previews follow it.
 
@@ -71,17 +153,22 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 - `layout.tsx` imports the share image (`app/og.jpg`) and sets no
   `metadataBase`: on Vercel, Next makes its URL absolute with the deployment's
   host. Render it from `scripts/og.html` at 1200×630 as a JPEG (quality 88),
-  and change both when the hero's title, line or commands change.
+  and change both when the hero's title, `app/message.ts`'s sentence or the
+  quickstart's commands change.
 
 ## The commands and the showcase
 
-- `app/commands.ts` feeds the hero and `/llms.txt`. The commands follow the
+- `app/commands.ts` holds every command, ask and prompt the site shows. Its
+  `quickstart`, on `/get-started` and in the hero's terminal tab, follows the
   README's quick start; never add `--force`. When that journey changes,
   change the commands and the showcase, and run them once against the
   published CLI.
 - Steps 1 to 4 replay a recorded session (`app/showcase/sessions.ts`).
   Re-record rather than edit when what the CLI prints, the files setup writes
   or the flow format change.
+- CLI output on the front page and in the change history comes from recorded
+  runs (`app/showcase/runs.ts`): cut lines, never reword them; re-record
+  rather than edit when the CLI's output changes.
 - `login-preview.tsx` draws each login screen from `@zitadel/components`'
   atoms in the default template's English copy. When that copy or a step's
   fields change, change the screens.

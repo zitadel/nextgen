@@ -2,6 +2,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { DESCRIPTION } from "./message";
 import og from "./og.jpg";
 import "./globals.css";
 import { THEME_SCRIPT } from "./theme";
@@ -35,9 +36,8 @@ const apkFutural = localFont({
   display: "swap",
 });
 
-const title = "Zitadel preview — your login in one minute";
-const description =
-  "Open-source auth that lives in your repo: your user model, your flows, your look. For developers and the agents they work with.";
+const title = "Zitadel Next: open-source auth platform your agent can run";
+const description = DESCRIPTION;
 
 // The share image, rendered from scripts/og.html (AGENTS.md), imported so it
 // loads from /_next/; on Vercel, Next makes its URL absolute with the
@@ -59,7 +59,7 @@ export const metadata: Metadata = {
 // The website's favicons (packages/theme/assets/favicons in
 // zitadel/new-website), served from public/favicons/ and declared as it does:
 // a dark mark for a light browser, a light one for a dark browser. The
-// console, the login UI and the docs link this same set (AGENTS.md).
+// console, the login and the docs link this same set (AGENTS.md).
 function favicons(): Metadata["icons"] {
   const schemes = ["light", "dark"].map((scheme) => ({
     dir: `/favicons/${scheme}`,

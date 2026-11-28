@@ -17,32 +17,77 @@ export function Words({ text }: { text: string }) {
   ));
 }
 
+// A command's words, quietly told apart: the program and its subcommands in
+// the line's own ink, a flag and the shell's `&&` and `<` a step back, and
+// what the reader passes, a flag's value, a quoted string or a
+// <placeholder>, in the strings' colour of the docs' syntax theme
+// (globals.css, code.tsx).
+const FLAG = "text-text-secondary";
+const VALUE = "text-(--zl-shiki-token-string)";
+const OPERATOR = new Set(["&&", "<", ">", "|"]);
+
+/**
+ * A command, its words coloured by what they are; wraps as Words does, a
+ * quoted string as one word, and a list of values after its commas.
+ */
+export function CommandWords({ command }: { command: string }) {
+  let afterFlag = false;
+  return (command.match(/'[^']*'|"[^"]*"|\S+/g) ?? []).map((word, index) => {
+    const operator = OPERATOR.has(word);
+    const flag = word.startsWith("-") || operator;
+    const value = !flag && (afterFlag || /^<.+>$/.test(word) || /^["']/.test(word));
+    afterFlag = flag && !operator && !word.includes("=");
+    return (
+      // biome-ignore lint/suspicious/noArrayIndexKey: the words of a fixed command, never reordered
+      <Fragment key={index}>
+        {index > 0 && " "}
+        <span className={flag ? FLAG : value ? VALUE : undefined}>
+          {word.split(/(?<=,)/).map((part, at) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: the parts of a fixed word, never reordered
+            <Fragment key={at}>
+              {at > 0 && <wbr />}
+              <span className="whitespace-nowrap">{part}</span>
+            </Fragment>
+          ))}
+        </span>
+      </Fragment>
+    );
+  });
+}
+
 /**
  * A command at its prompt with its copy button, in every window that shows
  * one. A line too long for a phone wraps under its command, not its $.
  * `children` stands in for the command while it is typed out
- * (terminal-card.tsx); `end` adds a control before the copy button.
- * `placement` is where the line sits, which a copy reports (analytics.ts).
+ * (terminal-card.tsx); `end` adds a control before the copy button, and
+ * `pinned` shows the copy button always, for a list of steps to copy one by
+ * one. `placement` is where the line sits, which a copy reports
+ * (analytics.ts). With `ask`, it is an ask at your agent's prompt (›), not a
+ * command at the shell's, and stays plain words. The prompt is muted.
  */
 export function CommandLine({
   command,
   placement,
   children,
   end,
+  pinned = false,
+  ask = false,
 }: {
   command: string;
   placement: Placement;
   children?: ReactNode;
   end?: ReactNode;
+  pinned?: boolean;
+  ask?: boolean;
 }) {
   const snippet = snippetOf(command);
   return (
     <div className="group -mx-2 flex items-start gap-2 rounded-md px-2 transition-colors hover:bg-tint/[0.04]">
       <span className="flex-1 pl-[2ch] -indent-[2ch] text-text-primary">
-        <span aria-hidden="true" className="select-none text-text-accent">
-          {"$ "}
+        <span aria-hidden="true" className="select-none text-text-muted">
+          {ask ? "› " : "$ "}
         </span>
-        {children ?? <Words text={command} />}
+        {children ?? (ask ? <Words text={command} /> : <CommandWords command={command} />)}
       </span>
       {/* Centered on the first line of the command, whatever its height. */}
       <span className="my-[calc((1lh_-_1.75rem)/2)] flex shrink-0 items-center gap-2">
@@ -51,7 +96,7 @@ export function CommandLine({
           text={command}
           label={command}
           event={snippet && { snippet, placement }}
-          className={LINE_COPY}
+          className={pinned ? "" : LINE_COPY}
         />
       </span>
     </div>

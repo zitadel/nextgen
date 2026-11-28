@@ -23,6 +23,8 @@
   --color-window-bar: #18181c;
   --color-window-border: rgb(255 255 255 / 0.08);
   --color-window-sunken: rgb(0 0 0 / 0.2);
+  /* The thin thumb of what scrolls inside a window (.window). */
+  --color-window-scrollbar: rgb(255 255 255 / 0.18);
 
   /* The header's frosted plane (site-header.tsx). */
   --color-glass: rgb(20 20 23 / 0.55);
@@ -37,6 +39,17 @@
      step to a soft green at the last, where the login is live. */
   --color-step-start: #f25543;
   --color-step-end: #5fd99a;
+
+  /* The brand's graphic pieces (app/brand/, AGENTS.md): Zitadel's orange,
+     the one highlight, and the dark its light falls off into; the notched
+     cards' hairline and fill; the chip behind the animated icons. */
+  --color-brand: #f25543;
+  --color-brand-deep: #6b1d14;
+  --color-brand-fade: #0f0f11;
+  --color-brand-glow: rgb(242 85 67 / 0.15);
+  --color-notch-edge: rgb(130 130 156 / 0.5);
+  --color-notch-fill: rgb(30 31 36 / 0.72);
+  --color-icon-chip: rgb(255 255 255 / 0.04);
 
   /* layout.tsx sets --font-arimo, --font-apk-futural and --font-azeret-mono
      on <html>. */
@@ -60,6 +73,29 @@
      their ink has faded out. */
   --title-ink: 70%;
   --title-fade: 125%;
+  /* How much grain the brand's noise lays over the page: less on the light
+     side. */
+  --noise-opacity: 0.06;
+  /* The tallest a feature's window stands on the front page: the live
+     login's in its browser, Passkeys & passwords' (capped.tsx). */
+  --window-cap: 28.875rem;
+  /* How the hero's blade fan drops its dark ground (hero-fan.tsx): here
+     the lighter of fan and page, which the ground never is; on the paper
+     the fan inverted back to orange, its ground pushed past the paper, and
+     the darker of the two. */
+  --fan-blend: lighten;
+  --fan-filter: none;
+  /* Code in the docs' syntax colours (code.tsx): the variables of Shiki's
+     CSS-variables theme, "zitadel", with the values apps/docs/app/global.css
+     gives them from @zitadel/design-tokens' --zl-syntax-* (dark here, light
+     below). A copy: change both. */
+  --zl-shiki-foreground: #fafafa;
+  --zl-shiki-token-keyword: #9e7ed8;
+  --zl-shiki-token-string: #f37d6d;
+  --zl-shiki-token-string-expression: #f37d6d;
+  --zl-shiki-token-constant: #ea8aa0;
+  --zl-shiki-token-comment: #9e9eb2;
+  --zl-shiki-token-punctuation: #9e9eb2;
   color-scheme: dark;
 }
 
@@ -84,6 +120,7 @@
   --color-window-border: rgb(17 17 20 / 0.1);
   --window-shadow: 0 1px 2px rgb(17 17 20 / 0.05), 0 6px 16px -10px rgb(17 17 20 / 0.12);
   --color-window-sunken: rgb(17 17 20 / 0.025);
+  --color-window-scrollbar: rgb(17 17 20 / 0.2);
   --color-glass: rgb(255 255 255 / 0.65);
   --glass-shadow: 0 1px 2px rgb(17 17 20 / 0.04), 0 4px 12px -8px rgb(17 17 20 / 0.1);
   --color-diff-added: #15803d;
@@ -92,37 +129,63 @@
   --color-diff-removed-surface: rgb(239 68 68 / 0.1);
   --color-step-start: #e5432f;
   --color-step-end: #16a067;
+  /* The brand's light falls off into the paper here, and its cards are
+     lighter; the icons keep a dark chip, drawn for the dark. */
+  --color-brand: #e5432f;
+  --color-brand-deep: #f6c3b9;
+  --color-brand-fade: #f6f6f8;
+  --color-brand-glow: rgb(229 67 47 / 0.08);
+  --color-notch-edge: rgb(17 17 20 / 0.14);
+  --color-notch-fill: rgb(255 255 255 / 0.78);
+  --color-icon-chip: #141417;
+  --noise-opacity: 0.035;
+  --fan-blend: darken;
+  --fan-filter: invert(1) hue-rotate(180deg) saturate(1.6) brightness(1.05);
+  --zl-shiki-foreground: #0a0a0a;
+  --zl-shiki-token-keyword: #401889;
+  --zl-shiki-token-string: #bd2514;
+  --zl-shiki-token-string-expression: #bd2514;
+  --zl-shiki-token-constant: #c52247;
+  --zl-shiki-token-comment: #686883;
+  --zl-shiki-token-punctuation: #686883;
   /* Dark ink grays the step colors more than white does: less of it, and
      gone by the foot. */
   --title-ink: 95%;
   --title-fade: 95%;
 }
 
-/* The page's own pieces: the hero (page.tsx), the logo (logo.tsx) and the
-   steps' dots. */
+/* The page's own pieces: the windows' scrollbars, the hero's title
+   (page.tsx), the logo (logo.tsx) and the steps' dots. */
 @layer components {
-  /* The hero takes the first screen under the header (h-16), its content
-     just above the middle and the cue to the steps at its foot (page.tsx).
-     Never shorter than its content needs, and on a very tall screen no
-     taller than 60rem, so the content does not float in a void and the
-     steps begin in view. */
-  .hero {
-    min-height: clamp(36rem, 100svh - 4rem, 60rem);
+  /* Whatever scrolls inside a window (window.tsx), a code file, a table, a
+     run: a thin thumb in the theme's neutral ink on a clear track, never the
+     system's grey bar. Safari reads the -webkit- rules; the others the
+     standard pair, which wins where both apply. */
+  .window * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-window-scrollbar) transparent;
   }
 
-  /* The cue nods down now and then, once the hero has settled. */
-  @media (prefers-reduced-motion: no-preference) {
-    .scroll-cue svg {
-      animation: cue-nod 2.4s var(--ease) 1.8s infinite;
-    }
+  .window ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
   }
 
-  /* The text of the page's two display titles, the hero's and the finish's
-     (showcase/finish.tsx), in one look: white at the top, and toward the
-     foot of each line the process's colors, --title-from on its left to
-     --title-to on its right (the hero: Zitadel's orange to the finish's
-     green; the finish: its own green). Cloned per line, so a title that
-     wraps lights every line alike. */
+  .window ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .window ::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background: var(--color-window-scrollbar);
+  }
+
+  /* The text of the display titles, the hero's and the other pages'
+     (.hero-title), the closing band's and the finish's (showcase/finish.tsx),
+     in one look: white at the top, and toward the foot of each line the
+     process's colors, --title-from on its left to --title-to on its right
+     (the hero's: Zitadel's orange to the finish's green; the finish: its own
+     green). Cloned per line, so a title that wraps lights every line alike. */
   .display-title {
     font-family: var(--font-heading);
     letter-spacing: -0.025em;
@@ -142,8 +205,9 @@
     color: transparent;
   }
 
-  /* The hero's title: on one line wherever the screen has room; on a phone
-     larger, on two (page.tsx breaks it after "Your login"). */
+  /* The hero's title, and every other page's (sections.tsx): the front
+     page's on two lines (page.tsx breaks it before "your agent" from a small
+     tablet up), a long one wrapping, balanced, on a phone. */
   .hero-title {
     --title-from: var(--color-step-start);
     --title-to: var(--color-step-end);
@@ -159,29 +223,6 @@
   .hero-lede {
     width: 100%;
     contain: inline-size;
-  }
-
-  /* The three things the line says are yours (page.tsx): set in mono, a
-     faint underline in the color of the step that changes it (--step), and
-     that color on hover, as a link down to that step. */
-  .yours {
-    font-family: var(--font-mono);
-    font-size: 0.9em;
-    color: var(--color-text-primary);
-    text-decoration: underline dotted color-mix(in oklch, var(--step) 70%, transparent);
-    text-decoration-thickness: 1px;
-    text-underline-offset: 0.3em;
-    white-space: nowrap;
-    transition:
-      color 200ms ease,
-      text-decoration-color 200ms ease;
-  }
-
-  .yours:hover,
-  .yours:focus-visible {
-    color: var(--step);
-    text-decoration-style: solid;
-    text-decoration-color: var(--step);
   }
 
   /* A step's dot (step.tsx, finish.tsx), on the rail and in a phone's
@@ -218,12 +259,11 @@
       animation: caption-in 1.4s var(--ease) both;
     }
 
-    /* The line, the commands and the buttons (page.tsx), soon after: they
-       are what a visitor came to copy. */
+    /* The hero's line, its asks, its start window and its ways to start
+       (page.tsx), soon after. */
     .teaser {
       animation: teaser-in 1s var(--ease) 0.25s both;
     }
-
   }
 
   /* The logo (logo.tsx) plays as on the website once a hover, or with
@@ -467,6 +507,76 @@
   }
 }
 
+/* The brand's graphic pieces on the front page (app/brand/): grain, light,
+   the dividers' shapes, the blade fan, the stage, the notched cards' edge
+   and the fade under a capped window. Orange is their light, one light a
+   screen; nothing here marks state or a control. */
+@layer components {
+  /* The grain: the noise tile over what the element paints, under its
+     content. */
+  .brand-noise {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .brand-noise::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background-image: url("./brand/noise.svg");
+    background-size: 160px 160px;
+    opacity: var(--noise-opacity);
+    pointer-events: none;
+  }
+
+  /* The dividers' shapes (divider.tsx): orange at the lit edge, falling off
+     into the dark, or the paper. */
+  .shape-from {
+    stop-color: var(--color-brand);
+  }
+
+  .shape-mid {
+    stop-color: var(--color-brand-deep);
+  }
+
+  .shape-to {
+    stop-color: var(--color-brand-fade);
+  }
+
+  /* The hero's blade fan (hero-fan.tsx): its first frame, under the video
+     once that plays. Its frames carry the dark ground they were drawn on,
+     which this drops into the page's light and grain (--fan-blend,
+     --fan-filter). */
+  .hero-fan {
+    background: url("./brand/hero-fan.avif") center / 100% 100% no-repeat;
+    mix-blend-mode: var(--fan-blend);
+    filter: var(--fan-filter);
+  }
+
+  /* A stage of orange light falling to black (the dark) or the paper, for
+     the transcript and the change history (page.tsx): an accent, never a
+     wash. */
+  .brand-stage {
+    background:
+      radial-gradient(60% 55% at 50% 0%, var(--color-brand-glow), transparent 75%),
+      linear-gradient(to bottom, color-mix(in oklch, var(--color-brand-deep) 22%, var(--color-brand-fade)), var(--color-brand-fade) 80%);
+  }
+
+  /* The notched card's hairline (notched-card.tsx): the gradient the
+     agency's card draws, in the theme's ink. */
+  .notch-edge {
+    background: linear-gradient(83deg, var(--color-notch-edge) -9%, transparent 0%, var(--color-notch-edge) 86%);
+  }
+
+  /* A capped window's foot (capped.tsx): the window's own surface rising
+     over the cut. */
+  .window-fade {
+    background: linear-gradient(to bottom, transparent, var(--color-window) 70%);
+  }
+}
+
 @keyframes finish-pop {
   40% {
     scale: 1.25;
@@ -502,22 +612,12 @@
   }
 }
 
-@keyframes cue-nod {
-  0%,
-  60%,
-  to {
-    translate: 0 0;
-  }
-
-  30% {
-    translate: 0 0.25rem;
-  }
-}
-
 /* The words come into focus, and the commands rise into place under them. */
+/* From a soft blur, never from nothing: a title that first paints unseen is
+   never the page's largest paint, which the title is meant to be. */
 @keyframes caption-in {
   from {
-    opacity: 0;
+    opacity: 0.35;
     filter: blur(0.5rem);
   }
 }

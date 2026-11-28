@@ -66,23 +66,48 @@ properties:
     type: string
     description: >-
       A stable page category, never a URL; on the docs, the page's path, such
-      as `/docs/reference/cli`.
+      as `/docs/reference/cli`; on the website, a feature page's two segments,
+      such as `platform/teams`, and the features' overview `platform`.
   view:
     type: string
     values: [list, details]
     description: The kind of page; on a modal, the page it was opened from.
   tab:
     type: string
-    values: [sign_in_methods, identity_providers, overview, authentication, active, deactivated]
-    description: The selected tab, on pages with tracked tabs.
+    values:
+      - sign_in_methods
+      - identity_providers
+      - overview
+      - authentication
+      - active
+      - deactivated
+      - with_agent
+      - in_terminal
+    description: >-
+      The selected tab, on pages with tracked tabs; `with_agent` and
+      `in_terminal` are the website front page's start window.
   placement:
     type: string
-    values: [hero, showcase, footer]
-    description: Where on its page a copy button or a call to action sits.
+    values: [header, hero, showcase, try_it, decide, closing, footer]
+    description: >-
+      Where on its page a copy button or a call to action sits: `header` is
+      the bar over every website page, `showcase` the quickstart's
+      walkthrough on /get-started, `try_it` the Try it section of a website
+      phase or feature page, which `page` names, `decide` the change history
+      under the front page's You stay in charge or a phase page's You
+      decide, and `closing` the website front page's closing band.
   target:
     type: string
-    values: [quickstart, github]
-    description: Where a link leads, as a stable name, never a URL.
+    values:
+      - quickstart
+      - github
+      - get_started
+      - sign_up
+      - contact
+    description: >-
+      Where a link leads, as a stable name, never a URL: `get_started` is the
+      website's /get-started page, `sign_up` the cloud's sign-up page and
+      `contact` zitadel.com's contact page.
 
   # Attribution
   utm_source:
@@ -107,13 +132,50 @@ properties:
   # Calls to action
   snippet:
     type: string
-    values: [all, start, setup, dev, dry_run, deploy, skills]
+    values:
+      - all
+      - ask
+      - agent_prompt
+      - start
+      - setup
+      - dev
+      - dry_run
+      - deploy
+      - skills
+      - policy_test
+      - rollback
+      - deployment_list
+      - grant_list
+      - grant_create
+      - grant_delete
+      - members
+      - event_list
+      - auth_method
+      - idp_list
+      - user_list
+      - invitation_create
+      - team_create
+      - team_list
+      - team_get
+      - team_deactivate
+      - api_ls
+      - application_publish
+      - application_get
     description: >-
       What a copy button copied, never its text: the CLI command it runs
-      (`start`, `setup`, `dry_run` for `deploy --dry-run`, `deploy`), `dev` for
-      the app's dev server,
-      `skills` for the coding agents' skills, or `all` for the website's whole
-      block of commands.
+      (`start`, `setup`, `dry_run` for `deploy --dry-run`, `deploy`,
+      `policy_test`, `rollback` for `deployment rollback`,
+      `deployment_list`, `grant_list`,
+      `grant_create`, `grant_delete`, `members` for `api listProjectMembers`,
+      `event_list` for any `event list`, `auth_method` for any `auth-method`
+      command, `idp_list`, `user_list`, `invitation_create`, `team_create`,
+      `team_list`, `team_get`, `team_deactivate`, `api_ls` for `api ls`,
+      `application_publish` and `application_get` for those `api`
+      operations), `dev` for the app's dev server, `skills` for the coding
+      agents' skills, `ask` for an ask for your agent (the front page's start
+      window types through several; it is whichever it shows),
+      `agent_prompt` for the front page's prompt that has your agent set
+      Zitadel up, or `all` for a whole block of commands.
 
   # Journeys and actions
   flow:
@@ -773,14 +835,26 @@ components:
     events:
       copied_command:
         status: emitted
-        trigger: A copy button put its command on the clipboard.
+        trigger: >-
+          A copy button put its command on the clipboard, or the front page's
+          Copy prompt for your agent its prompt.
         destinations: [vercel]
         properties: [page, snippet, placement]
       clicked_link:
         status: emitted
-        trigger: A call to action, to the quickstart or to GitHub, is clicked.
+        trigger: >-
+          A call to action is clicked: the front page's Start in our cloud,
+          Run it yourself and Talk to us, the walkthrough's quickstart and
+          GitHub, or the header's Get started.
         destinations: [vercel]
         properties: [page, target, placement]
+      selected_tab:
+        status: emitted
+        trigger: >-
+          A tab of the front page's start window is chosen: with your agent,
+          or in your terminal.
+        destinations: [vercel]
+        properties: [page, tab, placement]
 
   docs:
     source: apps/docs

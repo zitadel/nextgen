@@ -21,7 +21,9 @@
     // Vercel it never hits. The Speed Insights sample rate and the commit the
     // analytics events report are read at build time (next.config.ts,
     // app/layout.tsx), and whether crawlers may index the deployment
-    // (app/robots.txt/route.ts); strict mode would hide them.
+    // (app/robots.txt/route.ts); strict mode would hide them. The front
+    // page's structured data reads the CLI's version and the server's
+    // license from their package.json (app/structured-data.tsx).
     "build": {
       "env": [
         "NODE_ENV",
@@ -36,7 +38,9 @@
         ".env*",
         "$TURBO_ROOT$/.changeset/config.json",
         "$TURBO_ROOT$/apps/*/CHANGELOG.md",
-        "$TURBO_ROOT$/packages/*/CHANGELOG.md"
+        "$TURBO_ROOT$/packages/*/CHANGELOG.md",
+        "$TURBO_ROOT$/apps/cli/package.json",
+        "$TURBO_ROOT$/apps/server/package.json"
       ],
       "outputs": [".next/**", "!.next/cache/**"]
     },
