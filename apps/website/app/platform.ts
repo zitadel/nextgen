@@ -120,7 +120,7 @@ export const FEATURES: readonly Feature[] = [
     description:
       "Connect a customer's OpenID Connect provider, and their people sign in to your app with their work accounts.",
     phase: "operate",
-    related: ["identity-providers", "sign-in"],
+    related: ["organizations", "scim"],
   },
   {
     slug: "scim",
@@ -146,7 +146,7 @@ export const FEATURES: readonly Feature[] = [
     description:
       "Decide who can do what: grant people and teams a role, take it away again, and see every change in the events.",
     phase: "govern",
-    related: ["users", "agents"],
+    related: ["oauth-server", "organizations"],
   },
   {
     slug: "oauth-server",
@@ -172,7 +172,7 @@ export const FEATURES: readonly Feature[] = [
     description:
       "Each agent you ship signs in as itself and acts for your users only with their consent. Every action names both.",
     phase: "govern",
-    related: ["permissions", "users"],
+    related: ["oauth-server", "permissions"],
   },
   {
     slug: "users",
@@ -185,7 +185,7 @@ export const FEATURES: readonly Feature[] = [
     description:
       "Describe the fields your users need in a schema, and sign-up asks for them. Invite colleagues to your project with a link.",
     phase: "operate",
-    related: ["permissions", "login-ui"],
+    related: ["organizations", "scim"],
   },
 ];
 

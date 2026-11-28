@@ -5,7 +5,11 @@ import type { FeatureSlug } from "./platform";
 // What each feature page shows under the hood (feature-page.tsx): one real
 // thing from this repo or its docs, and the line that says what it is. The
 // front page's features show the same windows (capabilities.tsx), from here,
-// so the two never drift apart.
+// so the two never drift apart. A code window keeps its lines within the
+// window at 1440px (62 characters) and breaks any object or array of more
+// than one entry that a phone could not hold, so it runs past the edge only
+// for one value too long to break, such as a URL; the content stays the
+// source's, only its line breaks are the site's.
 
 export type Hood = { line: string; artifact: ReactNode };
 
@@ -15,9 +19,24 @@ const PASSKEY_STEP = `{
   "name": "identifier",
   "fields": ["email"],
   "actions": [
-    { "name": "submit", "kind": "submit", "primary": true, "text_key": "identifier.action.continue" },
-    { "name": "passkey", "kind": "passkey", "primary": false, "text_key": "identifier.action.passkey" },
-    { "name": "register", "kind": "navigate", "primary": false, "text_key": "identifier.action.register.link" }
+    {
+      "name": "submit",
+      "kind": "submit",
+      "primary": true,
+      "text_key": "identifier.action.continue"
+    },
+    {
+      "name": "passkey",
+      "kind": "passkey",
+      "primary": false,
+      "text_key": "identifier.action.passkey"
+    },
+    {
+      "name": "register",
+      "kind": "navigate",
+      "primary": false,
+      "text_key": "identifier.action.register.link"
+    }
   ],
   "transitions": {
     "submit": { "target": "password" },
@@ -34,7 +53,12 @@ const PASSWORD_STEP = `{
   "name": "password",
   "fields": ["x-auth-methods#password"],
   "actions": [
-    { "name": "submit", "kind": "submit", "primary": true, "text_key": "password.action.signin" }
+    {
+      "name": "submit",
+      "kind": "submit",
+      "primary": true,
+      "text_key": "password.action.signin"
+    }
   ],
   "transitions": {
     "submit": { "target": "done" }
@@ -52,15 +76,32 @@ const GOOGLE_RESULT = `{
     "file": ".zitadel/idps/google.json",
     "claim_mapping": { "email": "email" },
     "verified_claims": { "email": "email_verified" },
-    "scopes": ["openid", "profile", "email"],
+    "scopes": [
+      "openid",
+      "profile",
+      "email"
+    ],
     "unmapped": [],
     "used_by": ["default-human-user"]
   },
-  "callback_uri": "http://localhost:3000/__nextgen/idp/google/callback",
-  "changed": [".zitadel/schemas/default-human-user.json", ".zitadel/flows/default-login.json"],
-  "client_id": { "variable": "GOOGLE_CLIENT_ID", "published": "stored" },
-  "secret": { "variable": "GOOGLE_CLIENT_SECRET", "published": "stored" },
-  "next_commands": ["npx @zitadel/cli@latest deploy --dry-run", "npx @zitadel/cli@latest deploy"]
+  "callback_uri":
+    "http://localhost:3000/__nextgen/idp/google/callback",
+  "changed": [
+    ".zitadel/schemas/default-human-user.json",
+    ".zitadel/flows/default-login.json"
+  ],
+  "client_id": {
+    "variable": "GOOGLE_CLIENT_ID",
+    "published": "stored"
+  },
+  "secret": {
+    "variable": "GOOGLE_CLIENT_SECRET",
+    "published": "stored"
+  },
+  "next_commands": [
+    "npx @zitadel/cli@latest deploy --dry-run",
+    "npx @zitadel/cli@latest deploy"
+  ]
 }`;
 
 // The user schema's properties once the company is added: the default schema
@@ -101,13 +142,17 @@ const CREATE_TEAM = `{ "name": "Acme" }
 // (oauth_metadata_test.go, cmd/server/mux_test.go).
 const OAUTH_METADATA = `{
   "issuer": "https://app.example.com/oauth/proj_123",
-  "authorization_endpoint": "https://app.example.com/oauth/proj_123/authorize",
+  "authorization_endpoint":
+    "https://app.example.com/oauth/proj_123/authorize",
   "token_endpoint": "…/oauth/proj_123/token",
   "jwks_uri": "…/oauth/proj_123/jwks",
   "response_types_supported": ["code"],
   "response_modes_supported": ["query"],
   "grant_types_supported": ["authorization_code"],
-  "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
+  "token_endpoint_auth_methods_supported": [
+    "client_secret_basic",
+    "client_secret_post"
+  ],
   "code_challenge_methods_supported": ["S256"]
 }`;
 
@@ -118,13 +163,32 @@ const ENTRA_CONNECTION = `{
   "team": "acme",
   "slug": "entra",
   "domains": ["acme.com"],
-  "oidc": [{ "slug": "sign-in", "issuer": "https://login.microsoftonline.com/<tenant-id>/v2.0", "client_id": "<client-id>", "client_secret": "<client-secret>" }],
+  "oidc": [
+    {
+      "slug": "sign-in",
+      "issuer":
+        "https://login.microsoftonline.com/<tenant-id>/v2.0",
+      "client_id": "<client-id>",
+      "client_secret": "<client-secret>"
+    }
+  ],
   "scim": [{ "slug": "sync" }],
   "mappings": {
-    "subject": { "sign-in": "oid", "sync": "externalId" },
+    "subject": {
+      "sign-in": "oid",
+      "sync": "externalId"
+    },
     "user": {
-      "sign-in": { "email": "email", "givenName": "given_name", "familyName": "family_name" },
-      "sync": { "email": "emails[primary eq true].value", "givenName": "name.givenName", "familyName": "name.familyName" }
+      "sign-in": {
+        "email": "email",
+        "givenName": "given_name",
+        "familyName": "family_name"
+      },
+      "sync": {
+        "email": "emails[primary eq true].value",
+        "givenName": "name.givenName",
+        "familyName": "name.familyName"
+      }
     }
   }
 }`;

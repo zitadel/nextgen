@@ -43,9 +43,10 @@ const SHOWN: Record<FeatureGroup, string> = {
  * group and the feature within it, and CSS shows the chosen ones, so it works
  * without script, every window is in the page for crawlers, and the arrow
  * keys move from group to group and from feature to feature. Each group
- * opens on its first feature. From a laptop up the windows stack in one
- * place beside the list and stay in view under the header while it scrolls;
- * below, the chosen feature's window opens under its entry. The entries'
+ * opens on its first feature. From a laptop up the chosen window stands
+ * beside the list, alone, so the section ends where the taller of the two
+ * does, and stays in view under the header while the list scrolls; below,
+ * it opens under its entry. The entries'
  * highlight reaches into the margin, so their text lines up with the
  * section's heading.
  */
@@ -106,7 +107,7 @@ export function Capabilities() {
                     {feature.line}
                   </span>
                 </label>
-                <div className="flex min-w-0 flex-col items-start gap-4 max-lg:hidden max-lg:pt-3 max-lg:pb-6 max-lg:pl-4 max-lg:peer-checked:flex lg:invisible lg:sticky lg:top-24 lg:col-start-2 lg:row-[2/-1] lg:self-start lg:peer-checked:visible">
+                <div className="hidden min-w-0 flex-col items-start gap-4 peer-checked:flex max-lg:pt-3 max-lg:pb-6 max-lg:pl-4 lg:sticky lg:top-24 lg:col-start-2 lg:row-[2/-1] lg:self-start">
                   <div className="w-full">
                     <Shown feature={feature} />
                   </div>

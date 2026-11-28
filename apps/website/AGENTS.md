@@ -31,6 +31,8 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   agent, Under the hood, Try it, Questions, and Related.
 - Under the hood shows one real thing from this repo, taken from code or
   docs; Try it only commands that work now (README, the CLI skill, `--help`).
+- Break a code window's objects and arrays, never a value, so its lines fit
+  the window at 1440px (`app/hoods.tsx` says how far).
 - "Solutions" is kept for use-case pages (B2B SaaS, consumer apps, agents and
   MCP); a feature goes under Platform.
 - The header's links and menus of groups come from `app/nav.ts`: add a menu,
