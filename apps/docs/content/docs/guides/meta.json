@@ -11,6 +11,7 @@
     "migrate-user-schema",
     "sign-in-methods",
     "social-sign-in",
+    "enable-oauth",
     "customize-design",
     "customize-copy",
     "troubleshooting"

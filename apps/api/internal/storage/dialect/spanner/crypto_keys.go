@@ -190,6 +190,24 @@ func (s cryptoKeyStatements) GetSigningKey(ctx context.Context, filter database.
 	return keys[0], nil
 }
 
+// ListSigningKeys implements [service.CryptoKeyStatements].
+func (s cryptoKeyStatements) ListSigningKeys(ctx context.Context, filter database.Filter[domain.SigningKeyField]) ([]*domain.SigningKey, error) {
+	var compiler statementCompiler
+	if err := compileRead(&compiler, signingKeyQuery, &database.ListOptions[domain.SigningKeyField]{Filter: filter}, signingKeySchema); err != nil {
+		return nil, err
+	}
+	var keys []*domain.SigningKey
+	err := s.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+		var err error
+		keys, err = collectRows(iter, s.scanSigningKey)
+		return err
+	})
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return keys, nil
+}
+
 func (s cryptoKeyStatements) scanSigningKey(row *spanner.Row) (*domain.SigningKey, error) {
 	key := new(domain.SigningKey)
 	err := row.Columns(&key.ID, &key.ProjectID, &key.Key, &key.Algorithm, &key.State, &key.CreatedAt, &key.ActivatedAt, &key.RetiredAt, &key.Purpose)

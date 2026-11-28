@@ -55,5 +55,14 @@ post:
         application/json:
           schema:
             $ref: ../../../components/error-details.yaml
+    '409':
+      description: |
+        The user already has access to the project (`inv.already_member`,
+        with their strongest role as `details.details.relation`); the
+        invitation stays pending.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
     default:
       $ref: rejectInvitation-error-response.yaml

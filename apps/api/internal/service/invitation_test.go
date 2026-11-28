@@ -27,12 +27,12 @@ const (
 
 func newMockedInvitationService(t *testing.T, platformProjectID string) (*service.InvitationService, *servicemocks.MockAllStatements, *servicemocks.MockKeyService, *[]*domain.Event) {
 	t.Helper()
-	return newMockedInvitationServiceChecking(t, platformProjectID, inviterAdmin(true))
+	return newMockedInvitationServiceChecking(t, platformProjectID, projectRoles(map[string]string{"user_admin": "admin"}))
 }
 
-// newMockedInvitationServiceChecking builds the service with inviterIsAdmin as
-// its accept-time inviter check.
-func newMockedInvitationServiceChecking(t *testing.T, platformProjectID string, inviterIsAdmin service.InviterCheck) (*service.InvitationService, *servicemocks.MockAllStatements, *servicemocks.MockKeyService, *[]*domain.Event) {
+// newMockedInvitationServiceChecking builds the service with projectRole as
+// its check of the inviter's and the redeemer's roles.
+func newMockedInvitationServiceChecking(t *testing.T, platformProjectID string, projectRole service.ProjectRoleCheck) (*service.InvitationService, *servicemocks.MockAllStatements, *servicemocks.MockKeyService, *[]*domain.Event) {
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
@@ -58,7 +58,7 @@ func newMockedInvitationServiceChecking(t *testing.T, platformProjectID string, 
 	refs := &grantRefStub{byID: map[string]domain.UserRef{
 		"user_admin": {UserID: "user_admin", Identifier: "ada@example.com", IdentifierProperty: "email", Display: "Ada Lovelace"},
 	}}
-	return service.NewInvitationService(db, keys, grants, refs, inviterIsAdmin, invitationConsole, platformProjectID), statements, keys, events
+	return service.NewInvitationService(db, keys, grants, refs, projectRole, invitationConsole, platformProjectID), statements, keys, events
 }
 
 // newMockedInvitationServiceWithRefs also returns the ref resolver, which
@@ -75,7 +75,7 @@ func newMockedInvitationServiceWithRefs(t *testing.T) (*service.InvitationServic
 		invitationProjectID: {"user_local": {UserID: "user_local", Display: "Grace Hopper"}},
 	}}
 	db := service.NewPool(pool)
-	return service.NewInvitationService(db, nil, service.NewGrantService(db, nil, grantPlatformProjID), refs, inviterAdmin(true), invitationConsole, grantPlatformProjID), statements, refs
+	return service.NewInvitationService(db, nil, service.NewGrantService(db, nil, grantPlatformProjID), refs, projectRoles(map[string]string{"user_admin": "admin"}), invitationConsole, grantPlatformProjID), statements, refs
 }
 
 // homedRefStub resolves a user only in the project that homes them, and

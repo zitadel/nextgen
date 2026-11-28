@@ -160,6 +160,10 @@ type CryptoKeyStatements interface {
 	CreateEncryptionKey(ctx context.Context, key *domain.EncryptionKey) error
 	UpdateKey(ctx context.Context, id string, key string) error
 	GetSigningKey(ctx context.Context, filter database.Filter[domain.SigningKeyField]) (*domain.SigningKey, error)
+	// ListSigningKeys returns every signing key filter matches, in no
+	// particular order. A project holds only the few keys of its rotation,
+	// so the list is not paged.
+	ListSigningKeys(ctx context.Context, filter database.Filter[domain.SigningKeyField]) ([]*domain.SigningKey, error)
 	CreateSigningKey(ctx context.Context, key *domain.SigningKey) error
 }
 

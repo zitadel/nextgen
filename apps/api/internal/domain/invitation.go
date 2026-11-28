@@ -52,6 +52,17 @@ func ErrInvitationSelfReject() Error {
 	return newError(PrefixInvitation.ErrorCodePrefix("self_reject"), "the inviter cannot decline their own invitation", nil, nil)
 }
 
+// ErrInvitationAlreadyMember refuses redeeming an invitation for a user who
+// already holds relation on its project, from any source.
+func ErrInvitationAlreadyMember(relation string) Error {
+	return newError(PrefixInvitation.ErrorCodePrefix("already_member"), "you already have access to this project", InvitationAlreadyMemberDetails{Relation: relation}, nil)
+}
+
+// InvitationAlreadyMemberDetails names the role the user already holds.
+type InvitationAlreadyMemberDetails struct {
+	Relation string `json:"relation"`
+}
+
 // ErrInvitationInviterNotAdmin refuses an accept whose creator no longer
 // administers the project (ADR 086 §10).
 func ErrInvitationInviterNotAdmin() Error {
