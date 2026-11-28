@@ -55,6 +55,11 @@ export default defineConfig({
   plugins: [
     dts({
       tsconfigPath: "./tsconfig.lib.json",
+      afterDiagnostic: (diagnostics) => {
+        if (diagnostics.length > 0) {
+          throw new Error("the declarations have type errors");
+        }
+      },
       outDirs: {
         dir: "dist",
         moduleFormat: extension === ".mjs" ? "esm" : undefined,
