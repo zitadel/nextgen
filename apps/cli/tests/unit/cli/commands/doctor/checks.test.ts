@@ -2701,8 +2701,6 @@ describe("ProjectMatchCheck", () => {
 });
 
 describe("ClaimCheck", () => {
-  // A cloud project's unclaimed record is checked with the server, which
-  // answers unclaimed unless a test says otherwise.
   it.beforeEach(({ server }) => {
     server.use(
       http.get("*/projects/:project_id/claim", () => {
@@ -2741,8 +2739,6 @@ describe("ClaimCheck", () => {
   // The local record is written only where the claim ran, so a project claimed
   // from another machine reads detached until the server is asked.
   describe("for a project claimed from another machine", () => {
-    // The local record is written only where the claim ran, so the server is
-    // asked; it names a team the record does not.
     it.beforeEach(({ server }) => {
       server.use(
         http.get(`*/projects/${PROJECT_ID}/claim`, () => {

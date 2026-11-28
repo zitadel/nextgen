@@ -200,8 +200,6 @@ describe("status command", () => {
     );
   });
 
-  // The local record is written only where the claim ran, so a project claimed
-  // from another machine reads detached here until the server is asked.
   it("reports a project claimed from another machine as owned, and stops nudging", async ({
     dir: cwd,
     server,

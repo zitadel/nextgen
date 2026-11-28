@@ -702,7 +702,7 @@ func TestGetClaimWindow(t *testing.T) {
 
 // TestGetProjectClaim: the challenge-free read of a project's claim, on the
 // project secret. It reads the owning-team grant, so a project claimed
-// anywhere reads as claimed, and another project's secret learns nothing.
+// anywhere reads as claimed.
 func TestGetProjectClaim(t *testing.T) {
 	t.Parallel()
 
@@ -724,7 +724,6 @@ func TestGetProjectClaim(t *testing.T) {
 		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
-	// The team lives in the platform project, which no test deletes.
 	t.Cleanup(func() {
 		_, err := harness.EnsureServiceDB(t).Statements().DeactivateTeam(context.Background(), platform.ID, team.ID)
 		assert.NoError(t, err)
@@ -738,13 +737,23 @@ func TestGetProjectClaim(t *testing.T) {
 	require.True(t, ok, helpers.MustMarshal(t, claimed))
 	assert.Equal(t, api.TeamID(team.ID), owner.TeamID)
 	assert.WithinDuration(t, time.Now(), owner.ClaimedAt, time.Minute)
+}
 
+// TestGetProjectClaimForeignSecret: a valid project.write bearer for another
+// project misses the authz gate → 404, so it learns nothing about this one.
+func TestGetProjectClaimForeignSecret(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
 	other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	foreign, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	harness.SetProjectSecretOnApiClient(t, foreign, other)
-	refused, err := foreign.GetProjectClaim(t.Context(), params)
+	harness.SetProjectSecretOnApiClient(t, client, other)
+
+	resp, err := client.GetProjectClaim(t.Context(), api.GetProjectClaimParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)
-	assert.IsType(t, &api.GetProjectClaimNotFound{}, refused, helpers.MustMarshal(t, refused))
+	require.IsType(t, &api.GetProjectClaimNotFound{}, resp, helpers.MustMarshal(t, resp))
 }

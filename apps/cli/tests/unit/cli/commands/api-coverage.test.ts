@@ -75,7 +75,8 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
     "unauthenticated bootstrap minting secrets; `zitadel setup` and `zitadel env add` own it",
   createProjectClaim: "the browser claim flow; `zitadel claim` calls it",
   getProjectClaimStatus: "the browser claim flow; `zitadel claim` calls it",
-  getProjectClaim: "the claim read; `status` and `doctor` check a local unclaimed record with it",
+  getProjectClaim:
+    "the claim read; `status`, `doctor` and `claim` check a local unclaimed record with it",
   // These two are reached by nothing in the CLI at all — not the registry, not
   // `zitadel claim`. Either the claim flow is incomplete or they are dead
   // generated surface; recorded as a question rather than implied to be owned.

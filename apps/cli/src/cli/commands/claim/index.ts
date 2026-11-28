@@ -323,11 +323,6 @@ export default class Claim extends Telemetered(ChangeCommand) {
     const started = await claimService.start();
     switch (started.outcome) {
       case "already-claimed": {
-        // The record here names no team (checked above), so write down the
-        // one the server named, as a completed claim does: otherwise a copy
-        // made before the claim stays unclaimed for every later command. The
-        // 409 carries no claim time, so the claim is read for it; a read that
-        // fails leaves the record as it was, and the skip stands.
         const current = localRecord
           ? await claimService.current().catch((error: unknown) => {
               if (isCancellation(error)) {
@@ -343,8 +338,9 @@ export default class Claim extends Telemetered(ChangeCommand) {
         }
         return this.alreadyClaimed({
           project_id: projectId,
-          team_id: started.teamId,
-          ...(current?.status === "claimed" ? { claimed_at: current.claimed_at } : {}),
+          ...(current?.status === "claimed"
+            ? { team_id: current.team_id, claimed_at: current.claimed_at }
+            : { team_id: started.teamId }),
           dashboard_url: started.dashboardUrl,
         });
       }

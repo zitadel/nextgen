@@ -143,7 +143,6 @@ describe("confirmed claim state", () => {
     expect(state).toEqual({ kind: "detached", claimable: true });
   });
 
-  // A claim cannot be undone, so an attached record is not second-guessed.
   it("keeps an attached record whatever the server would say", async ({ server }) => {
     server.use(
       http.get("*/projects/proj-001/claim", () => {
@@ -177,8 +176,6 @@ describe("confirmed claim state", () => {
     expect(state).toEqual({ kind: "not-applicable" });
   });
 
-  // The cloud check reads the hostname alone; the secret goes only to the
-  // exact origin, so a hand-edited scheme or port sends nothing.
   it.for(["http://preview.zitadel.com", "https://preview.zitadel.com:8443"])(
     "asks nothing of %s, keeping the record",
     async (server, { server: msw }) => {

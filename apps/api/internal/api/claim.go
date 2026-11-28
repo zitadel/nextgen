@@ -70,9 +70,6 @@ func (h *Handler) GetProjectClaimStatus(ctx context.Context, params api.GetProje
 	return &resp, nil
 }
 
-// GetProjectClaim answers whether the project is claimed, with no challenge:
-// the owning-team grant is the source of truth (ADR 046 §1), so a client that
-// claimed from another machine reads the same answer.
 func (h *Handler) GetProjectClaim(ctx context.Context, params api.GetProjectClaimParams) (api.GetProjectClaimRes, error) {
 	projectID := string(params.ProjectID)
 	if err := h.requireProjectAccess(ctx, projectID, projectAccess, opRead); err != nil {

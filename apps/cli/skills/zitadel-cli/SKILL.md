@@ -1303,7 +1303,8 @@ owning team in `.zitadel/secret`. When the link expires, or `--challenge-id`
 names one the platform does not know (`E_NOT_FOUND`), `next_commands` starts a
 new `--no-wait` link. A project that already has a team is `skipped` with
 `reason: "already-claimed"`, carries `data.console_url`, the link to the
-project's console, and records the owning team in `.zitadel/secret`; one past its 14 days fails with `E_VALIDATION` and no
+project's console, and records the owning team in the project's own
+`.zitadel/secret` when the server confirms it; one past its 14 days fails with `E_VALIDATION` and no
 `next_commands`, since a new link cannot reopen it.
 For a project on the hosted cloud, `status` and `doctor` read the owning team
 from `.zitadel/secret` and ask the server when it names none, so a project

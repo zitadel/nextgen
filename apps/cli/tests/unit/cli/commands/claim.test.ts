@@ -261,9 +261,6 @@ describe("claim", () => {
     expect(json.data.dashboard_url).toContain(String(claimed.team_id));
   });
 
-  // A copy of the project made before the claim names no team; the command
-  // that learns the team from the platform writes it down, as a completed
-  // claim does.
   it("records the owning team the platform named in the local secret", async ({ dir: cwd }) => {
     const project = await makeProject(cwd);
     await Promise.all([

@@ -2954,7 +2954,7 @@
       "get": {
         "operationId": "getProjectClaim",
         "summary": "Get a project's claim",
-        "description": "Returns whether the project is claimed, and if so by which team and when.\n\nA [claim attaches a project to a team](/docs/concepts/project-team-user#claim).\n`zitadel status` and `zitadel doctor` call this operation to tell whether\nto suggest `zitadel claim`, so a project claimed from another machine stops\nbeing reported as unclaimed.\n\nUnlike `getProjectClaimStatus` (`GET /projects/{project_id}/claim/status`), it needs\nno challenge: it reads the project's owning-team grant, the claim's source\nof truth. It starts nothing and spends nothing. Authenticate with the project\nsecret.\n",
+        "description": "Returns whether the project is claimed, and if so by which team and when.\n\nA [claim attaches a project to a team](/docs/concepts/project-team-user#claim).\n`zitadel status` and `zitadel doctor` call this operation to tell whether\nto suggest `zitadel claim`, and `zitadel claim` calls it to record the\nowning team of a project that is already claimed, so a project claimed from\nanother machine stops being reported as unclaimed.\n\nUnlike `getProjectClaimStatus` (`GET /projects/{project_id}/claim/status`), it needs\nno challenge: it reads the project's owning-team grant, the claim's source\nof truth. It starts nothing and spends nothing. Authenticate with the project\nsecret.\n",
         "tags": [
           "Projects"
         ],

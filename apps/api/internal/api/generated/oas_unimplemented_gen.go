@@ -973,8 +973,9 @@ func (UnimplementedHandler) GetProject(ctx context.Context, params GetProjectPar
 // Returns whether the project is claimed, and if so by which team and when.
 //
 // A [claim attaches a project to a team]. `zitadel status` and `zitadel doctor` call this operation to
-// tell whether to suggest `zitadel claim`, so a project claimed from another machine stops being
-// reported as unclaimed.
+// tell whether to suggest `zitadel claim`, and `zitadel claim` calls it to record the owning team of a
+// project that is already claimed, so a project claimed from another machine stops being reported as
+// unclaimed.
 //
 // Unlike `getProjectClaimStatus` (`GET /projects/{project_id}/claim/status`), it needs no challenge:
 // it reads the project's owning-team grant, the claim's source of truth. It starts nothing and spends
