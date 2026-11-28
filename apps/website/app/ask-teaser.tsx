@@ -24,14 +24,26 @@ const ITEMS: readonly {
     ask: "Connect Acme's Okta for single sign-on.",
     link: { href: featurePath("single-sign-on"), target: "single_sign_on" },
   },
-  { label: "Organizations", ask: "Give each customer its own organization and admins." },
+  {
+    label: "Organizations",
+    ask: "Give each customer its own organization and admins.",
+    link: { href: featurePath("organizations"), target: "organizations" },
+  },
   {
     label: "Permissions",
     ask: "Let support read users, but not change them.",
     link: { href: featurePath("permissions"), target: "permissions" },
   },
-  { label: "OAuth server", ask: "Protect our MCP server with OAuth." },
-  { label: "SCIM", ask: "Sync Acme's people from Entra with SCIM." },
+  {
+    label: "OAuth server",
+    ask: "Protect our MCP server with OAuth.",
+    link: { href: featurePath("oauth-server"), target: "oauth_server" },
+  },
+  {
+    label: "SCIM",
+    ask: "Sync Acme's people from Entra with SCIM.",
+    link: { href: featurePath("scim"), target: "scim" },
+  },
   {
     label: "Agent identity",
     ask: "Let our booking agent act for a user, with their consent.",

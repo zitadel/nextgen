@@ -10,9 +10,9 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   this order and nothing else: the hero (title, line, the asks it takes, the
   start window with your agent's tab first, Start in our cloud and Run it
   yourself), the work (each phase's first exchange, linking its page), What
-  your agent can turn on (the features by group, each with a window and its
-  page), You stay in charge (beside the change history), the questions, and
-  a closing band with both ways to start and Talk to us.
+  your agent can turn on (a tab per group of features, each feature with a
+  window and its page), You stay in charge (beside the change history), the
+  questions, and a closing band with both ways to start and Talk to us.
 - What Zitadel Next is lives in `app/message.ts`: the description, the share
   image, `/llms.txt` and the first question's answer, not the hero's line.
 - A front-page window renders what another page shows, from the same data or

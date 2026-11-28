@@ -2,19 +2,23 @@ import type { PhaseSlug } from "./phases";
 
 // The platform's features, a page each under /platform/ (feature-page.tsx),
 // in the groups the header's Platform menu shows (nav.ts), and the overview
-// that lists them at /platform; the sitemap and /llms.txt read them from here
-// too.
+// that lists them at /platform; the front page, the footer, the sitemap and
+// /llms.txt read them from here too. FEATURES lists them group by group, in
+// FEATURE_GROUPS' order.
 
 export type FeatureSlug =
   | "sign-in"
   | "login-ui"
-  | "single-sign-on"
   | "identity-providers"
+  | "organizations"
+  | "single-sign-on"
+  | "scim"
   | "permissions"
+  | "oauth-server"
   | "agents"
   | "users";
 
-export type FeatureGroup = "Sign-in" | "Access";
+export type FeatureGroup = "Sign-in" | "Customers" | "Access";
 
 export type Feature = {
   slug: FeatureSlug;
@@ -39,17 +43,17 @@ export type Feature = {
   related: readonly [FeatureSlug, FeatureSlug];
 };
 
-export const FEATURE_GROUPS: readonly FeatureGroup[] = ["Sign-in", "Access"];
+export const FEATURE_GROUPS: readonly FeatureGroup[] = ["Sign-in", "Customers", "Access"];
 
 /** The overview of every feature, by group (app/platform/page.tsx). */
 export const PLATFORM = {
   path: "/platform",
   name: "Platform",
   title: "Every piece your agent can run.",
-  line: "How people sign in, and who can do what. Each piece has a page of its own.",
-  metaTitle: "Sign-in, single sign-on, permissions and agents — Zitadel",
+  line: "How people sign in, what each of your customers gets, and who can do what. Each piece has a page of its own.",
+  metaTitle: "Sign-in, B2B organizations, single sign-on, SCIM and OAuth — Zitadel",
   description:
-    "Sign-in, login screens, single sign-on, identity providers, permissions, agents and users: the pieces of Zitadel your agent can run.",
+    "Sign-in, login screens, identity providers, organizations, single sign-on, SCIM, permissions, an OAuth server, agent identity and users: the pieces of Zitadel your agent can run.",
 } as const;
 
 export const FEATURES: readonly Feature[] = [
@@ -80,19 +84,6 @@ export const FEATURES: readonly Feature[] = [
     related: ["sign-in", "users"],
   },
   {
-    slug: "single-sign-on",
-    group: "Sign-in",
-    name: "Single sign-on",
-    keywords: "single sign-on (SSO)",
-    title: "Let every customer bring their own sign-in.",
-    line: "Connect a customer's identity provider, and their people sign in with their work accounts.",
-    metaTitle: "Single sign-on (SSO) for B2B apps — Zitadel",
-    description:
-      "Connect a customer's OpenID Connect provider, and their people sign in to your app with their work accounts.",
-    phase: "operate",
-    related: ["identity-providers", "sign-in"],
-  },
-  {
     slug: "identity-providers",
     group: "Sign-in",
     name: "Identity providers",
@@ -106,6 +97,45 @@ export const FEATURES: readonly Feature[] = [
     related: ["single-sign-on", "sign-in"],
   },
   {
+    slug: "organizations",
+    group: "Customers",
+    name: "Organizations",
+    keywords: "multi-tenant organizations (B2B)",
+    title: "Give every customer its own organization.",
+    line: "Each customer gets its own members, admins, sign-in and brand, all inside one project.",
+    metaTitle: "Multi-tenant organizations for B2B SaaS — Zitadel",
+    description:
+      "Give every customer of your B2B app its own organization, with its members, admins, sign-in and brand, all inside one project.",
+    phase: "operate",
+    related: ["single-sign-on", "permissions"],
+  },
+  {
+    slug: "single-sign-on",
+    group: "Customers",
+    name: "Single sign-on",
+    keywords: "single sign-on (SSO)",
+    title: "Let every customer bring their own sign-in.",
+    line: "Connect a customer's identity provider, and their people sign in with their work accounts.",
+    metaTitle: "Single sign-on (SSO) for B2B apps — Zitadel",
+    description:
+      "Connect a customer's OpenID Connect provider, and their people sign in to your app with their work accounts.",
+    phase: "operate",
+    related: ["identity-providers", "sign-in"],
+  },
+  {
+    slug: "scim",
+    group: "Customers",
+    name: "SCIM",
+    keywords: "SCIM provisioning",
+    title: "Let your customers' directories keep your users current.",
+    line: "When Acme adds or removes someone in Okta or Entra ID, your app hears about it.",
+    metaTitle: "SCIM provisioning from Okta and Entra ID — Zitadel",
+    description:
+      "Your customers' directories, such as Okta and Entra ID, add and remove their people in your app through SCIM.",
+    phase: "operate",
+    related: ["single-sign-on", "organizations"],
+  },
+  {
     slug: "permissions",
     group: "Access",
     name: "Permissions",
@@ -117,6 +147,19 @@ export const FEATURES: readonly Feature[] = [
       "Decide who can do what: grant people and teams a role, take it away again, and see every change in the events.",
     phase: "govern",
     related: ["users", "agents"],
+  },
+  {
+    slug: "oauth-server",
+    group: "Access",
+    name: "OAuth server",
+    keywords: "OAuth 2.1 and OpenID Connect",
+    title: "Be the sign-in your APIs trust.",
+    line: "Zitadel issues and checks the tokens for your APIs, your MCP servers and the apps your partners build.",
+    metaTitle: "OAuth 2.1 and OpenID Connect server for APIs and MCP — Zitadel",
+    description:
+      "Zitadel issues the tokens for your APIs, your MCP servers and your partners' apps, as an OAuth 2.1 and OpenID Connect server at your app's own origin.",
+    phase: "govern",
+    related: ["agents", "permissions"],
   },
   {
     slug: "agents",

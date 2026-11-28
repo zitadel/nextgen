@@ -79,7 +79,69 @@ const USER_PROPERTIES = `"properties": {
   }
 }`;
 
+// A team created through the API, as its spec gives the request and the
+// answer (apps/api/api/openapi/endpoints/teams: create-team-request.yaml,
+// team-response.yaml, components/schemas/team-status.yaml), the values that
+// differ per team cut short.
+const CREATE_TEAM = `{ "name": "Acme" }
+
+201 Created
+{
+  "id": "…",
+  "name": "Acme",
+  "status": "active",
+  "created_at": "…",
+  "updated_at": "…"
+}`;
+
+// A project's authorization server metadata (RFC 8414), as the server builds
+// it (apps/api/internal/oauth/metadata.go, factory.go): the issuer at the
+// app's origin, the endpoints a client calls on the server's own public base
+// (cut to …), with the origin and project ID of the server's tests
+// (oauth_metadata_test.go, cmd/server/mux_test.go).
+const OAUTH_METADATA = `{
+  "issuer": "https://app.example.com/oauth/proj_123",
+  "authorization_endpoint": "https://app.example.com/oauth/proj_123/authorize",
+  "token_endpoint": "…/oauth/proj_123/token",
+  "jwks_uri": "…/oauth/proj_123/jwks",
+  "response_types_supported": ["code"],
+  "response_modes_supported": ["query"],
+  "grant_types_supported": ["authorization_code"],
+  "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
+  "code_challenge_methods_supported": ["S256"]
+}`;
+
+// A customer's Entra ID connection, signing its people in and provisioning
+// them under one subject, as the identity model gives it
+// (docs/design/api/identity-model.md, Connections).
+const ENTRA_CONNECTION = `{
+  "team": "acme",
+  "slug": "entra",
+  "domains": ["acme.com"],
+  "oidc": [{ "slug": "sign-in", "issuer": "https://login.microsoftonline.com/<tenant-id>/v2.0", "client_id": "<client-id>", "client_secret": "<client-secret>" }],
+  "scim": [{ "slug": "sync" }],
+  "mappings": {
+    "subject": { "sign-in": "oid", "sync": "externalId" },
+    "user": {
+      "sign-in": { "email": "email", "givenName": "given_name", "familyName": "family_name" },
+      "sync": { "email": "emails[primary eq true].value", "givenName": "name.givenName", "familyName": "name.familyName" }
+    }
+  }
+}`;
+
 export const HOODS: Record<FeatureSlug, Hood> = {
+  organizations: {
+    line: "Each customer is a team in your project. This is how the API creates one, as its spec gives it: a name no other team in the project has, and the team that comes back.",
+    artifact: <CodeFile title="POST /api/v1/teams" code={CREATE_TEAM} />,
+  },
+  "oauth-server": {
+    line: "Each project is an OAuth authorization server at your app's own origin. This is the metadata it serves for clients to find it, as the server builds it: the authorization code grant with PKCE, for confidential clients.",
+    artifact: <CodeFile title="/.well-known/oauth-authorization-server" code={OAUTH_METADATA} />,
+  },
+  scim: {
+    line: "In Zitadel's identity model, one connection signs a customer's people in and provisions them under one subject. This is its example: Acme's Entra ID, with OpenID Connect to sign in and SCIM to sync.",
+    artifact: <CodeFile title="acme/entra" code={ENTRA_CONNECTION} />,
+  },
   "sign-in": {
     line: "A step of your login flow offers a passkey through an action. This is the sign-in step once passkeys are on, as the docs give it: email and Continue, or a passkey that signs the user straight in.",
     artifact: <CodeFile title=".zitadel/flows/default-login.json" code={PASSKEY_STEP} />,

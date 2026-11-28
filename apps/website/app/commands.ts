@@ -74,3 +74,13 @@ export const grantCreateCommand =
 export const membersCommand = "npx @zitadel/cli@latest api listProjectMembers";
 export const userListCommand = "npx @zitadel/cli@latest user list";
 export const invitationCommand = "npx @zitadel/cli@latest invitation create --relation admin";
+// A customer's organization is a team in the project (`team --help`).
+export const teamCreateCommand = "npx @zitadel/cli@latest team create --name Acme";
+export const teamListCommand = "npx @zitadel/cli@latest team list";
+export const teamGetCommand = "npx @zitadel/cli@latest team get <team_id>";
+export const teamDeactivateCommand = "npx @zitadel/cli@latest team deactivate <team_id>";
+// Applications go through the API, which `api` calls by operation (`api --help`).
+export const apiListCommand = "npx @zitadel/cli@latest api ls";
+export const applicationPublishCommand =
+  "npx @zitadel/cli@latest api publishApplication --file application.json";
+export const applicationGetCommand = "npx @zitadel/cli@latest api getApplication <application_id>";

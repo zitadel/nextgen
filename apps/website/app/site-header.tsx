@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { GetStartedButton } from "./cta";
 import { Disclosure } from "./disclosure";
 import { GitHubMark } from "./github-mark";
@@ -186,8 +187,18 @@ export function SiteHeader({
                   buttonClassName={`group gap-1 ${NAV_LINK}`}
                   panelClassName={`${PANEL} left-0`}
                 >
-                  {/* A column per group, so another group sits beside it. */}
-                  <div className="grid auto-cols-[17.5rem] grid-flow-col gap-2">
+                  {/* A column per group, so another group sits beside it; on
+                      a laptop at most two, the rest under them, so a wide
+                      menu stays on screen. */}
+                  <div
+                    style={
+                      {
+                        "--cols": item.groups.length,
+                        "--cols-lg": Math.min(item.groups.length, 2),
+                      } as CSSProperties
+                    }
+                    className="grid grid-cols-[repeat(var(--cols-lg),17.5rem)] gap-2 xl:grid-cols-[repeat(var(--cols),17.5rem)]"
+                  >
                     {item.groups.map((group) => (
                       <Group
                         key={group.heading}

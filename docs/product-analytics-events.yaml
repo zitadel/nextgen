@@ -104,16 +104,19 @@ properties:
       - sign_up
       - contact
       - sign_in
+      - organizations
       - single_sign_on
       - permissions
+      - oauth_server
+      - scim
       - agents
       - investigate
     description: >-
       Where a link leads, as a stable name, never a URL: `get_started` is the
       website's /get-started page, `sign_up` the cloud's sign-up page and
-      `contact` zitadel.com's contact page; `sign_in`, `single_sign_on`,
-      `permissions` and `agents` are those website feature pages and
-      `investigate` that phase page.
+      `contact` zitadel.com's contact page; `sign_in`, `organizations`,
+      `single_sign_on`, `permissions`, `oauth_server`, `scim` and `agents`
+      are those website feature pages and `investigate` that phase page.
 
   # Attribution
   utm_source:
@@ -158,16 +161,25 @@ properties:
       - idp_list
       - user_list
       - invitation_create
+      - team_create
+      - team_list
+      - team_get
+      - team_deactivate
+      - api_ls
+      - application_publish
+      - application_get
     description: >-
       What a copy button copied, never its text: the CLI command it runs
       (`start`, `setup`, `dry_run` for `deploy --dry-run`, `deploy`,
       `policy_test`, `rollback` for `deployment rollback`, `grant_list`,
       `grant_create`, `grant_delete`, `members` for `api listProjectMembers`,
       `event_list` for any `event list`, `auth_method` for any `auth-method`
-      command, `idp_list`, `user_list`, `invitation_create`), `dev` for the
-      app's dev server, `skills` for the coding agents' skills, `ask` for the
-      ask that has your agent add sign-in, or `all` for a whole block of
-      commands.
+      command, `idp_list`, `user_list`, `invitation_create`, `team_create`,
+      `team_list`, `team_get`, `team_deactivate`, `api_ls` for `api ls`,
+      `application_publish` and `application_get` for those `api`
+      operations), `dev` for the app's dev server, `skills` for the coding
+      agents' skills, `ask` for the ask that has your agent add sign-in, or
+      `all` for a whole block of commands.
 
   # Journeys and actions
   flow:

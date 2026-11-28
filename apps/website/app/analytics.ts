@@ -26,6 +26,13 @@ import {
   userEventsCommand,
   userListCommand,
   userSignInsCommand,
+  teamCreateCommand,
+  teamListCommand,
+  teamGetCommand,
+  teamDeactivateCommand,
+  apiListCommand,
+  applicationPublishCommand,
+  applicationGetCommand,
 } from "./commands";
 
 // The website's custom events in Vercel Web Analytics, as
@@ -48,9 +55,9 @@ export type Placement = "header" | "hero" | "showcase" | "try_it" | "closing" | 
 /**
  * Where a call to action leads, as a stable name, never a URL: `get_started`
  * is /get-started, `sign_up` the cloud's sign-up and `contact` zitadel.com's
- * contact page; `sign_in`, `single_sign_on`, `permissions` and `agents` are
- * those feature pages and `investigate` that phase page, from the hero's
- * capabilities.
+ * contact page; `sign_in`, `organizations`, `single_sign_on`, `permissions`,
+ * `oauth_server`, `scim` and `agents` are those feature pages and
+ * `investigate` that phase page, from the hero's capabilities.
  */
 export type Target =
   | "quickstart"
@@ -59,8 +66,11 @@ export type Target =
   | "sign_up"
   | "contact"
   | "sign_in"
+  | "organizations"
   | "single_sign_on"
   | "permissions"
+  | "oauth_server"
+  | "scim"
   | "agents"
   | "investigate";
 
@@ -91,7 +101,14 @@ export type Snippet =
   | "auth_method"
   | "idp_list"
   | "user_list"
-  | "invitation_create";
+  | "invitation_create"
+  | "team_create"
+  | "team_list"
+  | "team_get"
+  | "team_deactivate"
+  | "api_ls"
+  | "application_publish"
+  | "application_get";
 
 const SNIPPETS = new Map<string, Snippet>([
   [startCommand, "start"],
@@ -119,6 +136,13 @@ const SNIPPETS = new Map<string, Snippet>([
   [membersCommand, "members"],
   [userListCommand, "user_list"],
   [invitationCommand, "invitation_create"],
+  [teamCreateCommand, "team_create"],
+  [teamListCommand, "team_list"],
+  [teamGetCommand, "team_get"],
+  [teamDeactivateCommand, "team_deactivate"],
+  [apiListCommand, "api_ls"],
+  [applicationPublishCommand, "application_publish"],
+  [applicationGetCommand, "application_get"],
 ]);
 
 /** The snippet `command` is, or `undefined` for a command the catalog has no name for. */

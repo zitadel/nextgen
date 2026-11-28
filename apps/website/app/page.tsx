@@ -2,11 +2,10 @@ import type { CSSProperties } from "react";
 import { AskTeaser } from "./ask-teaser";
 import { ChangeHistory, type Question, Questions, Transcript } from "./blocks";
 import { Capabilities } from "./capabilities";
-import { appPath } from "./commands";
 import { StartButtons } from "./cta";
 import { HISTORY } from "./get-started/history";
 import { ANSWER } from "./message";
-import { PHASES, phasePath } from "./phases";
+import { PHASES, type PhaseSlug, phasePath } from "./phases";
 import { PLATFORM } from "./platform";
 import { Part, PointList, TopLight, Unbroken } from "./sections";
 import { SiteFooter } from "./site-footer";
@@ -18,6 +17,14 @@ import { StartWindow } from "./start-window";
 // (message.ts).
 const LINE =
   "Ask the agent you already use for passkeys, single sign-on or a new role. It sets them up in your app and in Zitadel, and you review every change before it goes live.";
+
+// The way on from each phase's exchange to its page.
+const READ_ABOUT: Record<PhaseSlug, string> = {
+  "get-started": "Read about getting started",
+  operate: "Read about operating",
+  investigate: "Read about investigating",
+  govern: "Read about governing",
+};
 
 // What stays yours, whatever your agent runs (LICENSING.md for the licenses).
 const DECIDE = [
@@ -128,16 +135,14 @@ export default function Home() {
         </section>
 
         <Part id="the-work" title="From first sign-in to the audit, your agent does the work.">
-          <div className="max-w-3xl">
-            <Transcript
-              title={appPath}
-              exchanges={PHASES.map(({ slug, short, asks }) => ({
-                ...asks[0],
-                tag: short,
-                link: { href: phasePath(slug), label: `How ${short} works` },
-              }))}
-            />
-          </div>
+          <Transcript
+            title="Your agent"
+            exchanges={PHASES.map(({ slug, short, asks }) => ({
+              ...asks[0],
+              tag: short,
+              link: { href: phasePath(slug), label: READ_ABOUT[slug] },
+            }))}
+          />
         </Part>
 
         <Part

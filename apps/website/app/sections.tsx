@@ -63,7 +63,8 @@ export function TitleBlock({
   );
 }
 
-const H2 = "font-heading text-2xl leading-8 tracking-[-0.02em] md:text-3xl md:leading-10";
+const H2 =
+  "text-balance font-heading text-2xl leading-8 tracking-[-0.02em] md:text-3xl md:leading-10";
 
 /**
  * A page's section: its heading and line over its content, or from a laptop
