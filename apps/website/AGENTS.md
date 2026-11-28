@@ -7,14 +7,19 @@ guide to choosing it or Zitadel v4 at `/choose-version`.
 Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 - The front page says your agent can do the auth work and shows how, in
-  this order and nothing else: the hero (title, line, the asks it takes, the
-  start window with your agent's tab first, Start in our cloud and Run it
-  yourself), the work (each phase's first exchange, linking its page), What
-  your agent can turn on (a tab per group of features, each feature with a
-  window and its page), You stay in charge (beside the change history), the
-  questions, and a closing band with both ways to start and Talk to us.
+  this order and nothing else: the hero (title, line, the asks it takes,
+  Start in our cloud and Run it yourself, beside the start window with your
+  agent's tab first), the work (each phase's first exchange, linking its
+  page), What your agent can turn on (a tab per group of features, each
+  feature with a window and its page), You stay in charge (four points around
+  the change history), and a closing band with both ways to start and Talk
+  to us. No questions: `/llms.txt` answers those.
+- A feature's window on the front page stops at the default one's height
+  (`app/brand/capped.tsx`) and links its page, which shows it whole.
 - What Zitadel Next is lives in `app/message.ts`: the description, the share
   image, `/llms.txt` and the first question's answer, not the hero's line.
+- The questions about Zitadel Next as a whole live in `app/message.ts`, word
+  for word; the phase and feature pages keep their own.
 - A front-page window renders what another page shows, from the same data or
   component, never a copy: a feature's is its Under the hood
   (`app/hoods.tsx`), Sign-in's the live login.
@@ -83,9 +88,32 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 - Dark and light share one set of names in `app/globals.css`: add a color as
   a token with a value on both sides, never a `white`/`black` literal.
 - Build from the site's own pieces (windows, command blocks, the steps' labels
-  and hairlines, the display title): no colored card borders and no color per
-  section or phase. Zitadel's orange is the one accent, as the title and the
-  steps use it, and no brand color marks state, such as the current page.
+  and hairlines, the display title) and the brand's graphic pieces, never a
+  color per section or phase.
+- The brand's pieces are its gradient shapes (the hero's blade fan, the
+  dividers'), orange light falling to black or the paper, the noise grain,
+  mesh glows and the notched cards: components and assets in `app/brand/`.
+- Their classes and tokens are `app/globals.css`' brand block and the
+  `--color-brand*`, `--color-glow-*`, `--color-notch-*` and `--fan-*` tokens.
+- Zitadel's orange is the only color for buttons, links and state; no brand
+  color marks state, such as the current page.
+- Lilac, purple and pink only ever light a background (the mesh glows, the
+  light's far side), never text, a control or a border.
+- No colored card borders: the notched cards' hairline (`.notch-edge`) is the
+  theme's neutral ink.
+- Play a Lottie only with `lottie-web`'s light player (`lottie_light`), after
+  the first paint (`app/brand/lottie-icon.tsx`): the full player needs
+  `'unsafe-eval'`. Give reduced motion its first frame.
+- The hero's fan is the agency's animation as an H.264 video over its first
+  frame (`app/brand/hero-fan.tsx`), loaded from 1024px when idle, never for
+  reduced motion or Save-Data. It beat the Lottie, an animated WebP and a
+  WebM on size and looks.
+- Keep the fan's first frame under 0.05 bits a pixel at 550×448, so the title
+  stays the largest paint. Remake both from the agency's frames a shade darker
+  (`lutrgb` minus 3), the video with `libx264 -crf 19 -tune animation`.
+- Colour code where the page is built: JSON with Shiki and the docs' theme
+  (`app/code.tsx`), a command's words in `app/command-line.tsx`; never ship a
+  highlighter. The `--zl-shiki-*` tokens copy the docs': change both.
 - `app/theme.ts` sets `data-theme` before the first paint, from the header
   toggle's choice or the system's; the login previews follow it.
 

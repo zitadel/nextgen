@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { Placement } from "./analytics";
+import { Json } from "./code";
 import { CommandLine, Words } from "./command-line";
 import { appPath, quickstart, skillsCommand } from "./commands";
 import { CopyButton } from "./copy-button";
@@ -130,14 +131,19 @@ export function RowList({ title, rows }: { title: string; rows: readonly Row[] }
   );
 }
 
-/** A file or a JSON document as it stands, in a window titled with where it comes from. */
+/**
+ * A file or a JSON document as it stands, in a window titled with where it
+ * comes from, in the docs' syntax colours (code.tsx).
+ */
 export function CodeFile({ title, code }: { title: string; code: string }) {
   return (
     <Window title={title}>
       <pre
-        className={`overflow-x-auto py-5 font-mono text-text-secondary text-xs leading-5 md:text-[0.8125rem] md:leading-6 ${WINDOW_INSET}`}
+        className={`overflow-x-auto py-5 font-mono text-(--zl-shiki-foreground) text-xs leading-5 md:text-[0.8125rem] md:leading-6 ${WINDOW_INSET}`}
       >
-        <code>{code}</code>
+        <code>
+          <Json code={code} />
+        </code>
       </pre>
     </Window>
   );

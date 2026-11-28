@@ -87,8 +87,17 @@ function useOnScreen(ref: RefObject<Element | null>): boolean {
  * itself is hidden. Before the page hydrates, without script and for reduced
  * motion, the first ask simply stands, and only hover and focus change it.
  * A name with a page links to it and reports `clicked_link` from the hero.
+ * With `start` it aligns left from a laptop up, as the hero's column does.
  */
-export function AskTeaser({ className = "" }: { className?: string }) {
+export function AskTeaser({
+  start = false,
+  className = "",
+}: {
+  start?: boolean;
+  className?: string;
+}) {
+  // From a laptop up, with `start`, it lines up on the left like the hero.
+  const align = start ? "lg:items-start lg:text-left lg:justify-start" : "";
   const [active, setActive] = useState(0);
   const [typed, setTyped] = useState(ITEMS[0]?.ask.length ?? 0);
   const [motion, setMotion] = useState(false);
@@ -127,7 +136,7 @@ export function AskTeaser({ className = "" }: { className?: string }) {
   return (
     <div
       ref={root}
-      className={`flex flex-col items-center gap-3 border-border-primary border-y py-4 ${className}`}
+      className={`flex flex-col items-center gap-3 border-border-primary border-y py-4 ${align} ${className}`}
     >
       <div aria-hidden="true" className="grid w-full font-mono text-sm leading-6">
         {ITEMS.map(({ label, ask }, index) => {
@@ -135,7 +144,7 @@ export function AskTeaser({ className = "" }: { className?: string }) {
           return (
             <p
               key={label}
-              className={`text-pretty text-center text-text-primary [grid-area:1/1] ${shown ? "" : "invisible"}`}
+              className={`text-pretty text-center text-text-primary [grid-area:1/1] ${align} ${shown ? "" : "invisible"}`}
             >
               <span className="select-none text-text-accent">{"› "}</span>
               {shown ? (
@@ -153,7 +162,7 @@ export function AskTeaser({ className = "" }: { className?: string }) {
       </div>
       <ul
         aria-label="Things to ask your agent"
-        className="flex flex-wrap justify-center gap-x-1.5 gap-y-1 text-sm leading-6"
+        className={`flex flex-wrap justify-center gap-x-1.5 gap-y-1 text-sm leading-6 ${align}`}
       >
         {ITEMS.map(({ label, ask, link }, index) => {
           const lit = index === active;

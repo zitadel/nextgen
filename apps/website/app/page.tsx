@@ -1,13 +1,17 @@
 import type { CSSProperties } from "react";
 import { AskTeaser } from "./ask-teaser";
-import { ChangeHistory, type Question, Questions, Transcript } from "./blocks";
+import { ChangeHistory, Transcript } from "./blocks";
+import { Divider } from "./brand/divider";
+import footerLight from "./brand/footer-light.webp";
+import { HeroFan } from "./brand/hero-fan";
+import { MeshGlow } from "./brand/mesh-glow";
+import { NotchedCard } from "./brand/notched-card";
 import { Capabilities } from "./capabilities";
 import { StartButtons } from "./cta";
 import { HISTORY } from "./get-started/history";
-import { ANSWER } from "./message";
 import { PHASES, type PhaseSlug, phasePath } from "./phases";
 import { PLATFORM } from "./platform";
-import { Part, PointList, TopLight, Unbroken } from "./sections";
+import { Part, Unbroken } from "./sections";
 import { SiteFooter } from "./site-footer";
 import { SiteHeader } from "./site-header";
 import { StartWindow } from "./start-window";
@@ -26,49 +30,38 @@ const READ_ABOUT: Record<PhaseSlug, string> = {
   govern: "Read about governing",
 };
 
-// What stays yours, whatever your agent runs (LICENSING.md for the licenses).
+// What stays yours, whatever your agent runs (LICENSING.md for the licenses),
+// each with its notched card's label, a word the point already says, and
+// where its glow sits.
 const DECIDE = [
-  "Every change is a diff you review before it goes live.",
-  "Each change names who made it: a person, or an agent acting for one.",
-  "You can roll back to the release before.",
-  "It's open source: the server under AGPL-3.0, the SDKs under MIT. Run it in our cloud or on your servers.",
-];
-
-// The questions, word for word from the message house; the first answers
-// with what Zitadel Next is (message.ts).
-const QUESTIONS: readonly Question[] = [
-  { question: "What is Zitadel Next?", answer: ANSWER },
   {
-    question: "Does Zitadel have its own AI agent?",
-    answer:
-      "No. It opens every part of auth to the agent you already use, and that agent acts with your permissions. Every change it makes names it.",
+    label: "Review",
+    point: "Every change is a diff you review before it goes live.",
+    glow: { x: "85%", y: "10%" },
   },
   {
-    question: "Can a coding agent set up sign-in with it?",
-    answer:
-      "Yes. Your agent adds sign-in to your app and changes every setting, and you review each change.",
+    label: "Named",
+    point: "Each change names who made it: a person, or an agent acting for one.",
+    glow: { x: "20%", y: "75%" },
   },
   {
-    question: "How do the agents in my product get identity?",
-    answer:
-      "Each signs in as itself and acts for a user only with that user's consent. Every action names both.",
+    label: "Roll back",
+    point: "You can roll back to the release before.",
+    glow: { x: "80%", y: "70%" },
   },
   {
-    question: "Is it open source?",
-    answer:
-      "Yes. The server is AGPL-3.0, and the SDKs and client libraries are MIT. It runs in Zitadel Cloud or on your servers.",
-  },
-  {
-    question: "How is it different from Auth0?",
-    answer:
-      "It is open source and self-hostable, multi-tenant, and the agent you already use can run every part of it.",
+    label: "Open source",
+    point:
+      "It's open source: the server under AGPL-3.0, the SDKs under MIT. Run it in our cloud or on your servers.",
+    glow: { x: "30%", y: "15%" },
   },
 ];
 
-// The closing title in the hero's colors: Zitadel's orange to the green.
+// The front page's display titles in the brand's one highlight: white at
+// the top, orange at the foot, end to end.
 const TITLE_COLORS = {
-  "--title-from": "var(--color-step-start)",
-  "--title-to": "var(--color-step-end)",
+  "--title-from": "var(--color-brand)",
+  "--title-to": "var(--color-brand)",
 } as CSSProperties;
 
 /** A quiet link with an arrow, the way on from a section to a page. */
@@ -98,57 +91,93 @@ function MoreLink({ href, children }: { href: string; children: string }) {
 }
 
 // The front page says your agent can do the auth work and shows how
-// (AGENTS.md): the asks it takes and how to start, agent first; the work of
-// each phase; the features, each with a window and its page; what stays
-// yours; the questions; and the ways to start again at its end. The
-// quickstart's walkthrough is /get-started.
+// (AGENTS.md), in the brand's look (app/brand/): the asks it takes and how
+// to start, agent first, over the blade fan; the work of each phase on a
+// stage of orange light; the features, each with a window and its page; what
+// stays yours as a bento of notched cards; and the ways to start again over
+// the footer's light. The quickstart's walkthrough is /get-started; the
+// questions about Zitadel Next as a whole are /llms.txt's (message.ts).
 export default function Home() {
   return (
     <>
-      <TopLight />
       <SiteHeader />
-      <main>
+      {/* Pulled up under the glass header by its height, so the light and
+          the grain start at the top of the page and read through the glass.
+          Its own ground, so the fan blends with the page's (.hero-fan). */}
+      <main className="brand-noise -mt-16 bg-background pt-16">
+        <div
+          aria-hidden="true"
+          className="brand-light pointer-events-none absolute inset-x-0 top-0 -z-10 h-[60rem]"
+        />
         <section
           aria-labelledby="hero-title"
-          className="flex flex-col items-center px-6 pt-16 pb-12 md:pt-28 md:pb-16"
+          className="overflow-x-clip px-6 pt-12 pb-16 md:pt-20 lg:pt-24 lg:pb-24"
         >
-          {/* The title sets the width; the line under it fills it and wraps
-              inside it (.hero-lede), so the two read as one block. */}
-          <div className="grid w-fit max-w-full justify-items-center">
-            <h1 id="hero-title" className="hero-title">
-              <span className="display-title">
-                The auth platform <br className="max-sm:hidden" />
-                your agent can run.
-              </span>
-            </h1>
-            <p className="hero-lede teaser mt-5 text-balance text-center text-base text-text-secondary leading-7 md:text-lg md:leading-8">
-              <Unbroken text={LINE} />
-            </p>
-          </div>
-          <div className="teaser mt-8 flex w-full flex-col items-center gap-6">
-            <AskTeaser className="w-full max-w-3xl" />
-            <div className="w-full max-w-3xl">
-              <StartWindow placement="hero" />
+          <div className="mx-auto grid max-w-6xl items-center gap-14 lg:grid-cols-2 lg:gap-12">
+            <div className="flex min-w-0 flex-col items-center lg:items-start">
+              {/* The title sets the width; the line under it fills it and
+                  wraps inside it (.hero-lede), so the two read as one block. */}
+              <div className="grid w-fit max-w-full justify-items-center lg:justify-items-start">
+                <h1
+                  id="hero-title"
+                  style={TITLE_COLORS}
+                  className="hero-title lg:text-left lg:text-[3.5rem]"
+                >
+                  <span className="display-title">
+                    The auth platform <br className="max-sm:hidden" />
+                    your agent can run.
+                  </span>
+                </h1>
+                <p className="hero-lede teaser mt-5 text-balance text-center text-base text-text-secondary leading-7 md:text-lg md:leading-8 lg:text-left">
+                  <Unbroken text={LINE} />
+                </p>
+              </div>
+              <div className="teaser mt-8 flex w-full flex-col items-center gap-7 lg:items-start">
+                <AskTeaser start className="w-full max-w-3xl" />
+                <StartButtons placement="hero" className="lg:justify-start" />
+              </div>
             </div>
-            <StartButtons placement="hero" />
+            {/* The start window on the blade fan, the fan's light pooled
+                under it; below a laptop the fan's first frame is a soft
+                ground behind it. */}
+            <div className="relative flex min-w-0 items-center justify-center py-10 lg:min-h-[36rem] lg:py-0">
+              <HeroFan className="pointer-events-none absolute top-1/2 left-1/2 -z-10 aspect-[550/448] w-[135%] max-w-none -translate-x-1/2 -translate-y-1/2 opacity-45 lg:opacity-100" />
+              <div
+                aria-hidden="true"
+                className="fan-pool pointer-events-none absolute inset-x-[-10%] bottom-[-8%] -z-10 h-1/2"
+              />
+              <div className="teaser w-full max-w-[31.5rem]">
+                <StartWindow placement="hero" />
+              </div>
+            </div>
           </div>
         </section>
 
-        <Part id="the-work" title="From first sign-in to the audit, your agent does the work.">
-          <Transcript
-            title="Your agent"
-            exchanges={PHASES.map(({ slug, short, asks }) => ({
-              ...asks[0],
-              tag: short,
-              link: { href: phasePath(slug), label: READ_ABOUT[slug] },
-            }))}
-          />
+        <Part
+          id="the-work"
+          title="From first sign-in to the audit, your agent does the work."
+          centered
+          divider={<Divider number="01" tag="The work" shape="slats" />}
+        >
+          <div className="brand-stage brand-noise rounded-[2rem] px-4 py-10 sm:px-8 md:px-16 md:py-16">
+            <div className="mx-auto max-w-3xl">
+              <Transcript
+                title="Your agent"
+                exchanges={PHASES.map(({ slug, short, asks }) => ({
+                  ...asks[0],
+                  tag: short,
+                  link: { href: phasePath(slug), label: READ_ABOUT[slug] },
+                }))}
+              />
+            </div>
+          </div>
         </Part>
 
         <Part
           id="what-you-get"
           title="What your agent can turn on."
           line="Each piece has its own page with the details."
+          divider={<Divider number="02" tag="What you get" shape="sphere" />}
         >
           <div className="flex flex-col items-start gap-8">
             <div className="w-full">
@@ -158,21 +187,43 @@ export default function Home() {
           </div>
         </Part>
 
-        <Part id="in-charge" title="You stay in charge.">
-          <div className="grid items-start gap-8 lg:grid-cols-2 lg:gap-14">
-            <PointList points={DECIDE} />
-            <ChangeHistory changes={HISTORY} />
+        <Part
+          id="in-charge"
+          title="You stay in charge."
+          divider={<Divider number="03" tag="You stay in charge" shape="rosette" />}
+        >
+          {/* A bento: the change history as the large card, the four points
+              around it as notched cards on lilac, purple and pink glows. */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="brand-stage brand-noise flex items-center rounded-[1.25rem] p-4 sm:p-6 md:col-span-2 lg:row-span-2">
+              <div className="w-full">
+                <ChangeHistory changes={HISTORY} />
+              </div>
+            </div>
+            {DECIDE.map(({ label, point, glow }) => (
+              <NotchedCard key={label} label={label} glow={<MeshGlow x={glow.x} y={glow.y} />}>
+                <p className="text-pretty text-lg text-text-primary leading-7">{point}</p>
+              </NotchedCard>
+            ))}
           </div>
-        </Part>
-
-        <Part id="questions" title="Questions">
-          <Questions questions={QUESTIONS} />
         </Part>
 
         <section
           aria-labelledby="closing-title"
-          className="border-border-primary border-t px-6 pt-16 pb-20 md:pt-24 md:pb-28"
+          className="relative isolate overflow-hidden border-border-primary border-t px-6 pt-20 pb-24 md:pt-28 md:pb-32"
         >
+          {/* One frame of zitadel/new-website's footer animation
+              (Footer_Red.json), its ground keyed out, at the band's edge,
+              served from /_next/ like every image here. */}
+          <img
+            src={footerLight.src}
+            width={footerLight.width}
+            height={footerLight.height}
+            alt=""
+            decoding="async"
+            loading="lazy"
+            className="pointer-events-none absolute top-1/2 right-0 -z-10 h-[125%] w-auto max-w-none -translate-y-1/2 opacity-50 md:opacity-90"
+          />
           <div className="mx-auto flex max-w-3xl flex-col items-center">
             <h2
               id="closing-title"

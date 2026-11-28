@@ -17,6 +17,30 @@ export function Words({ text }: { text: string }) {
   ));
 }
 
+// A command's words, quietly told apart: the program and its subcommands in
+// the line's own ink, a flag (and `&&`) a step back, and what the reader
+// passes, a flag's value or a <placeholder>, in the strings' colour of the
+// docs' syntax theme (globals.css, code.tsx).
+const FLAG = "text-text-secondary";
+const VALUE = "text-(--zl-shiki-token-string)";
+
+/** A command, its words coloured by what they are; wraps as Words does. */
+export function CommandWords({ command }: { command: string }) {
+  let afterFlag = false;
+  return command.split(" ").map((word, index) => {
+    const flag = word.startsWith("-") || word === "&&";
+    const value = !flag && (afterFlag || /^<.+>$/.test(word));
+    afterFlag = flag && word !== "&&" && !word.includes("=");
+    return (
+      // biome-ignore lint/suspicious/noArrayIndexKey: the words of a fixed command, never reordered
+      <Fragment key={index}>
+        {index > 0 && " "}
+        <span className={`whitespace-nowrap ${flag ? FLAG : value ? VALUE : ""}`}>{word}</span>
+      </Fragment>
+    );
+  });
+}
+
 /**
  * A command at its prompt with its copy button, in every window that shows
  * one. A line too long for a phone wraps under its command, not its $.
@@ -25,7 +49,7 @@ export function Words({ text }: { text: string }) {
  * `pinned` shows the copy button always, for a list of steps to copy one by
  * one. `placement` is where the line sits, which a copy reports
  * (analytics.ts). With `ask`, it is an ask at your agent's prompt (›), not a
- * command at the shell's.
+ * command at the shell's, and stays plain words. The prompt is muted.
  */
 export function CommandLine({
   command,
@@ -46,10 +70,10 @@ export function CommandLine({
   return (
     <div className="group -mx-2 flex items-start gap-2 rounded-md px-2 transition-colors hover:bg-tint/[0.04]">
       <span className="flex-1 pl-[2ch] -indent-[2ch] text-text-primary">
-        <span aria-hidden="true" className="select-none text-text-accent">
+        <span aria-hidden="true" className="select-none text-text-muted">
           {ask ? "› " : "$ "}
         </span>
-        {children ?? <Words text={command} />}
+        {children ?? (ask ? <Words text={command} /> : <CommandWords command={command} />)}
       </span>
       {/* Centered on the first line of the command, whatever its height. */}
       <span className="my-[calc((1lh_-_1.75rem)/2)] flex shrink-0 items-center gap-2">

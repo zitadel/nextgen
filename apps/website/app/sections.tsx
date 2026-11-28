@@ -68,7 +68,9 @@ const H2 =
 
 /**
  * A page's section: its heading and line over its content, or from a laptop
- * up, with `split`, beside it; `wide` gives it the showcase's width.
+ * up, with `split`, beside it; `wide` gives it the showcase's width. The
+ * front page sets the brand's `divider` over it (brand/divider.tsx), and may
+ * center its heading.
  */
 export function Part({
   id,
@@ -76,6 +78,8 @@ export function Part({
   line,
   split = false,
   wide = false,
+  divider,
+  centered = false,
   children,
 }: {
   id: string;
@@ -83,6 +87,8 @@ export function Part({
   line?: ReactNode;
   split?: boolean;
   wide?: boolean;
+  divider?: ReactNode;
+  centered?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -91,20 +97,25 @@ export function Part({
       aria-labelledby={`${id}-title`}
       className="scroll-mt-20 overflow-x-clip px-6 py-12 md:py-16"
     >
-      <div
-        className={`mx-auto ${wide ? "max-w-6xl" : "max-w-5xl"} ${
-          split
-            ? "grid items-start gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-14"
-            : "flex flex-col gap-8"
-        }`}
-      >
-        <header className="flex max-w-2xl flex-col gap-3">
-          <h2 id={`${id}-title`} className={H2}>
-            {title}
-          </h2>
-          {line && <p className="text-pretty text-text-secondary leading-7">{line}</p>}
-        </header>
-        <div className="min-w-0">{children}</div>
+      <div className={`mx-auto ${wide ? "max-w-6xl" : "max-w-5xl"}`}>
+        {divider && <div className="mb-10 md:mb-12">{divider}</div>}
+        <div
+          className={
+            split
+              ? "grid items-start gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-14"
+              : "flex flex-col gap-8"
+          }
+        >
+          <header
+            className={`flex max-w-2xl flex-col gap-3 ${centered ? "mx-auto items-center text-center" : ""}`}
+          >
+            <h2 id={`${id}-title`} className={H2}>
+              {title}
+            </h2>
+            {line && <p className="text-pretty text-text-secondary leading-7">{line}</p>}
+          </header>
+          <div className="min-w-0">{children}</div>
+        </div>
       </div>
     </section>
   );

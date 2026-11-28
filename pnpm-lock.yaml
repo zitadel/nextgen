@@ -437,6 +437,9 @@ catalogs:
     lit:
       specifier: ^3.3.3
       version: 3.3.3
+    lottie-web:
+      specifier: ^5.13.0
+      version: 5.13.0
     lucide:
       specifier: ^1.70.0
       version: 1.72.0
@@ -1409,6 +1412,9 @@ importers:
       '@zitadel/components':
         specifier: workspace:*
         version: link:../../packages/components
+      lottie-web:
+        specifier: 'catalog:'
+        version: 5.13.0
       next:
         specifier: 'catalog:'
         version: 16.4.6(@babel/core@8.0.5)(@opentelemetry/api@1.9.1)(@playwright/test@1.65.1)(@types/node@24.19.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(sass@1.104.1)
@@ -1427,6 +1433,9 @@ importers:
       semver:
         specifier: 'catalog:'
         version: 7.8.6
+      shiki:
+        specifier: 'catalog:'
+        version: 4.6.0
     devDependencies:
       '@tailwindcss/postcss':
         specifier: 'catalog:'
@@ -13777,6 +13786,9 @@ packages:
   loose-envify@1.4.0:
     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
     hasBin: true
+
+  lottie-web@5.13.0:
+    resolution: {integrity: sha512-+gfBXl6sxXMPe8tKQm7qzLnUy5DUPJPKIyRHwtpCpyUEYjHYRJC/5gjUvdkuO2c3JllrPtHXH5UJJK8LRYl5yQ==}
 
   loupe@3.2.1:
     resolution: {integrity: sha512-CdzqowRJCeLU72bHvWqwRBBlLcMEtIvGrlvef74kMnV2AolS9Y8xUv1I0U/MNAWMhBlKIoyuEgoJ0t/bbwHbLQ==}
@@ -30062,6 +30074,8 @@ snapshots:
   loose-envify@1.4.0:
     dependencies:
       js-tokens: 4.0.0
+
+  lottie-web@5.13.0: {}
 
   loupe@3.2.1: {}
 

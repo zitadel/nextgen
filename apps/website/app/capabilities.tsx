@@ -1,4 +1,6 @@
 import type { CSSProperties } from "react";
+import { Capped } from "./brand/capped";
+import { type IconName, LottieIcon } from "./brand/lottie-icon";
 import { HOODS } from "./hoods";
 import { FEATURE_GROUPS, FEATURES, type Feature, type FeatureGroup, featurePath } from "./platform";
 import { BrowserFrame } from "./showcase/browser-frame";
@@ -27,6 +29,14 @@ function groupId(group: FeatureGroup): string {
   return `features-${group.toLowerCase().replace(/[^a-z]+/g, "-")}`;
 }
 
+// The brand's animated icon on each group's tab: a ring for signing in,
+// stacked layers for each customer's own, bars for levels of access.
+const ICONS: Record<FeatureGroup, IconName> = {
+  "Sign-in": "circle",
+  Customers: "triangle",
+  Access: "bars",
+};
+
 // What shows a group's features while its tab is chosen, written out whole:
 // Tailwind finds a class only as a whole string in the source, and the Record
 // makes a new group bring its own.
@@ -39,7 +49,9 @@ const SHOWN: Record<FeatureGroup, string> = {
 /**
  * The features (platform.ts), a tab per group over a list to pick from beside
  * one window: each entry the words people search for it, its title and line,
- * its window and the link to its page. Radio buttons hold both choices, the
+ * its window, no taller than the default one's (capped.tsx), and the link to
+ * its page. Each group's tab carries the brand's animated icon. Radio
+ * buttons hold both choices, the
  * group and the feature within it, and CSS shows the chosen ones, so it works
  * without script, every window is in the page for crawlers, and the arrow
  * keys move from group to group and from feature to feature. Each group
@@ -67,8 +79,11 @@ export function Capabilities() {
         {FEATURE_GROUPS.map((group, index) => (
           <label
             key={group}
-            className="cursor-pointer rounded-md px-3 py-1.5 font-semibold text-sm text-text-muted leading-5 transition-colors hover:text-text-primary has-[:checked]:bg-tint/10 has-[:checked]:text-text-primary has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-text-primary"
+            className="flex cursor-pointer items-center gap-2 rounded-md py-1.5 pr-3 pl-1.5 font-semibold text-sm text-text-muted leading-5 transition-colors hover:text-text-primary has-[:checked]:bg-tint/10 has-[:checked]:text-text-primary has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-text-primary"
           >
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-icon-chip">
+              <LottieIcon name={ICONS[group]} className="size-6" />
+            </span>
             <input
               type="radio"
               name="feature-group"
@@ -109,7 +124,9 @@ export function Capabilities() {
                 </label>
                 <div className="hidden min-w-0 flex-col items-start gap-4 peer-checked:flex max-lg:pt-3 max-lg:pb-6 max-lg:pl-4 lg:sticky lg:top-24 lg:col-start-2 lg:row-[2/-1] lg:self-start">
                   <div className="w-full">
-                    <Shown feature={feature} />
+                    <Capped href={featurePath(feature.slug)}>
+                      <Shown feature={feature} />
+                    </Capped>
                   </div>
                   <a
                     href={featurePath(feature.slug)}
