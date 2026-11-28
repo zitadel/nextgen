@@ -112,16 +112,14 @@ function CardLabel({ label }: { label: string }) {
 
 /**
  * A card with its label in a notch at the top left; `children` fill it under
- * the notch, and `glow` paints behind its surface (mesh-glow.tsx).
+ * the notch, at its foot.
  */
 export function NotchedCard({
   label,
-  glow,
   className = "",
   children,
 }: {
   label: string;
-  glow?: ReactNode;
   className?: string;
   children: ReactNode;
 }) {
@@ -176,7 +174,6 @@ export function NotchedCard({
         className={`relative isolate m-px flex h-[calc(100%-2px)] flex-col justify-end overflow-hidden bg-notch-fill ${inner ? "" : "rounded-2xl"}`}
         style={inner ? { clipPath: `path('${inner}')` } : undefined}
       >
-        {glow}
         <div className="flex flex-1 flex-col justify-end px-6 pt-20 pb-6 md:px-7 md:pb-7">
           {children}
         </div>

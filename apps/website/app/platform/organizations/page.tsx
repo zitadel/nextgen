@@ -25,17 +25,15 @@ export default function OrganizationsPage() {
           {
             ask: "Give each customer its own organization and admins.",
             reply:
-              "Each customer is now a team in your project. Their admins manage their own people from there.",
+              "Done. Each customer has its own organization now, and its admins look after their own people.",
           },
           {
             ask: "Which customers do we have?",
-            reply:
-              "Your project has a team for each customer. I listed them, each with when it was created.",
+            reply: "Here's every customer, with when each one was created.",
           },
           {
             ask: "Acme left. Turn off their organization.",
-            reply:
-              "I deactivated Acme's team. The team and its history stay on record for your audit.",
+            reply: "Acme's organization is off. Its history stays on record for your audit.",
           },
         ],
         hood: HOODS.organizations,

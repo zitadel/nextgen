@@ -39,6 +39,11 @@ export const skillsCommand = "npx skills add zitadel/nextgen --full-depth";
 // person types it to the agent.
 export const signInAsk = "Add sign-in to my app.";
 
+// The prompt the front page's Copy prompt for your agent copies: the skills,
+// whose router skill is named `zitadel` (skills/zitadel/SKILL.md) and routes
+// setup to the CLI's, then the ask.
+export const agentPrompt = `Set up Zitadel in this app. Run \`${skillsCommand}\`, then use the Zitadel skill to add sign-in.`;
+
 // The quickstart with your agent, the front page's start window's first tab:
 // the skills, then the ask (`ask`, at the agent's prompt, not the shell's).
 export const agentQuickstart = [

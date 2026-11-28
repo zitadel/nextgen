@@ -7,17 +7,21 @@ guide to choosing it or Zitadel v4 at `/choose-version`.
 Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 - The front page says your agent can do the auth work and shows how, in
-  this order and nothing else: the hero (title, line, the asks it takes,
-  Start in our cloud and Run it yourself, beside the start window with your
+  this order and nothing else: the hero (title, a line for each it serves,
+  the asks it takes, the ways to start, beside the start window with your
   agent's tab first), the work (each phase's first exchange, linking its
   page), What your agent can turn on (a tab per group of features, each
   feature with a window and its page), You stay in charge (four points around
-  the change history), and a closing band with both ways to start and Talk
-  to us. No questions: `/llms.txt` answers those.
+  the change history), Recently shipped (the changelog's three newest
+  entries), and a closing band with the ways to start and Talk to us. No
+  questions: `/llms.txt` answers those.
+- The ways to start (`app/cta.tsx`) are two buttons, Start in our cloud and
+  Copy prompt for your agent, and quiet links; never more than three buttons
+  in a row.
 - A feature's window on the front page stops at the default one's height
   (`app/brand/capped.tsx`) and links its page, which shows it whole.
 - What Zitadel Next is lives in `app/message.ts`: the description, the share
-  image, `/llms.txt` and the first question's answer, not the hero's line.
+  image, `/llms.txt` and the first question's answer, not the hero's lines.
 - The questions about Zitadel Next as a whole live in `app/message.ts`, word
   for word; the phase and feature pages keep their own.
 - A front-page window renders what another page shows, from the same data or
@@ -36,6 +40,10 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   agent, Under the hood, Try it, Questions, and Related.
 - Under the hood shows one real thing from this repo, taken from code or
   docs; Try it only commands that work now (README, the CLI skill, `--help`).
+- Your agent's replies (`app/phases.ts`, the feature pages' Ask your agent)
+  answer like a colleague in chat: the outcome first, in the first person,
+  two sentences at most, no field or resource names; the same ask, the same
+  reply.
 - Break a code window's objects and arrays, never a value, so its lines fit
   the window at 1440px (`app/hoods.tsx` says how far).
 - "Solutions" is kept for use-case pages (B2B SaaS, consumer apps, agents and
@@ -91,14 +99,14 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   and hairlines, the display title) and the brand's graphic pieces, never a
   color per section or phase.
 - The brand's pieces are its gradient shapes (the hero's blade fan, the
-  dividers'), orange light falling to black or the paper, the noise grain,
-  mesh glows and the notched cards: components and assets in `app/brand/`.
+  dividers'), orange light falling to black or the paper, the noise grain
+  and the notched cards: components and assets in `app/brand/`.
 - Their classes and tokens are `app/globals.css`' brand block and the
-  `--color-brand*`, `--color-glow-*`, `--color-notch-*` and `--fan-*` tokens.
+  `--color-brand*`, `--color-notch-*` and `--fan-*` tokens.
+- At most one glowing element on any screen at 1440px: drop a glow rather
+  than add one.
 - Zitadel's orange is the only color for buttons, links and state; no brand
   color marks state, such as the current page.
-- Lilac, purple and pink only ever light a background (the mesh glows, the
-  light's far side), never text, a control or a border.
 - No colored card borders: the notched cards' hairline (`.notch-edge`) is the
   theme's neutral ink.
 - Play a Lottie only with `lottie-web`'s light player (`lottie_light`), after
@@ -137,7 +145,7 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 ## The commands and the showcase
 
-- `app/commands.ts` holds every command and ask the site shows. Its
+- `app/commands.ts` holds every command, ask and prompt the site shows. Its
   `quickstart`, on `/get-started` and in the hero's terminal tab, follows the
   README's quick start; never add `--force`. When that journey changes,
   change the commands and the showcase, and run them once against the

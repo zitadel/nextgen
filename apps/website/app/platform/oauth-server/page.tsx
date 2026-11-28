@@ -24,17 +24,16 @@ export default function OAuthServerPage() {
           {
             ask: "Protect our MCP server with OAuth.",
             reply:
-              "Your MCP server now accepts only tokens Zitadel issued for it. MCP clients find the sign-in through its metadata.",
+              "Done. Your MCP server only accepts tokens Zitadel issued for it now, and MCP clients find the sign-in by themselves.",
           },
           {
             ask: "Let a partner's app call our API.",
             reply:
-              "I registered their app with its own client. They sign their users in with the authorization code flow and call your API with the token.",
+              "Their app has its own client now. It signs their users in and calls your API with the token it gets.",
           },
           {
             ask: "Which apps can get tokens for our API?",
-            reply:
-              "These applications, each with its client and the redirect addresses it may use.",
+            reply: "These apps, each with the addresses it may send people back to.",
           },
         ],
         hood: HOODS["oauth-server"],

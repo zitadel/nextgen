@@ -37,17 +37,17 @@ export const PHASES: readonly Phase[] = [
       {
         ask: "Add sign-in to my app.",
         reply:
-          "Setup added the login, sign-up and profile pages to your app. I signed up a test user and signed in again to check that it works.",
+          "Done. Your app has login, sign-up and a profile page now. I made a test user and signed in with it to be sure. Want passkeys next?",
       },
       {
         ask: "Add passkeys.",
         reply:
-          "Passkeys are on in your user schema, and the sign-in and sign-up steps offer them. The change is ready for your review.",
+          "Passkeys are on, and sign-in and sign-up offer them now. Want to review it before I deploy?",
       },
       {
         ask: "Use our brand on the login screen.",
         reply:
-          "I set the login's design tokens to your colors and font in your stylesheet, so the login screens look like the rest of your app.",
+          "Your login screens use your colors and font now, set in your own stylesheet, so they match the rest of your app.",
       },
     ],
   },
@@ -63,17 +63,16 @@ export const PHASES: readonly Phase[] = [
       {
         ask: "Connect this customer's single sign-on.",
         reply:
-          "I connected their OpenID Connect provider and added it to your sign-in steps. Their people sign in with their work accounts once you deploy.",
+          "Their OpenID Connect provider is connected and part of your sign-in now. When you deploy, their people can sign in with their work accounts. Should I deploy?",
       },
       {
         ask: "Require 12-character passwords.",
         reply:
-          "The password policy asks for at least 12 characters. New passwords are checked once you deploy; passwords already set stay as they are.",
+          "Done. New passwords need at least 12 characters once you deploy. Passwords people already have keep working.",
       },
       {
         ask: "Give support read access to users.",
-        reply:
-          "I gave the support team viewer access to the project. They can read your users and change nothing.",
+        reply: "Your support team can read your users now, and they can't change a thing.",
       },
     ],
   },
@@ -89,17 +88,17 @@ export const PHASES: readonly Phase[] = [
       {
         ask: "Why couldn't Dana sign in yesterday?",
         reply:
-          "The events show her password checks failed. She signed up with a passkey and never set a password, so her passkey is the way in.",
+          "Found it: she kept trying a password, but she signed up with a passkey and never set one. Her passkey still works, so that's her way in.",
       },
       {
         ask: "Who changed the password policy?",
         reply:
-          "Your agent did, for you, in the release that requires 12-character passwords. The release names the commit it came from and why.",
+          "That was me, for you: the release that requires 12-character passwords. It names the commit it came from and why.",
       },
       {
         ask: "Which sign-ins failed this morning?",
         reply:
-          "Some password checks, and a single sign-on the provider turned down. I listed each one with its user and the time it happened.",
+          "Some password attempts, and one single sign-on the provider turned down. Here's each, with who it was and when.",
       },
     ],
   },
@@ -115,16 +114,15 @@ export const PHASES: readonly Phase[] = [
       {
         ask: "Let our support agent look up orders for a user.",
         reply:
-          "Done. The support agent can look up a user's orders once that user agrees, and each look-up names the agent and the user.",
+          "Done. The support agent can look up a user's orders once that user says yes, and every look-up names both of them.",
       },
       {
         ask: "Show what our agents did for Dana.",
-        reply: "Only the support agent acted for her: it looked up her orders after she agreed.",
+        reply: "Only the support agent: it looked up her orders after she said yes.",
       },
       {
         ask: "Remove the support agent's access.",
-        reply:
-          "Removed. The agent's requests are refused from now on, and the events show that you removed it.",
+        reply: "Removed. Its requests are refused from now on, and the record shows you did it.",
       },
     ],
   },

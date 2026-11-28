@@ -19,17 +19,17 @@ export default function LoginUiPage() {
           {
             ask: "Use our brand on the login screen.",
             reply:
-              "I set the login's design tokens to your colors and font in your stylesheet, so the login screens look like the rest of your app.",
+              "Your login screens use your colors and font now, set in your own stylesheet, so they match the rest of your app.",
           },
           {
             ask: "Ask for the company at sign-up.",
             reply:
-              "Your user schema has a company field, and the sign-up step asks for it. Review the change, then deploy.",
+              "Sign-up asks for the company now, and it's stored with each user. Have a look, then deploy.",
           },
           {
             ask: "Ask for email and password on one screen.",
             reply:
-              "The sign-in step asks for email and password together and goes straight to signed in. The change is ready for your review.",
+              "Done. Sign-in asks for email and password on one screen and signs people straight in. It's ready for you to review.",
           },
         ],
         hood: HOODS["login-ui"],

@@ -25,17 +25,17 @@ export default function IdentityProvidersPage() {
           {
             ask: "Add sign-in with GitHub.",
             reply:
-              "GitHub signs people in with plain OAuth, not OpenID Connect, so I can't connect it. Google or any OpenID Connect provider works the same way.",
+              "I can't: GitHub uses plain OAuth, not OpenID Connect. Google or any OpenID Connect provider works, though. Want Google instead?",
           },
           {
             ask: "Show which providers we offer.",
             reply:
-              "Google, on the sign-in, sign-up and password steps. Its connection is .zitadel/idps/google.json.",
+              "Just Google, on sign-in, sign-up and the password step. Its connection is a file in your repo.",
           },
           {
             ask: "Remove the Google button.",
             reply:
-              "I took Google off the sign-in steps and the user schema. Deploy warns first if that leaves anyone without a way in.",
+              "Done, Google's off your sign-in. If that leaves anyone without a way in, deploy warns you first.",
           },
         ],
         hood: HOODS["identity-providers"],

@@ -19,17 +19,16 @@ export default function ScimPage() {
           {
             ask: "Sync Acme's people from Entra with SCIM.",
             reply:
-              "Acme's admin gets a SCIM endpoint and a token for Entra ID. People Acme adds appear in your app, and people who leave lose access.",
+              "Done: Acme's admin gets a SCIM address and a token for Entra ID. From then on, people Acme adds show up in your app, and people who leave lose access.",
           },
           {
             ask: "Who did Acme's directory add this week?",
-            reply:
-              "These people, each created by Acme's directory. The events name the directory as the actor.",
+            reply: "These people, all added by Acme's directory, and each one's history says so.",
           },
           {
             ask: "Stop syncing Acme's directory.",
             reply:
-              "I revoked the directory's token. It can't add or change anyone now, and the people it added stay.",
+              "Its token's revoked, so it can't add or change anyone now. The people it already added stay.",
           },
         ],
         hood: HOODS.scim,

@@ -39,16 +39,12 @@
   --color-step-end: #5fd99a;
 
   /* The brand's graphic pieces (app/brand/, AGENTS.md): Zitadel's orange,
-     the one highlight, and the dark its light falls off into; the glows'
-     lilac, purple and pink, which only ever light a background; the notched
+     the one highlight, and the dark its light falls off into; the notched
      cards' hairline and fill; the chip behind the animated icons. */
   --color-brand: #f25543;
   --color-brand-deep: #6b1d14;
   --color-brand-fade: #0f0f11;
   --color-brand-glow: rgb(242 85 67 / 0.3);
-  --color-glow-lilac: #bba5e4;
-  --color-glow-purple: #7a5af8;
-  --color-glow-pink: #e879c9;
   --color-notch-edge: rgb(130 130 156 / 0.5);
   --color-notch-fill: rgb(30 31 36 / 0.72);
   --color-icon-chip: rgb(255 255 255 / 0.04);
@@ -75,10 +71,9 @@
      their ink has faded out. */
   --title-ink: 70%;
   --title-fade: 125%;
-  /* How much grain the brand's noise lays over the page, and how strongly
-     its orange light shows: less of both on the light side. */
+  /* How much grain the brand's noise lays over the page: less on the light
+     side. */
   --noise-opacity: 0.06;
-  --glow-strength: 1;
   /* The tallest a feature's window stands on the front page: its default
      one's height, the live login in its browser (capped.tsx). */
   --window-cap: 28.875rem;
@@ -131,20 +126,16 @@
   --color-diff-removed-surface: rgb(239 68 68 / 0.1);
   --color-step-start: #e5432f;
   --color-step-end: #16a067;
-  /* The brand's light falls off into the paper here, and its glows and
-     cards are lighter; the icons keep a dark chip, drawn for the dark. */
+  /* The brand's light falls off into the paper here, and its cards are
+     lighter; the icons keep a dark chip, drawn for the dark. */
   --color-brand: #e5432f;
   --color-brand-deep: #f6c3b9;
   --color-brand-fade: #f6f6f8;
   --color-brand-glow: rgb(229 67 47 / 0.16);
-  --color-glow-lilac: #d9cdf6;
-  --color-glow-purple: #b8a6fb;
-  --color-glow-pink: #f5c2e6;
   --color-notch-edge: rgb(17 17 20 / 0.14);
   --color-notch-fill: rgb(255 255 255 / 0.78);
   --color-icon-chip: #141417;
   --noise-opacity: 0.035;
-  --glow-strength: 0.55;
   --fan-blend: darken;
   --fan-filter: invert(1) hue-rotate(180deg) saturate(1.6) brightness(1.05);
   --zl-shiki-foreground: #0a0a0a;
@@ -491,9 +482,9 @@
 }
 
 /* The brand's graphic pieces on the front page (app/brand/): grain, light,
-   the blade fan, the stage, the glows, the notched cards' edge and the
-   fade under a capped window. Orange is their light; lilac, purple and pink
-   only ever glow behind a surface; nothing here marks state or a control. */
+   the dividers' shapes, the blade fan, the stage, the notched cards' edge
+   and the fade under a capped window. Orange is their light, one light a
+   screen; nothing here marks state or a control. */
 @layer components {
   /* The grain: the noise tile over what the element paints, under its
      content. */
@@ -514,12 +505,10 @@
     pointer-events: none;
   }
 
-  /* The front page's light from the top: orange over the hero's fan, a
-     purple haze at the far side. */
+  /* The front page's light from the top: orange over the hero's fan, the
+     first screen's one light. */
   .brand-light {
-    background:
-      radial-gradient(38% 46% at 74% 12%, var(--color-brand-glow), transparent 70%),
-      radial-gradient(34% 40% at 12% 0%, color-mix(in oklch, var(--color-glow-purple) 14%, transparent), transparent 70%);
+    background: radial-gradient(38% 46% at 74% 12%, var(--color-brand-glow), transparent 70%);
   }
 
   /* The dividers' shapes (divider.tsx): orange at the lit edge, falling off
@@ -546,32 +535,12 @@
     filter: var(--fan-filter);
   }
 
-  /* The orange light pooled under the start window. */
-  .fan-pool {
-    background: radial-gradient(50% 50% at 50% 50%, var(--color-brand-glow), transparent 72%);
-  }
-
   /* A stage of orange light falling to black (the dark) or the paper, for
-     the transcript (page.tsx). */
+     the transcript and the change history (page.tsx). */
   .brand-stage {
     background:
       radial-gradient(60% 55% at 50% 0%, var(--color-brand-glow), transparent 75%),
       linear-gradient(to bottom, color-mix(in oklch, var(--color-brand-deep) 45%, var(--color-brand-fade)), var(--color-brand-fade) 80%);
-  }
-
-  /* A mesh glow (mesh-glow.tsx): three soft blots of lilac, purple and
-     pink behind a card, placed by --glow-x and --glow-y. */
-  .mesh-glow {
-    position: absolute;
-    inset: -20%;
-    z-index: -1;
-    filter: blur(28px);
-    opacity: calc(0.55 * var(--glow-strength));
-    background:
-      radial-gradient(28% 32% at var(--glow-x, 80%) var(--glow-y, 20%), var(--color-glow-purple), transparent 70%),
-      radial-gradient(30% 34% at calc(var(--glow-x, 80%) - 22%) calc(var(--glow-y, 20%) + 18%), var(--color-glow-lilac), transparent 70%),
-      radial-gradient(24% 28% at calc(var(--glow-x, 80%) + 6%) calc(var(--glow-y, 20%) + 36%), var(--color-glow-pink), transparent 70%);
-    pointer-events: none;
   }
 
   /* The notched card's hairline (notched-card.tsx): the gradient the

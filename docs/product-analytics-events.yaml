@@ -144,6 +144,7 @@ properties:
     values:
       - all
       - ask
+      - agent_prompt
       - start
       - setup
       - dev
@@ -178,8 +179,9 @@ properties:
       `team_list`, `team_get`, `team_deactivate`, `api_ls` for `api ls`,
       `application_publish` and `application_get` for those `api`
       operations), `dev` for the app's dev server, `skills` for the coding
-      agents' skills, `ask` for the ask that has your agent add sign-in, or
-      `all` for a whole block of commands.
+      agents' skills, `ask` for the ask that has your agent add sign-in,
+      `agent_prompt` for the front page's prompt that has your agent set
+      Zitadel up, or `all` for a whole block of commands.
 
   # Journeys and actions
   flow:
@@ -839,7 +841,9 @@ components:
     events:
       copied_command:
         status: emitted
-        trigger: A copy button put its command on the clipboard.
+        trigger: >-
+          A copy button put its command on the clipboard, or the front page's
+          Copy prompt for your agent its prompt.
         destinations: [vercel]
         properties: [page, snippet, placement]
       clicked_link:

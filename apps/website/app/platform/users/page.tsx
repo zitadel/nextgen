@@ -25,17 +25,17 @@ export default function UsersPage() {
           {
             ask: "Add a company field.",
             reply:
-              "Your user schema has a company field, and the sign-up step asks for it. Review the change, then deploy.",
+              "Sign-up asks for the company now, and it's stored with each user. Have a look, then deploy.",
           },
           {
             ask: "Invite Dana as an admin.",
             reply:
-              "I created an admin invitation for Dana. Send her the link yourself; it expires in 72 hours.",
+              "Here's Dana's admin invite. Send her the link yourself; it expires in 72 hours.",
           },
           {
             ask: "Import our users from Zitadel v4.",
             reply:
-              "I imported your users from Zitadel v4 into this project. They keep their email addresses and sign in as before.",
+              "Your Zitadel v4 users are in this project now. They keep their email addresses and sign in as before.",
           },
         ],
         hood: HOODS.users,

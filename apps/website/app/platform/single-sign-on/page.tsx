@@ -25,17 +25,17 @@ export default function SingleSignOnPage() {
           {
             ask: "Connect this customer's single sign-on.",
             reply:
-              "I connected their OpenID Connect provider with the details they sent. Once you deploy, their people sign in with their work accounts.",
+              "Their OpenID Connect provider is connected and part of your sign-in now. When you deploy, their people can sign in with their work accounts. Should I deploy?",
           },
           {
             ask: "Which customers use single sign-on?",
             reply:
-              "These customers sign in through their own provider. I listed each with its connection and when it was added.",
+              "These ones, each through their own provider. Here's each connection and when it was added.",
           },
           {
             ask: "Turn off passwords for this customer.",
             reply:
-              "Done. People at this customer sign in through their provider only; everyone else keeps their password.",
+              "Done. Their people sign in through their own provider only; everyone else keeps their password.",
           },
         ],
         hood: HOODS["single-sign-on"],

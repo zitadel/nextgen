@@ -1,5 +1,5 @@
-/** The brand's signature shapes, small: slats, a sphere, a rosette (the hero has the blade fan). */
-export type Shape = "slats" | "sphere" | "rosette";
+/** The brand's signature shapes, small: slats, a sphere, a rosette, a blade fan. */
+export type Shape = "slats" | "sphere" | "rosette" | "blade";
 
 /** One shape in a 32 × 32 box, lit in orange and falling off into the dark. */
 function ShapeMark({ shape }: { shape: Shape }) {
@@ -42,6 +42,10 @@ function ShapeMark({ shape }: { shape: Shape }) {
             fill={`url(#${id}-line)`}
             opacity="0.7"
           />
+        ))}
+      {shape === "blade" &&
+        ["2,4 12,9 12,23 2,28", "13,2 19,8 19,24 13,30", "20,4 30,9 30,23 20,28"].map((points) => (
+          <polygon key={points} points={points} fill={`url(#${id}-line)`} />
         ))}
     </svg>
   );

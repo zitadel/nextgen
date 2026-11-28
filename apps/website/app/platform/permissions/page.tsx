@@ -24,18 +24,17 @@ export default function PermissionsPage() {
         asks: [
           {
             ask: "Give support read access to users.",
-            reply:
-              "I gave the support team viewer access to the project. They can read your users and change nothing.",
+            reply: "Your support team can read your users now, and they can't change a thing.",
           },
           {
             ask: "Who can delete users?",
             reply:
-              "The project's admins, its owning team among them, and anything that holds the project secret, such as your backend.",
+              "Your project's admins, including the team that owns it, and anything holding the project's secret, like your backend.",
           },
           {
             ask: "Remove Alex's admin access.",
             reply:
-              "I revoked Alex's admin grant, and the events record that you did. If Alex is in the team that owns the project, that access stays until Alex leaves the team.",
+              "Done, and the record shows it was you. If Alex is in the team that owns the project, that access stays until Alex leaves it.",
           },
         ],
         hood: HOODS.permissions,

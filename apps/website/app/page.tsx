@@ -4,11 +4,13 @@ import { ChangeHistory, Transcript } from "./blocks";
 import { Divider } from "./brand/divider";
 import footerLight from "./brand/footer-light.webp";
 import { HeroFan } from "./brand/hero-fan";
-import { MeshGlow } from "./brand/mesh-glow";
 import { NotchedCard } from "./brand/notched-card";
 import { Capabilities } from "./capabilities";
+import { type Entry, entryPath, readChangelog } from "./changelog/entries";
+import { DATE } from "./changelog/entry";
 import { StartButtons } from "./cta";
 import { HISTORY } from "./get-started/history";
+import { links } from "./links";
 import { PHASES, type PhaseSlug, phasePath } from "./phases";
 import { PLATFORM } from "./platform";
 import { Part, Unbroken } from "./sections";
@@ -16,11 +18,23 @@ import { SiteFooter } from "./site-footer";
 import { SiteHeader } from "./site-header";
 import { StartWindow } from "./start-window";
 
-// The line under the title: what you ask, and what you keep. What Zitadel
-// Next is, in the message house's words, is the site's description
-// (message.ts).
-const LINE =
-  "Ask the agent you already use for passkeys, single sign-on or a new role. It sets them up in your app and in Zitadel, and you review every change before it goes live.";
+// Under the title, whom it serves, each in a line: who it is for as a tag,
+// and what it gives them. What Zitadel Next is, in the message house's
+// words, stays the site's description (message.ts).
+const FOR = [
+  {
+    who: "For your coding agent",
+    what: "Set up sign-in through Zitadel's CLI, MCP and skills.",
+  },
+  {
+    who: "For your customers",
+    what: "Passkeys, single sign-on and organizations, ready when they ask.",
+  },
+  {
+    who: "For the agents you ship",
+    what: "Their own identity, acting only with a user's consent.",
+  },
+];
 
 // The way on from each phase's exchange to its page.
 const READ_ABOUT: Record<PhaseSlug, string> = {
@@ -31,31 +45,23 @@ const READ_ABOUT: Record<PhaseSlug, string> = {
 };
 
 // What stays yours, whatever your agent runs (LICENSING.md for the licenses),
-// each with its notched card's label, a word the point already says, and
-// where its glow sits.
+// each with its notched card's label, a word the point already says.
 const DECIDE = [
-  {
-    label: "Review",
-    point: "Every change is a diff you review before it goes live.",
-    glow: { x: "85%", y: "10%" },
-  },
+  { label: "Review", point: "Every change is a diff you review before it goes live." },
   {
     label: "Named",
     point: "Each change names who made it: a person, or an agent acting for one.",
-    glow: { x: "20%", y: "75%" },
   },
-  {
-    label: "Roll back",
-    point: "You can roll back to the release before.",
-    glow: { x: "80%", y: "70%" },
-  },
+  { label: "Roll back", point: "You can roll back to the release before." },
   {
     label: "Open source",
     point:
       "It's open source: the server under AGPL-3.0, the SDKs under MIT. Run it in our cloud or on your servers.",
-    glow: { x: "30%", y: "15%" },
   },
 ];
+
+// The newest entries the changelog shows on the front page.
+const SHIPPED = 3;
 
 // The front page's display titles in the brand's one highlight: white at
 // the top, orange at the foot, end to end.
@@ -90,13 +96,50 @@ function MoreLink({ href, children }: { href: string; children: string }) {
   );
 }
 
+/**
+ * The changelog's newest entries as notched cards, each labelled with the
+ * day it landed, its title linking the entry's page (the whole card answers
+ * a click), its summary and the release that carries it, once one does. Read
+ * when the site builds (changelog/entries.ts), so a new entry reaches the
+ * front page with the deploy that brings it.
+ */
+function Shipped({ entries }: { entries: readonly Entry[] }) {
+  return (
+    <ul className="grid w-full gap-4 md:grid-cols-3">
+      {entries.map((entry) => (
+        <li key={entry.slug} className="flex">
+          <NotchedCard label={DATE.format(new Date(entry.date))}>
+            <h3 className="font-heading text-lg text-text-primary leading-7 tracking-[-0.01em]">
+              <a
+                href={entryPath(entry.slug)}
+                className="decoration-border-secondary underline-offset-4 after:absolute after:inset-0 after:content-[''] hover:underline focus-visible:underline focus-visible:outline-none"
+              >
+                {entry.title}
+              </a>
+            </h3>
+            <p className="mt-2 text-pretty text-sm text-text-secondary leading-6">
+              {entry.summary}
+            </p>
+            {entry.release && (
+              <p className="mt-3 font-mono text-text-muted text-xs leading-5">
+                {entry.release.tag}
+              </p>
+            )}
+          </NotchedCard>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 // The front page says your agent can do the auth work and shows how
-// (AGENTS.md), in the brand's look (app/brand/): the asks it takes and how
-// to start, agent first, over the blade fan; the work of each phase on a
-// stage of orange light; the features, each with a window and its page; what
-// stays yours as a bento of notched cards; and the ways to start again over
-// the footer's light. The quickstart's walkthrough is /get-started; the
-// questions about Zitadel Next as a whole are /llms.txt's (message.ts).
+// (AGENTS.md), in the brand's look (app/brand/), one light a screen: whom it
+// serves, the asks it takes and how to start, agent first, over the blade
+// fan; the work of each phase on a stage of orange light; the features, each
+// with a window and its page; what stays yours as a bento of notched cards;
+// what shipped last; and the ways to start again over the footer's light.
+// The quickstart's walkthrough is /get-started; the questions about Zitadel
+// Next as a whole are /llms.txt's (message.ts).
 export default function Home() {
   return (
     <>
@@ -113,39 +156,41 @@ export default function Home() {
           aria-labelledby="hero-title"
           className="overflow-x-clip px-6 pt-12 pb-16 md:pt-20 lg:pt-24 lg:pb-24"
         >
-          <div className="mx-auto grid max-w-6xl items-center gap-14 lg:grid-cols-2 lg:gap-12">
+          {/* The words' column a little wider, so the ways to start keep to
+              one row beside the start window at 1440px. */}
+          <div className="mx-auto grid max-w-6xl items-center gap-14 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-12">
             <div className="flex min-w-0 flex-col items-center lg:items-start">
-              {/* The title sets the width; the line under it fills it and
-                  wraps inside it (.hero-lede), so the two read as one block. */}
-              <div className="grid w-fit max-w-full justify-items-center lg:justify-items-start">
-                <h1
-                  id="hero-title"
-                  style={TITLE_COLORS}
-                  className="hero-title lg:text-left lg:text-[3.5rem]"
-                >
-                  <span className="display-title">
-                    The auth platform <br className="max-sm:hidden" />
-                    your agent can run.
-                  </span>
-                </h1>
-                <p className="hero-lede teaser mt-5 text-balance text-center text-base text-text-secondary leading-7 md:text-lg md:leading-8 lg:text-left">
-                  <Unbroken text={LINE} />
-                </p>
-              </div>
-              <div className="teaser mt-8 flex w-full flex-col items-center gap-7 lg:items-start">
+              <h1
+                id="hero-title"
+                style={TITLE_COLORS}
+                className="hero-title lg:text-left lg:text-[3.5rem]"
+              >
+                <span className="display-title">
+                  The auth platform <br className="max-sm:hidden" />
+                  your agent can run.
+                </span>
+              </h1>
+              <ul className="teaser mt-6 flex max-w-[34rem] flex-col gap-3.5 text-center lg:text-left">
+                {FOR.map(({ who, what }) => (
+                  <li key={who} className="flex flex-col gap-0.5">
+                    <span className="font-heading text-text-muted text-xs uppercase leading-5 tracking-[0.08em]">
+                      {who}
+                    </span>
+                    <span className="text-pretty text-base text-text-secondary leading-7">
+                      <Unbroken text={what} />
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="teaser mt-7 flex w-full flex-col items-center gap-6 lg:items-start">
                 <AskTeaser start className="w-full max-w-3xl" />
                 <StartButtons placement="hero" className="lg:justify-start" />
               </div>
             </div>
-            {/* The start window on the blade fan, the fan's light pooled
-                under it; below a laptop the fan's first frame is a soft
-                ground behind it. */}
+            {/* The start window on the blade fan; below a laptop the fan's
+                first frame is a soft ground behind it. */}
             <div className="relative flex min-w-0 items-center justify-center py-10 lg:min-h-[36rem] lg:py-0">
               <HeroFan className="pointer-events-none absolute top-1/2 left-1/2 -z-10 aspect-[550/448] w-[135%] max-w-none -translate-x-1/2 -translate-y-1/2 opacity-45 lg:opacity-100" />
-              <div
-                aria-hidden="true"
-                className="fan-pool pointer-events-none absolute inset-x-[-10%] bottom-[-8%] -z-10 h-1/2"
-              />
               <div className="teaser w-full max-w-[31.5rem]">
                 <StartWindow placement="hero" />
               </div>
@@ -192,19 +237,30 @@ export default function Home() {
           title="You stay in charge."
           divider={<Divider number="03" tag="You stay in charge" shape="rosette" />}
         >
-          {/* A bento: the change history as the large card, the four points
-              around it as notched cards on lilac, purple and pink glows. */}
+          {/* A bento: the change history as the large card on the section's
+              one light, the four points around it as notched cards. */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <div className="brand-stage brand-noise flex items-center rounded-[1.25rem] p-4 sm:p-6 md:col-span-2 lg:row-span-2">
               <div className="w-full">
                 <ChangeHistory changes={HISTORY} />
               </div>
             </div>
-            {DECIDE.map(({ label, point, glow }) => (
-              <NotchedCard key={label} label={label} glow={<MeshGlow x={glow.x} y={glow.y} />}>
+            {DECIDE.map(({ label, point }) => (
+              <NotchedCard key={label} label={label}>
                 <p className="text-pretty text-lg text-text-primary leading-7">{point}</p>
               </NotchedCard>
             ))}
+          </div>
+        </Part>
+
+        <Part
+          id="recently-shipped"
+          title="Recently shipped"
+          divider={<Divider number="04" tag="Recently shipped" shape="blade" />}
+        >
+          <div className="flex flex-col items-start gap-8">
+            <Shipped entries={readChangelog().entries.slice(0, SHIPPED)} />
+            <MoreLink href={links.changelog}>See the changelog</MoreLink>
           </div>
         </Part>
 

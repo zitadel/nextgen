@@ -2,6 +2,7 @@ import { track } from "@vercel/analytics";
 
 import {
   actorEventsCommand,
+  agentPrompt,
   correlationEventsCommand,
   customSsoCommand,
   deployCommand,
@@ -80,11 +81,13 @@ export type Tab = "with_agent" | "in_terminal";
 /**
  * What a copy button copied, never its text: `all` is a whole block of
  * commands, `event_list` any `event list` a page offers, `auth_method` any
- * `auth-method` command, `ask` the ask for your agent.
+ * `auth-method` command, `ask` the ask for your agent, `agent_prompt` the
+ * front page's prompt for your agent.
  */
 export type Snippet =
   | "all"
   | "ask"
+  | "agent_prompt"
   | "start"
   | "setup"
   | "dev"
@@ -118,6 +121,7 @@ const SNIPPETS = new Map<string, Snippet>([
   [deployCommand, "deploy"],
   [skillsCommand, "skills"],
   [signInAsk, "ask"],
+  [agentPrompt, "agent_prompt"],
   [policyTestCommand, "policy_test"],
   [rollbackCommand, "rollback"],
   [grantListCommand, "grant_list"],

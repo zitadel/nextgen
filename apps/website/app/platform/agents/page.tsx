@@ -19,17 +19,17 @@ export default function AgentsPage() {
           {
             ask: "Register our support agent.",
             reply:
-              "Done. The support agent has its own identity and signs in as itself, with only the access you gave it.",
+              "Done. It has its own identity now and signs in as itself, with only the access you gave it.",
           },
           {
             ask: "Let it look up orders when a user agrees.",
             reply:
-              "Users see a consent screen the first time the agent asks. Once they agree, each look-up names the agent and the user.",
+              "Users get a consent screen the first time it asks. Once they say yes, every look-up names both of them.",
           },
           {
             ask: "Show everything the support agent did today.",
             reply:
-              "It signed in as itself and looked up orders for users who had agreed. Every event names the agent and the user.",
+              "It signed in as itself and looked up orders, only for users who'd said yes. Each look-up names it and the user.",
           },
         ],
         hood: HOODS.agents,

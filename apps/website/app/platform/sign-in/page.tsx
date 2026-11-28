@@ -25,17 +25,17 @@ export default function SignInPage() {
           {
             ask: "Add passkeys.",
             reply:
-              "Passkeys are on in your user schema, and the sign-in and sign-up steps offer them. Deploy once you have reviewed the change.",
+              "Passkeys are on, and sign-in and sign-up offer them now. Want to review it before I deploy?",
           },
           {
             ask: "Let people sign in with Google.",
             reply:
-              "I connected Google with the client you created. Once you deploy, the sign-in, sign-up and password steps offer Continue with Google.",
+              "Connected, with the Google client you made. Once you deploy, sign-in, sign-up and the password step show Continue with Google. Should I deploy?",
           },
           {
             ask: "Require 12-character passwords.",
             reply:
-              "The password policy asks for at least 12 characters. New passwords are checked once you deploy; passwords already set stay as they are.",
+              "Done. New passwords need at least 12 characters once you deploy. Passwords people already have keep working.",
           },
         ],
         hood: HOODS["sign-in"],
