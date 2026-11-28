@@ -27,6 +27,7 @@ func TestBuildHTTPMuxAnswersAPathNothingServes(t *testing.T) {
 	require.NoError(t, err)
 
 	const vercelRequestID = "2vxlh-1792820352212-3ce3eb4ad630"
+	const requestID = "req_" + vercelRequestID
 	// With oauth.enabled off, the OAuth server's paths are such paths too.
 	for _, path := range []string{"/no-such-page", "/api/v1/no-such-page", "/api/v1", "/oauth/proj_123/token", "/.well-known/oauth-authorization-server/oauth/proj_123"} {
 		send := func(accept string) *httptest.ResponseRecorder {
@@ -40,14 +41,14 @@ func TestBuildHTTPMuxAnswersAPathNothingServes(t *testing.T) {
 
 		page := send("text/html,application/xhtml+xml,*/*;q=0.8")
 		assert.Equal(t, http.StatusNotFound, page.Code, path)
-		assert.Equal(t, vercelRequestID, page.Header().Get("X-Request-Id"), path)
-		assert.Contains(t, page.Body.String(), "Request ID <code>"+vercelRequestID+"</code>", path)
+		assert.Equal(t, requestID, page.Header().Get("X-Request-Id"), path)
+		assert.Contains(t, page.Body.String(), "Request ID <code>"+requestID+"</code>", path)
 		assert.Contains(t, page.Body.String(), `<a class="error-action" href="/console/">Open the console</a>`, path)
 		assert.Empty(t, page.Header().Get("Deprecation"), path)
 
 		envelope := send("*/*")
 		assert.Equal(t, http.StatusNotFound, envelope.Code, path)
-		assert.Equal(t, vercelRequestID, envelope.Header().Get("X-Request-Id"), path)
+		assert.Equal(t, requestID, envelope.Header().Get("X-Request-Id"), path)
 		assert.JSONEq(t, `{"code":"req.not_found","message":"No API operation matches this path."}`, envelope.Body.String(), path)
 		assert.Empty(t, envelope.Header().Get("Deprecation"), path)
 	}

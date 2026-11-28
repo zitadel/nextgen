@@ -1014,11 +1014,6 @@ export type SearchMeaning =
   | { kind: "event"; id: string }
   | { kind: "filter"; filter: ValueFilter; value: string };
 
-/**
- * 32 hex digits, the shape of a W3C trace id: a chain's ID, as the server
- * mints a `correlation_id`, or a request id a proxy assigned.
- */
-const TRACE_ID = /^[0-9a-f]{32}$/i;
 /** An API operation: one camel-cased word, as `createUser`. IDs carry an underscore. */
 const OPERATION = /^[a-z]+(?:[A-Z][a-z0-9]*)+$/;
 
@@ -1043,11 +1038,9 @@ const PREFIXES: Record<string, ValueFilterKey> = {
  * - `actor:…`, `user:…`, `resource:…`, `resource_type:…`, `app:…`, `device:…`
  *   and the other filters' prefixes ({@link VALUE_FILTERS}) name the filter.
  * - `evt_…` is an event, and opens it.
- * - `req_…`, `sess_…`, `flow_…` and `app_…` are a request, a session, a
- *   login flow and an application.
- * - 32 hex digits may be a chain or a request, so they mean both, and the
- *   person says which. An older invitation's chain has another shape: name
- *   it, as `chain:…`.
+ * - `req_…`, `corr_…`, `sess_…`, `flow_…` and `app_…` are a request, a chain,
+ *   a session, a login flow and an application. A chain whose ID has another
+ *   shape, as an older invitation's, is named, as `chain:…`.
  * - Words joined by dots are an event type, and one camel-cased word, as
  *   `createUser`, is an API operation.
  * - `user_…` may be whose account something happened to or who did
@@ -1073,7 +1066,7 @@ export function searchMeanings(term: string): SearchMeaning[] {
   if (value.endsWith(":") && PREFIXES[value.slice(0, -1)]) return [];
   if (value.startsWith("evt_")) return [{ kind: "event", id: value }];
   if (value.startsWith("req_")) return [filter("request")];
-  if (TRACE_ID.test(value)) return [filter("chain"), filter("request")];
+  if (value.startsWith("corr_")) return [filter("chain")];
   if (value.startsWith("sess_")) return [filter("session")];
   if (value.startsWith("flow_")) return [filter("flow")];
   if (value.startsWith("app_")) return [filter("client")];

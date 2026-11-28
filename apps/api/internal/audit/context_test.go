@@ -177,7 +177,7 @@ func TestEnsureCorrelation(t *testing.T) {
 		ctx := middleware.WithCorrelation(t.Context())
 		id, err := EnsureCorrelation(ctx)
 		require.NoError(t, err)
-		assert.Regexp(t, `^[0-9a-f]{32}$`, id)
+		assert.Regexp(t, `^corr_[0-9a-f]{32}$`, id)
 
 		again, err := EnsureCorrelation(ctx)
 		require.NoError(t, err)
@@ -198,7 +198,7 @@ func TestEnsureCorrelation(t *testing.T) {
 		require.NoError(t, err)
 		second, err := EnsureCorrelation(t.Context())
 		require.NoError(t, err)
-		assert.Regexp(t, `^[0-9a-f]{32}$`, first)
+		assert.Regexp(t, `^corr_[0-9a-f]{32}$`, first)
 		assert.NotEqual(t, first, second)
 	})
 }

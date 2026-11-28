@@ -630,7 +630,7 @@ func TestFlowService_Start_StoresTheChainInTheState(t *testing.T) {
 
 	t.Run("a flow of its own starts a chain", func(t *testing.T) {
 		state, startCtx := start(t, nil, nil)
-		assert.Regexp(t, `^[0-9a-f]{32}$`, state.CorrelationID)
+		assert.Regexp(t, `^corr_[0-9a-f]{32}$`, state.CorrelationID)
 		assert.Equal(t, state.CorrelationID, middleware.CorrelationFromContext(startCtx).Chain(),
 			"the attempt the state machine creates is in the flow's chain")
 	})
@@ -643,7 +643,7 @@ func TestFlowService_Start_StoresTheChainInTheState(t *testing.T) {
 	t.Run("an authorization request the project does not hold starts none", func(t *testing.T) {
 		id := "authreq_unknown"
 		state, _ := start(t, nil, &id)
-		assert.Regexp(t, `^[0-9a-f]{32}$`, state.CorrelationID, "the flow still has a chain of its own")
+		assert.Regexp(t, `^corr_[0-9a-f]{32}$`, state.CorrelationID, "the flow still has a chain of its own")
 	})
 }
 

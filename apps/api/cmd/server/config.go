@@ -231,10 +231,10 @@ type ServerConfig struct {
 	ConsoleOrigins []string `mapstructure:"console_origins"`
 	// RequestIDHeader names a header that a proxy in front of the server sets
 	// to its own ID for each request, such as Vercel's x-vercel-id. The server
-	// then uses that ID as the request ID, so its logs, events and error pages
-	// quote the ID the proxy's logs show. Empty, the server mints its own. Set
-	// it only behind a proxy that overwrites the header: otherwise a client
-	// chooses its own request ID.
+	// then uses req_ and that ID as the request ID, so its logs, events and
+	// error pages quote the ID the proxy's logs show. Empty, the server mints
+	// its own. Set it only behind a proxy that overwrites the header:
+	// otherwise a client chooses its own request ID.
 	RequestIDHeader string `mapstructure:"request_id_header"`
 	// IdleTimeout is how long the server keeps a connection open while it
 	// waits for the next request on it. A proxy in front that reuses its

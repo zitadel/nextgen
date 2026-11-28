@@ -113,7 +113,7 @@ func TestOAuthCodeRedemption(t *testing.T) {
 		newRequest := func() context.Context { return middleware.WithCorrelation(t.Context()) }
 		_, err := requests.Create(newRequest(), request)
 		require.NoError(t, err)
-		require.Regexp(t, `^[0-9a-f]{32}$`, request.CorrelationID)
+		require.Regexp(t, `^corr_[0-9a-f]{32}$`, request.CorrelationID)
 		code, err := requests.IssueCode(newRequest(), project.ID, request.ID, userID, session.ID)
 		require.NoError(t, err)
 		_, _, err = requests.RedeemCode(newRequest(), input(code))

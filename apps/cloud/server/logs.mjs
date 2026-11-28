@@ -10,10 +10,10 @@
 // - at the level the line names, the "level" of the server's JSON log lines:
 //   console.error for ERROR, console.warn for WARN, console.debug for DEBUG
 //   and console.log for the rest, a line that is not JSON included;
-// - in the context of the request the line names ("request_id": Vercel's
-//   request ID, which the server takes from x-vercel-id) while the wrapper
-//   holds that request open. Any other line (startup, background work, a
-//   line that arrives after its request was closed) is printed in the
+// - in the context of the request the line names ("request_id": req_ and
+//   Vercel's request ID, which the server takes from x-vercel-id) while the
+//   wrapper holds that request open. Any other line (startup, background
+//   work, a line that arrives after its request was closed) is printed in the
 //   context of the newest request in flight, which for the server's startup
 //   is the request that started the instance: Vercel keeps the level only of
 //   what a request prints, and files what none prints under every request in
@@ -27,10 +27,12 @@ const printers = [
   ["DEBUG", "debug"],
 ];
 
-// The request ID as Vercel shows it: x-vercel-id lists the regions before it
-// (sfo1::fra1::2vxlh-1792820352212-3ce3eb4ad630), as the server reads it too.
-export function vercelRequestId(header) {
-  return typeof header === "string" ? (header.split("::").pop() ?? "") : "";
+// The request ID the server's lines name: req_ and the ID Vercel shows, which
+// x-vercel-id lists after the regions
+// (sfo1::fra1::2vxlh-1792820352212-3ce3eb4ad630), as the server reads it.
+export function serverRequestId(header) {
+  const id = typeof header === "string" ? (header.split("::").pop() ?? "") : "";
+  return id === "" ? "" : `req_${id}`;
 }
 
 // The level and request a line names; neither for a line that is not one of

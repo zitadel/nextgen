@@ -331,7 +331,7 @@ func TestBuildHTTPMuxMountsTheRetentionTriggerOnlyWhenGiven(t *testing.T) {
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, r)
 	assert.Equal(t, "retention-trigger", rec.Header().Get("X-Test-Handler"))
-	assert.Equal(t, "2vxlh-1792820352212-3ce3eb4ad630", rec.Header().Get("X-Request-Id"))
+	assert.Equal(t, "req_2vxlh-1792820352212-3ce3eb4ad630", rec.Header().Get("X-Request-Id"))
 	// A longer path is not the trigger and stays with the API's root alias.
 	assert.Equal(t, "root", get(t, mux, audit.RetentionTriggerPath+"/x").Header().Get("X-Test-Handler"))
 
