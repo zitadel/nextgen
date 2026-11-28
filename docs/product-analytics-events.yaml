@@ -87,11 +87,23 @@ properties:
       front page's closing band.
   target:
     type: string
-    values: [quickstart, github, get_started, sign_up, contact]
+    values:
+      - quickstart
+      - github
+      - get_started
+      - sign_up
+      - contact
+      - sign_in
+      - single_sign_on
+      - permissions
+      - agents
+      - investigate
     description: >-
       Where a link leads, as a stable name, never a URL: `get_started` is the
       website's /get-started page, `sign_up` the cloud's sign-up page and
-      `contact` zitadel.com's contact page.
+      `contact` zitadel.com's contact page; `sign_in`, `single_sign_on`,
+      `permissions` and `agents` are those website feature pages and
+      `investigate` that phase page.
 
   # Attribution
   utm_source:
@@ -810,8 +822,8 @@ components:
         status: emitted
         trigger: >-
           A call to action is clicked: the front page's Start in our cloud,
-          Run it yourself and Talk to us, the walkthrough's quickstart and
-          GitHub, or the header's Get started.
+          Run it yourself and Talk to us, a linked capability in its hero, the
+          walkthrough's quickstart and GitHub, or the header's Get started.
         destinations: [vercel]
         properties: [page, target, placement]
 

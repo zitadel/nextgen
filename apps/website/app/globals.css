@@ -127,8 +127,8 @@
   }
 
   /* The hero's title, and every other page's (sections.tsx): the front
-     page's a line per sentence (page.tsx breaks it after the first), a long
-     one wrapping on a phone. */
+     page's on two lines (page.tsx breaks it before "your agent" from a small
+     tablet up), a long one wrapping, balanced, on a phone. */
   .hero-title {
     --title-from: var(--color-step-start);
     --title-to: var(--color-step-end);

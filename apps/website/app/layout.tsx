@@ -2,6 +2,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { SENTENCE } from "./message";
 import og from "./og.jpg";
 import "./globals.css";
 import { THEME_SCRIPT } from "./theme";
@@ -35,9 +36,8 @@ const apkFutural = localFont({
   display: "swap",
 });
 
-const title = "Zitadel Next: identity you can just ask";
-const description =
-  "Zitadel Next is open-source identity your agent can run, from the login screens to every policy, so you can just ask.";
+const title = "Zitadel Next: the auth platform your agent can run";
+const description = SENTENCE;
 
 // The share image, rendered from scripts/og.html (AGENTS.md), imported so it
 // loads from /_next/; on Vercel, Next makes its URL absolute with the

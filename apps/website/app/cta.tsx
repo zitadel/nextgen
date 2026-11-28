@@ -1,9 +1,10 @@
 "use client";
 
-import { type Placement, trackEvent } from "./analytics";
+import { type Placement, type Target, trackEvent } from "./analytics";
 import { GitHubMark } from "./github-mark";
 import { links } from "./links";
 import { phasePath } from "./phases";
+import { featurePath } from "./platform";
 
 const BUTTON =
   "group inline-flex h-11 items-center gap-2 rounded-lg px-5 font-semibold text-sm transition-colors";
@@ -73,6 +74,62 @@ export function StartButtons({
           Talk to us
         </a>
       )}
+    </div>
+  );
+}
+
+// What you can turn on, in the founder's order: each with the page that
+// shows it where there is one, and its name for analytics (analytics.ts).
+const CAPABILITIES: readonly { label: string; link?: { href: string; target: Target } }[] = [
+  { label: "Login", link: { href: featurePath("sign-in"), target: "sign_in" } },
+  {
+    label: "Single sign-on",
+    link: { href: featurePath("single-sign-on"), target: "single_sign_on" },
+  },
+  { label: "Organizations" },
+  { label: "Permissions", link: { href: featurePath("permissions"), target: "permissions" } },
+  { label: "OAuth server" },
+  { label: "SCIM" },
+  { label: "Agent identity", link: { href: featurePath("agents"), target: "agents" } },
+  { label: "Audit trail", link: { href: phasePath("investigate"), target: "investigate" } },
+];
+
+/**
+ * The hero's capabilities between hairlines, under a label in the steps'
+ * small type: what you get, whoever runs it. An item with a page links to it
+ * and reports `clicked_link` from the hero; one without stands as text. The
+ * items wrap as whole names.
+ */
+export function CapabilityStrip({ className = "" }: { className?: string }) {
+  return (
+    <div
+      className={`flex flex-col items-center gap-2.5 border-border-primary border-y py-4 ${className}`}
+    >
+      <p id="capabilities-label" className="font-mono text-text-muted text-xs leading-4">
+        Turn on what you need
+      </p>
+      <ul
+        aria-labelledby="capabilities-label"
+        className="flex flex-wrap justify-center gap-x-5 gap-y-1 text-sm leading-6"
+      >
+        {CAPABILITIES.map(({ label, link }) => (
+          <li key={label} className="whitespace-nowrap">
+            {link ? (
+              <a
+                href={link.href}
+                onClick={() =>
+                  trackEvent("clicked_link", { target: link.target, placement: "hero" })
+                }
+                className="text-text-secondary underline decoration-tint/25 underline-offset-4 transition-colors hover:text-text-primary hover:decoration-text-primary"
+              >
+                {label}
+              </a>
+            ) : (
+              <span className="text-text-secondary">{label}</span>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

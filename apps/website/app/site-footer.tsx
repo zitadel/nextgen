@@ -71,9 +71,7 @@ export function SiteFooter() {
           <a href="/" aria-label="Zitadel preview home" className="rounded-sm">
             <Logo id="footer-logo" className="h-6 w-auto" autoplay />
           </a>
-          <p className="text-sm text-text-muted leading-6">
-            Open-source identity your agent can run.
-          </p>
+          <p className="text-sm text-text-muted leading-6">Open-source auth your agent can run.</p>
           <div className="mt-1 rounded-lg border border-window-border bg-window px-3 py-1 font-mono text-xs leading-7">
             <CommandLine command={startCommand} placement="footer" />
           </div>

@@ -46,9 +46,21 @@ export type Placement = "header" | "hero" | "showcase" | "try_it" | "closing" | 
 /**
  * Where a call to action leads, as a stable name, never a URL: `get_started`
  * is /get-started, `sign_up` the cloud's sign-up and `contact` zitadel.com's
- * contact page.
+ * contact page; `sign_in`, `single_sign_on`, `permissions` and `agents` are
+ * those feature pages and `investigate` that phase page, from the hero's
+ * capabilities.
  */
-export type Target = "quickstart" | "github" | "get_started" | "sign_up" | "contact";
+export type Target =
+  | "quickstart"
+  | "github"
+  | "get_started"
+  | "sign_up"
+  | "contact"
+  | "sign_in"
+  | "single_sign_on"
+  | "permissions"
+  | "agents"
+  | "investigate";
 
 /**
  * What a copy button copied, never its text: `all` is a whole block of

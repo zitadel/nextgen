@@ -1,17 +1,14 @@
 import type { CSSProperties } from "react";
 import { ChangeHistory, QuickstartCommands, SkillsLine } from "./blocks";
 import { Capabilities } from "./capabilities";
-import { StartButtons } from "./cta";
+import { CapabilityStrip, StartButtons } from "./cta";
 import { HISTORY } from "./get-started/history";
+import { SENTENCE } from "./message";
 import { PHASES, phasePath } from "./phases";
 import { PLATFORM } from "./platform";
 import { Part, PointList, TitleRows, TopLight } from "./sections";
 import { SiteFooter } from "./site-footer";
 import { SiteHeader } from "./site-header";
-
-// The message house's sentence, word for word, under the title.
-const LINE =
-  "Zitadel Next is open-source identity your agent can run, from the login screens to every policy, so you can just ask.";
 
 // What stays yours, whatever your agent runs (LICENSING.md for the licenses).
 const DECIDE = [
@@ -73,16 +70,17 @@ export default function Home() {
           <div className="grid w-fit max-w-full justify-items-center">
             <h1 id="hero-title" className="hero-title">
               <span className="display-title">
-                Identity your agent can run. <br />
-                All of it.
+                The auth platform <br className="max-sm:hidden" />
+                your agent can run.
               </span>
             </h1>
             <p className="hero-lede teaser mt-5 text-balance text-center text-base text-text-secondary leading-7 md:text-lg md:leading-8">
-              {LINE}
+              {SENTENCE}
             </p>
           </div>
-          <div className="teaser mt-10 flex w-full flex-col items-center gap-6">
-            <div className="w-full max-w-[42rem]">
+          <div className="teaser mt-8 flex w-full flex-col items-center gap-6">
+            <CapabilityStrip className="w-full max-w-3xl" />
+            <div className="w-full max-w-3xl">
               <QuickstartCommands placement="hero" />
             </div>
             <SkillsLine placement="hero" className="text-balance text-center text-sm" />

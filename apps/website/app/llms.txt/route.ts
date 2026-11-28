@@ -1,4 +1,5 @@
 import { commands, deployCommand, dryRunCommand, folderCommand, skillsCommand } from "../commands";
+import { SENTENCE } from "../message";
 import { PHASES, phasePath } from "../phases";
 import { FEATURES, featurePath, PLATFORM } from "../platform";
 import { sessions } from "../showcase/sessions";
@@ -28,7 +29,7 @@ const featurePages = [
 
 const body = `# Zitadel (developer preview)
 
-> Your login in one minute. Zitadel is open-source auth for users, services, and AI agents that lives in the app's repo: one terminal session gives an app a local Zitadel with login, registration, and profile pages, and the user model, the login flow, and the styling are files in the repo. This is the preview of the next Zitadel: APIs, CLI flags and packages still change.
+> ${SENTENCE} One terminal session gives an app a local Zitadel with login, registration, and profile pages, and the user model, the login flow, and the styling are files in the app's repo. This is the preview of the next Zitadel: APIs, CLI flags and packages still change.
 
 Run it locally with the published CLI (Node.js 24 or newer), in a new folder for a Next.js app. Every Zitadel command takes \`--non-interactive --json\` and prints one JSON envelope on stdout:
 

@@ -7,8 +7,9 @@ guide to choosing it or Zitadel v4 at `/choose-version`.
 Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 - The front page leads with the quickstart, then shows what is in it, and
-  nothing else: the hero (title, line, the quickstart's numbered commands, the
-  skills command, Start in our cloud and Run it yourself), What you get (the
+  nothing else: the hero (title, the sentence of `app/message.ts`, the
+  capabilities to turn on, the quickstart's numbered commands, the skills
+  command, Start in our cloud and Run it yourself), What you get (the
   features by group, each with a window), What your agent runs (a row per
   phase with its first ask), You decide (beside the change history), and a
   closing band with both ways to start and Talk to us.
