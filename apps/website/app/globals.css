@@ -44,7 +44,7 @@
   --color-brand: #f25543;
   --color-brand-deep: #6b1d14;
   --color-brand-fade: #0f0f11;
-  --color-brand-glow: rgb(242 85 67 / 0.3);
+  --color-brand-glow: rgb(242 85 67 / 0.15);
   --color-notch-edge: rgb(130 130 156 / 0.5);
   --color-notch-fill: rgb(30 31 36 / 0.72);
   --color-icon-chip: rgb(255 255 255 / 0.04);
@@ -131,7 +131,7 @@
   --color-brand: #e5432f;
   --color-brand-deep: #f6c3b9;
   --color-brand-fade: #f6f6f8;
-  --color-brand-glow: rgb(229 67 47 / 0.16);
+  --color-brand-glow: rgb(229 67 47 / 0.08);
   --color-notch-edge: rgb(17 17 20 / 0.14);
   --color-notch-fill: rgb(255 255 255 / 0.78);
   --color-icon-chip: #141417;
@@ -505,12 +505,6 @@
     pointer-events: none;
   }
 
-  /* The front page's light from the top: orange over the hero's fan, the
-     first screen's one light. */
-  .brand-light {
-    background: radial-gradient(38% 46% at 74% 12%, var(--color-brand-glow), transparent 70%);
-  }
-
   /* The dividers' shapes (divider.tsx): orange at the lit edge, falling off
      into the dark, or the paper. */
   .shape-from {
@@ -536,11 +530,12 @@
   }
 
   /* A stage of orange light falling to black (the dark) or the paper, for
-     the transcript and the change history (page.tsx). */
+     the transcript and the change history (page.tsx): an accent, never a
+     wash. */
   .brand-stage {
     background:
       radial-gradient(60% 55% at 50% 0%, var(--color-brand-glow), transparent 75%),
-      linear-gradient(to bottom, color-mix(in oklch, var(--color-brand-deep) 45%, var(--color-brand-fade)), var(--color-brand-fade) 80%);
+      linear-gradient(to bottom, color-mix(in oklch, var(--color-brand-deep) 22%, var(--color-brand-fade)), var(--color-brand-fade) 80%);
   }
 
   /* The notched card's hairline (notched-card.tsx): the gradient the

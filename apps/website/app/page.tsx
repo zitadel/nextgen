@@ -180,14 +180,11 @@ export default function Home() {
     <>
       <StructuredData />
       <SiteHeader />
-      {/* Pulled up under the glass header by its height, so the light and
-          the grain start at the top of the page and read through the glass.
-          Its own ground, so the fan blends with the page's (.hero-fan). */}
+      {/* Pulled up under the glass header by its height, so the grain starts
+          at the top of the page and reads through the glass. Its own ground,
+          so the fan blends with the page's (.hero-fan); the fan is the
+          hero's only light. */}
       <main className="brand-noise -mt-16 bg-background pt-16">
-        <div
-          aria-hidden="true"
-          className="brand-light pointer-events-none absolute inset-x-0 top-0 -z-10 h-[60rem]"
-        />
         <section
           aria-labelledby="hero-title"
           className="overflow-x-clip px-6 pt-12 pb-16 md:pt-20 lg:pt-24 lg:pb-24"
