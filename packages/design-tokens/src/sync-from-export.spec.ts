@@ -344,7 +344,9 @@ describe("syncTokens against real figma-export/", () => {
     expect(out.themed.gradient!["base-end"]).toEqual({ dark: "#0f0f11", light: "#fafafa" });
     expect(out.themed.gradient!["lavender-start"]).toEqual({ dark: "#bba5e4", light: "#bba5e4" });
 
-    expect(out.themed.syntax!.key).toEqual({ dark: "#9066da", light: "#401889" });
+    // brand.purple.600 on the dark side, which stands 4.5:1 on every code
+    // background the console, the docs and the website draw.
+    expect(out.themed.syntax!.key).toEqual({ dark: "#9e7ed8", light: "#401889" });
   });
 
   it("keeps typography to the viewport axis", () => {

@@ -88,12 +88,12 @@
      gives them from @zitadel/design-tokens' --zl-syntax-* (dark here, light
      below). A copy: change both. */
   --zl-shiki-foreground: #fafafa;
-  --zl-shiki-token-keyword: #9066da;
-  --zl-shiki-token-string: #f25543;
-  --zl-shiki-token-string-expression: #f25543;
-  --zl-shiki-token-constant: #e25f7d;
-  --zl-shiki-token-comment: #686883;
-  --zl-shiki-token-punctuation: #82829c;
+  --zl-shiki-token-keyword: #9e7ed8;
+  --zl-shiki-token-string: #f37d6d;
+  --zl-shiki-token-string-expression: #f37d6d;
+  --zl-shiki-token-constant: #ea8aa0;
+  --zl-shiki-token-comment: #9e9eb2;
+  --zl-shiki-token-punctuation: #9e9eb2;
   color-scheme: dark;
 }
 
@@ -143,7 +143,7 @@
   --zl-shiki-token-string: #bd2514;
   --zl-shiki-token-string-expression: #bd2514;
   --zl-shiki-token-constant: #c52247;
-  --zl-shiki-token-comment: #82829c;
+  --zl-shiki-token-comment: #686883;
   --zl-shiki-token-punctuation: #686883;
   /* Dark ink grays the step colors more than white does: less of it, and
      gone by the foot. */
