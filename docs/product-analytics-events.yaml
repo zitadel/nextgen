@@ -67,7 +67,7 @@ properties:
     description: >-
       A stable page category, never a URL; on the docs, the page's path, such
       as `/docs/reference/cli`; on the website, a feature page's two segments,
-      such as `platform/sign-in`, and the features' overview `platform`.
+      such as `platform/teams`, and the features' overview `platform`.
   view:
     type: string
     values: [list, details]

@@ -9,12 +9,12 @@ import {
 import { FeaturePage, featureMetadata } from "../../feature-page";
 import { HOODS } from "../../hoods";
 
-export const metadata = featureMetadata("identity-providers");
+export const metadata = featureMetadata("social-login");
 
 export default function IdentityProvidersPage() {
   return (
     <FeaturePage
-      slug="identity-providers"
+      slug="social-login"
       content={{
         points: [
           "Google, or any provider that publishes OpenID Connect discovery.",
@@ -38,7 +38,7 @@ export default function IdentityProvidersPage() {
               "Done, Google's off your sign-in. If that leaves anyone without a way in, deploy warns you first.",
           },
         ],
-        hood: HOODS["identity-providers"],
+        hood: HOODS["social-login"],
         tryIt: {
           line: "Run them in your app's folder, once setup has run and Google's OAuth client exists.",
           content: (

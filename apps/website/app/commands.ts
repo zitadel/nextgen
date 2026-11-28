@@ -50,7 +50,7 @@ export const agentAsks = [
   signInAsk,
   "Add passkeys to sign-up.",
   "Connect Acme's Okta for single sign-on.",
-  "Give each customer its own organization and admins.",
+  "Give each customer its own team and admins.",
   "Let support read users, but not change them.",
   "Protect our MCP server with OAuth.",
   "Sync Acme's people from Entra with SCIM.",
@@ -94,7 +94,7 @@ export const grantCreateCommand =
 export const membersCommand = "npx @zitadel/cli@latest api listProjectMembers";
 export const userListCommand = "npx @zitadel/cli@latest user list";
 export const invitationCommand = "npx @zitadel/cli@latest invitation create --relation admin";
-// A customer's organization is a team in the project (`team --help`).
+// A customer is a team in the project (`team --help`).
 export const teamCreateCommand = "npx @zitadel/cli@latest team create --name Acme";
 export const teamListCommand = "npx @zitadel/cli@latest team list";
 export const teamGetCommand = "npx @zitadel/cli@latest team get <team_id>";

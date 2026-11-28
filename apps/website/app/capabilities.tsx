@@ -10,11 +10,12 @@ import { SEGMENTS } from "./window";
 
 /**
  * What to see of a feature: the window its page shows under the hood
- * (hoods.tsx); for Sign-in, the login itself, live (login-preview.tsx), the
- * page setup serves in the recorded session (showcase/sessions.ts).
+ * (hoods.tsx); for Passkeys & passwords, the login itself, live
+ * (login-preview.tsx), the page setup serves in the recorded session
+ * (showcase/sessions.ts).
  */
 function Shown({ feature }: { feature: Feature }) {
-  if (feature.slug === "sign-in") {
+  if (feature.slug === "passkeys-and-passwords") {
     return (
       <BrowserFrame url={login.url} showResult>
         <LoginFlow screens={login.screens} />
@@ -24,16 +25,16 @@ function Shown({ feature }: { feature: Feature }) {
   return HOODS[feature.slug].artifact;
 }
 
-/** A group's name as an id: `features-sign-in`. */
+/** A group's name as an id: `features-identity`, `features-b2b`. */
 function groupId(group: FeatureGroup): string {
-  return `features-${group.toLowerCase().replace(/[^a-z]+/g, "-")}`;
+  return `features-${group.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 }
 
-// The brand's animated icon on each group's tab: a ring for signing in,
-// stacked layers for each customer's own, bars for levels of access.
+// The brand's animated icon on each group's tab: a ring for identity,
+// stacked layers for each customer's own team, bars for levels of access.
 const ICONS: Record<FeatureGroup, IconName> = {
-  "Sign-in": "circle",
-  Customers: "triangle",
+  Identity: "circle",
+  B2B: "triangle",
   Access: "bars",
 };
 
@@ -41,8 +42,8 @@ const ICONS: Record<FeatureGroup, IconName> = {
 // Tailwind finds a class only as a whole string in the source, and the Record
 // makes a new group bring its own.
 const SHOWN: Record<FeatureGroup, string> = {
-  "Sign-in": "group-has-[#features-sign-in:checked]/caps:contents",
-  Customers: "group-has-[#features-customers:checked]/caps:contents",
+  Identity: "group-has-[#features-identity:checked]/caps:contents",
+  B2B: "group-has-[#features-b2b:checked]/caps:contents",
   Access: "group-has-[#features-access:checked]/caps:contents",
 };
 

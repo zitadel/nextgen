@@ -33,7 +33,7 @@ describe("pageOf", () => {
   });
 
   it("calls a feature page by its two segments", () => {
-    expect(pageOf("/platform/sign-in")).toBe("platform/sign-in");
+    expect(pageOf("/platform/passkeys-and-passwords")).toBe("platform/passkeys-and-passwords");
     expect(pageOf("/platform")).toBe("platform");
   });
 });

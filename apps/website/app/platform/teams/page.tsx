@@ -9,34 +9,34 @@ import {
 import { FeaturePage, featureMetadata } from "../../feature-page";
 import { HOODS } from "../../hoods";
 
-export const metadata = featureMetadata("organizations");
+export const metadata = featureMetadata("teams");
 
-export default function OrganizationsPage() {
+export default function TeamsPage() {
   return (
     <FeaturePage
-      slug="organizations"
+      slug="teams"
       content={{
         points: [
-          "An organization for each customer, as a team in your project, with a name no other customer has.",
+          "A team for each customer, in your project, with a name no other customer has.",
           "Each customer's own members and admins, its own sign-in and its own brand.",
           "A customer that leaves is deactivated, and its team stays on record for your audit.",
         ],
         asks: [
           {
-            ask: "Give each customer its own organization and admins.",
+            ask: "Give each customer its own team and admins.",
             reply:
-              "Done. Each customer has its own organization now, and its admins look after their own people.",
+              "Done. Each customer has its own team now, and its admins look after their own people.",
           },
           {
             ask: "Which customers do we have?",
             reply: "Here's every customer, with when each one was created.",
           },
           {
-            ask: "Acme left. Turn off their organization.",
-            reply: "Acme's organization is off. Its history stays on record for your audit.",
+            ask: "Acme left. Turn off their team.",
+            reply: "Acme's team is off. Its history stays on record for your audit.",
           },
         ],
-        hood: HOODS.organizations,
+        hood: HOODS.teams,
         tryIt: {
           line: "Run them in your app's folder, once setup has run.",
           content: (
@@ -56,7 +56,7 @@ export default function OrganizationsPage() {
         },
         questions: [
           {
-            question: "Is each organization a project of its own?",
+            question: "Is each team a project of its own?",
             answer:
               "No. Each customer is a team inside your one project, so one deploy reaches every customer.",
           },

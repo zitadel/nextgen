@@ -59,7 +59,7 @@ export const metadata: Metadata = {
 // The website's favicons (packages/theme/assets/favicons in
 // zitadel/new-website), served from public/favicons/ and declared as it does:
 // a dark mark for a light browser, a light one for a dark browser. The
-// console, the login UI and the docs link this same set (AGENTS.md).
+// console, the login and the docs link this same set (AGENTS.md).
 function favicons(): Metadata["icons"] {
   const schemes = ["light", "dark"].map((scheme) => ({
     dir: `/favicons/${scheme}`,

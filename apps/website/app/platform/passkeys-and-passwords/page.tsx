@@ -9,12 +9,12 @@ import {
 import { FeaturePage, featureMetadata } from "../../feature-page";
 import { HOODS } from "../../hoods";
 
-export const metadata = featureMetadata("sign-in");
+export const metadata = featureMetadata("passkeys-and-passwords");
 
 export default function SignInPage() {
   return (
     <FeaturePage
-      slug="sign-in"
+      slug="passkeys-and-passwords"
       content={{
         points: [
           "Passkeys and passwords, each switched on or off in your user schema.",
@@ -38,7 +38,7 @@ export default function SignInPage() {
               "Done. New passwords need at least 12 characters once you deploy. Passwords people already have keep working.",
           },
         ],
-        hood: HOODS["sign-in"],
+        hood: HOODS["passkeys-and-passwords"],
         tryIt: {
           line: "Run them in your app's folder, once setup has run.",
           content: (

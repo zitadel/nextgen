@@ -194,7 +194,7 @@ const ENTRA_CONNECTION = `{
 }`;
 
 export const HOODS: Record<FeatureSlug, Hood> = {
-  organizations: {
+  teams: {
     line: "Each customer is a team in your project. This is how the API creates one, as its spec gives it: a name no other team in the project has, and the team that comes back.",
     artifact: <CodeFile title="POST /api/v1/teams" code={CREATE_TEAM} />,
   },
@@ -206,11 +206,11 @@ export const HOODS: Record<FeatureSlug, Hood> = {
     line: "In Zitadel's identity model, one connection signs a customer's people in and provisions them under one subject. This is its example: Acme's Entra ID, with OpenID Connect to sign in and SCIM to sync.",
     artifact: <CodeFile title="acme/entra" code={ENTRA_CONNECTION} />,
   },
-  "sign-in": {
+  "passkeys-and-passwords": {
     line: "A step of your login flow offers a passkey through an action. This is the sign-in step once passkeys are on, as the docs give it: email and Continue, or a passkey that signs the user straight in.",
     artifact: <CodeFile title=".zitadel/flows/default-login.json" code={PASSKEY_STEP} />,
   },
-  "login-ui": {
+  "embedded-login": {
     line: "The login flow is a file in your repo. This is the default flow's password step, as the docs give it: what it asks for, its button, and where it leads.",
     artifact: <CodeFile title=".zitadel/flows/default-login.json" code={PASSWORD_STEP} />,
   },
@@ -242,7 +242,7 @@ export const HOODS: Record<FeatureSlug, Hood> = {
       />
     ),
   },
-  "identity-providers": {
+  "social-login": {
     line: "One command connects Google, and its JSON result names what it did: the connection's file, the files it changed, and where the credentials went. This is the result the docs give.",
     artifact: <CodeFile title="auth-method sso enable --provider google" code={GOOGLE_RESULT} />,
   },
@@ -270,7 +270,7 @@ export const HOODS: Record<FeatureSlug, Hood> = {
       />
     ),
   },
-  agents: {
+  "agent-identity": {
     line: "Every event carries the fields that name who acted and for whom. These are their descriptions in the API.",
     artifact: (
       // The shared event fields' descriptions in the API
@@ -290,7 +290,7 @@ export const HOODS: Record<FeatureSlug, Hood> = {
       />
     ),
   },
-  users: {
+  "user-management": {
     line: "Your user model is a JSON Schema in your repo. These are its properties once your agent adds the company, as the recorded session on /get-started wrote it.",
     artifact: <CodeFile title=".zitadel/schemas/default-human-user.json" code={USER_PROPERTIES} />,
   },

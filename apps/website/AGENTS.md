@@ -35,7 +35,7 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   for word; the phase and feature pages keep their own.
 - A front-page window renders what another page shows, from the same data or
   component, never a copy: a feature's is its Under the hood
-  (`app/hoods.tsx`), Sign-in's the live login.
+  (`app/hoods.tsx`), Passkeys & passwords' the live login.
 - Keep the showcase's walkthrough, logos, badges and star counts off the front
   page: the walkthrough is `/get-started`; roadmaps belong on the docs and
   zitadel.com.
@@ -57,6 +57,10 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   the window at 1440px (`app/hoods.tsx` says how far).
 - "Solutions" is kept for use-case pages (B2B SaaS, consumer apps, agents and
   MCP); a feature goes under Platform.
+- Say "team", never "organization" ([glossary](../../docs/design/glossary.md)
+  §9–10), except in the Teams page's title tag, where people search for it.
+- "Sign-in" is what a user does; "login" is the component (`<zitadel-login>`,
+  embedded login).
 - The header's links and menus of groups come from `app/nav.ts`: add a menu,
   a group or a link there, never in `site-header.tsx`.
 - The footer's menu columns, `/platform` and `/llms.txt` read the same data.

@@ -59,7 +59,7 @@ export default function ScimPage() {
           },
           {
             question: "Who sets up a customer's directory?",
-            answer: "The customer's admin, for their own organization, beside its single sign-on.",
+            answer: "The customer's admin, for their own team, beside its single sign-on.",
           },
         ],
       }}

@@ -155,7 +155,7 @@ type Events = {
 
 /**
  * A page's stable name: `home` for `/`, a feature page's two segments
- * (`platform/sign-in`), else its first path segment.
+ * (`platform/teams`), else its first path segment.
  */
 export function pageOf(pathname: string): string {
   const [, first = "", second] = pathname.split("/");

@@ -76,8 +76,8 @@
   /* How much grain the brand's noise lays over the page: less on the light
      side. */
   --noise-opacity: 0.06;
-  /* The tallest a feature's window stands on the front page: its default
-     one's height, the live login in its browser (capped.tsx). */
+  /* The tallest a feature's window stands on the front page: the live
+     login's in its browser, Passkeys & passwords' (capped.tsx). */
   --window-cap: 28.875rem;
   /* How the hero's blade fan drops its dark ground (hero-fan.tsx): here
      the lighter of fan and page, which the ground never is; on the paper

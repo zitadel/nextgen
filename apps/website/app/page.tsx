@@ -35,7 +35,7 @@ const FOR = [
   },
   {
     who: "For your customers",
-    what: "Passkeys, single sign-on and organizations, ready when they ask.",
+    what: "Passkeys, single sign-on and a team for each customer, ready when they ask.",
   },
   {
     who: "For the agents you ship",

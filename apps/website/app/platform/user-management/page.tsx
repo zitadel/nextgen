@@ -9,12 +9,12 @@ import {
 import { FeaturePage, featureMetadata } from "../../feature-page";
 import { HOODS } from "../../hoods";
 
-export const metadata = featureMetadata("users");
+export const metadata = featureMetadata("user-management");
 
 export default function UsersPage() {
   return (
     <FeaturePage
-      slug="users"
+      slug="user-management"
       content={{
         points: [
           "Your user model as a JSON Schema in your repo: the fields, which are required, which are unique.",
@@ -38,7 +38,7 @@ export default function UsersPage() {
               "Your Zitadel v4 users are in this project now. They keep their email addresses and sign in as before.",
           },
         ],
-        hood: HOODS.users,
+        hood: HOODS["user-management"],
         tryIt: {
           line: "Run them in your app's folder, once setup has run.",
           content: (

@@ -3,12 +3,12 @@ import { actorEventsCommand, appPath, userEventsCommand } from "../../commands";
 import { FeaturePage, featureMetadata } from "../../feature-page";
 import { HOODS } from "../../hoods";
 
-export const metadata = featureMetadata("agents");
+export const metadata = featureMetadata("agent-identity");
 
 export default function AgentsPage() {
   return (
     <FeaturePage
-      slug="agents"
+      slug="agent-identity"
       content={{
         points: [
           "Each agent signs in as itself, with only the access you give it.",
@@ -32,7 +32,7 @@ export default function AgentsPage() {
               "It signed in as itself and looked up orders, only for users who'd said yes. Each look-up names it and the user.",
           },
         ],
-        hood: HOODS.agents,
+        hood: HOODS["agent-identity"],
         tryIt: {
           line: "Run them in your app's folder. They read the events every caller writes.",
           content: (

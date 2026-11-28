@@ -3,12 +3,12 @@ import { appPath, deployCommand, dryRunCommand, setupCommand } from "../../comma
 import { FeaturePage, featureMetadata } from "../../feature-page";
 import { HOODS } from "../../hoods";
 
-export const metadata = featureMetadata("login-ui");
+export const metadata = featureMetadata("embedded-login");
 
 export default function LoginUiPage() {
   return (
     <FeaturePage
-      slug="login-ui"
+      slug="embedded-login"
       content={{
         points: [
           "Login, sign-up and profile pages that setup writes into your app.",
@@ -32,7 +32,7 @@ export default function LoginUiPage() {
               "Done. Sign-in asks for email and password on one screen and signs people straight in. It's ready for you to review.",
           },
         ],
-        hood: HOODS["login-ui"],
+        hood: HOODS["embedded-login"],
         tryIt: {
           line: "Run them in an empty folder for a new app.",
           content: (
