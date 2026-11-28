@@ -282,6 +282,32 @@ describe("claim", () => {
     });
   });
 
+  it("reports the team it recorded", async ({ dir: cwd }) => {
+    const project = await makeProject(cwd);
+    await Promise.all([
+      claim(cwd),
+      onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, project.id)),
+    ]);
+    const { claimed_at: _claimedAt, team_id: _teamId, ...withoutClaim } = await readSecret(cwd);
+    await writeSecret(cwd, withoutClaim);
+    server.use(
+      http.get("*/projects/:project_id/claim", () => {
+        return HttpResponse.json({
+          status: "claimed",
+          team_id: "team-recorded",
+          claimed_at: "2026-01-03T00:00:00Z",
+        });
+      }),
+    );
+
+    const res = await claim(cwd);
+
+    expect((parseJson(res.stdout) as { data: { team_id: string } }).data.team_id).toBe(
+      "team-recorded",
+    );
+    expect(await readSecret(cwd)).toMatchObject({ team_id: "team-recorded" });
+  });
+
   it("leaves the local secret as it was when the claim cannot be read", async ({ dir: cwd }) => {
     const project = await makeProject(cwd);
     await Promise.all([

@@ -938,6 +938,21 @@ describe("Server.hostUnlessDefault", () => {
   });
 });
 
+describe("Server.isCloudOrigin", () => {
+  it.for([ZitadelRuntime.DEFAULT, "https://preview.zitadel.com/path"])("accepts %s", (url) => {
+    expect(ZitadelRuntime.fromUrl(url).isCloudOrigin()).toBe(true);
+  });
+
+  it.for([
+    "http://preview.zitadel.com",
+    "https://preview.zitadel.com:8443",
+    "https://auth.example.com",
+    "x",
+  ])("rejects %s", (url) => {
+    expect(ZitadelRuntime.fromUrl(url).isCloudOrigin()).toBe(false);
+  });
+});
+
 describe("Server.isCloud", () => {
   it.for([ZitadelRuntime.DEFAULT, "https://preview.zitadel.com/path"])("accepts %s", (url) => {
     expect(ZitadelRuntime.fromUrl(url).isCloud()).toBe(true);

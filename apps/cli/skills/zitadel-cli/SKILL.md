@@ -1309,10 +1309,10 @@ project's console, and records the owning team in the project's own
 For a project on the hosted cloud, `status` and `doctor` read the owning team
 from `.zitadel/secret` and ask the server when it names none, so a project
 claimed from another machine reads as claimed
-(`data.project.claim.kind: "attached"`) and is not nudged again. `doctor` then
-warns that the record does not name the team (`details.recorded: false`), and
-`doctor --fix` writes it in. When the server cannot be reached they report the
-local record.
+(`data.project.claim.kind: "attached"`) with `recorded: false`. `status` then
+suggests `claim`, and `doctor` warns (`details.recorded: false`) and suggests
+`doctor --fix`; either writes the team into the record. When the server cannot
+be reached they report the local record.
 
 To get a person to the console of a project on a hosted or self-hosted server,
 run `console --no-open --json`: with no local server started in the directory it

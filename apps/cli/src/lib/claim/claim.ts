@@ -1,10 +1,10 @@
 import pTimeout from "p-timeout";
 
 import { ClaimService, createZitadelClient } from "@/lib/backend";
-import { SERVER } from "@/constants";
 import { isCancellation } from "@/lib/errors";
 import type { ProjectSecretData } from "@/lib/project";
 import { Runtime } from "@/lib/runtime";
+import { ZitadelRuntime } from "@/lib/server";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import type { BoxAction } from "@/lib/ui";
 
@@ -16,7 +16,11 @@ import type { BoxAction } from "@/lib/ui";
  * opposite output: the first prints nothing at all, the second nudges.
  */
 export type ClaimState =
-  | { kind: "attached"; team_id: string; claimed_at: string }
+  /**
+   * `recorded: false` marks a team the server confirmed that the local record
+   * does not name ({@link Claim.confirmed}); running `claim` writes it down.
+   */
+  | { kind: "attached"; team_id: string; claimed_at: string; recorded?: false }
   /**
    * `claimable` classifies the claim window from the locally recorded
    * creation time: once it has passed, nudges switch to reconciliation
@@ -91,10 +95,10 @@ export class Claim {
   }
 
   /**
-   * How long {@link Claim.confirmed} waits for the server before it keeps the
-   * local answer, so `status` and `doctor` stay quick on a slow network.
+   * How long a best-effort claim read waits for the server before it keeps the
+   * local answer, so `status`, `doctor` and `claim` stay quick on a slow network.
    */
-  private static readonly CONFIRM_TIMEOUT_MS = 1500;
+  static readonly CONFIRM_TIMEOUT_MS = 1500;
 
   /**
    * Decides the attachment state of a project, asking the server when the
@@ -118,7 +122,7 @@ export class Claim {
    */
   static async confirmed(input: ConfirmInput): Promise<ClaimState> {
     const local = Claim.classify(input);
-    if (local.kind !== "detached" || !Claim.isCloudOrigin(input.server)) {
+    if (local.kind !== "detached" || !ZitadelRuntime.fromUrl(input.server).isCloudOrigin()) {
       return local;
     }
     const service = new ClaimService(
@@ -136,7 +140,12 @@ export class Claim {
         milliseconds: Claim.CONFIRM_TIMEOUT_MS + 250,
       });
       if (claim.status === "claimed") {
-        return { kind: "attached", team_id: claim.team_id, claimed_at: claim.claimed_at };
+        return {
+          kind: "attached",
+          team_id: claim.team_id,
+          claimed_at: claim.claimed_at,
+          recorded: false,
+        };
       }
       return local;
     } catch (error) {
@@ -145,19 +154,6 @@ export class Claim {
       }
       return local;
     }
-  }
-
-  /**
-   * Whether `server` is exactly the hosted cloud's origin, scheme and port
-   * included. The cloud check that gates the nudges reads the hostname alone,
-   * which a hand-edited `zitadel.json` naming `http://` or another port would
-   * pass; the project secret goes only to the real origin, never in clear text.
-   *
-   * @param server - The server `zitadel.json` names.
-   * @returns Whether it is the hosted cloud's origin.
-   */
-  private static isCloudOrigin(server: string): boolean {
-    return URL.canParse(server) && new URL(server).origin === new URL(SERVER).origin;
   }
 
   /**
@@ -193,6 +189,18 @@ export class Claim {
   static deadline(createdAt: string | undefined, now = Date.now()): Date {
     const base = createdAt === undefined ? now : Date.parse(createdAt);
     return new Date((Number.isNaN(base) ? now : base) + Claim.WINDOW_MS);
+  }
+
+  /**
+   * The nudge for a team the server confirmed but the local record does not
+   * name: `claim` writes it down, so later commands know it offline.
+   *
+   * @param claim - The `claim` command, rendered by the run that reports it.
+   * @param teamId - The team the server named.
+   * @returns The nudge.
+   */
+  static unrecordedNudge(claim: SuggestedCommand, teamId: string): string {
+    return `Team ${teamId} owns this project, but .zitadel/secret does not record it. Run ${claim} to record it.`;
   }
 
   /**

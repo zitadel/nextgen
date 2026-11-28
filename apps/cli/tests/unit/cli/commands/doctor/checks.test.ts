@@ -2794,6 +2794,21 @@ describe("ClaimCheck", () => {
 
       expect(await textOf(dir, SECRET_FILE)).toBe(before);
     });
+
+    it("asks the server nothing on a dry run", async ({ dir, server }) => {
+      await aNextProject(dir);
+      const asked: string[] = [];
+      server.use(
+        http.get(`*/projects/${PROJECT_ID}/claim`, ({ request }) => {
+          asked.push(request.url);
+          return HttpResponse.json({ status: "unclaimed" });
+        }),
+      );
+
+      await new ClaimCheck().fix(aCheckContext(dir, { dryRun: true }));
+
+      expect(asked).toEqual([]);
+    });
   });
 
   it("warns from the local record when the server cannot say", async ({ dir, server }) => {

@@ -241,6 +241,20 @@ export abstract class ZitadelRuntime {
   }
 
   /**
+   * Whether the address is exactly the hosted cloud's origin, scheme and port
+   * included. {@link ZitadelRuntime.isCloud} reads the hostname alone, which an
+   * `http://` or other-port address passes; a credential goes only to this one.
+   *
+   * @returns `true` when the address is the hosted cloud's origin.
+   */
+  isCloudOrigin(): boolean {
+    return (
+      URL.canParse(this.address) &&
+      new URL(this.address).origin === new URL(ZitadelRuntime.DEFAULT).origin
+    );
+  }
+
+  /**
    * Where this server's console is: `/console/` on the hosted cloud, which
    * serves it apart from the API, and `/ui/console/` on any other server.
    *

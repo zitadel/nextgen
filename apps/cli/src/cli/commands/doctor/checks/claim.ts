@@ -59,7 +59,7 @@ export class ClaimCheck implements SanityCheck {
     }
     const { state } = read;
 
-    if (state.kind === "attached" && !Claim.isAttached(read.secret.data)) {
+    if (state.kind === "attached" && state.recorded === false) {
       return {
         name: this.name,
         status: "warn",
@@ -115,13 +115,11 @@ export class ClaimCheck implements SanityCheck {
    * @returns Once the record is written, or once there is nothing to write.
    */
   async fix(ctx: CheckContext): Promise<void> {
+    if (ctx.dryRun) {
+      return;
+    }
     const read = await ClaimCheck.read(ctx);
-    if (
-      ctx.dryRun ||
-      read === undefined ||
-      read.state.kind !== "attached" ||
-      Claim.isAttached(read.secret.data)
-    ) {
+    if (read === undefined || read.state.kind !== "attached" || read.state.recorded !== false) {
       return;
     }
     await read.secret

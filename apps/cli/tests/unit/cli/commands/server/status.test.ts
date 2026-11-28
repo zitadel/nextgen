@@ -200,7 +200,7 @@ describe("status command", () => {
     );
   });
 
-  it("reports a project claimed from another machine as owned, and stops nudging", async ({
+  it("reports a project claimed from another machine as owned, and points at claim to record it", async ({
     dir: cwd,
     server,
   }) => {
@@ -220,6 +220,7 @@ describe("status command", () => {
     const json = parseJson(res.stdout) as {
       data: {
         project: { claim?: { kind: string; team_id?: string; claimed_at?: string } };
+        next_actions: string[];
         next_commands: string[];
       };
     };
@@ -227,8 +228,11 @@ describe("status command", () => {
       kind: "attached",
       team_id: "team-002",
       claimed_at: "2026-01-03T00:00:00Z",
+      recorded: false,
     });
-    expect(json.data.next_commands).not.toContain(
+    expect(json.data.next_actions.join("\n")).toContain("does not record it");
+    expect(json.data.next_actions.join("\n")).not.toContain("its data may be lost");
+    expect(json.data.next_commands).toContain(
       expectedPublicCliCommand(`claim --server https://preview.zitadel.com --cwd ${cwd}`),
     );
   });

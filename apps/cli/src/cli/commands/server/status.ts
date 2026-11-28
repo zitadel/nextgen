@@ -44,8 +44,9 @@ type ProjectStatus =
       issuer?: string;
       /**
        * Whether the project is attached to a team, from the local
-       * `.zitadel/secret`. Omitted entirely off the cloud, where there is
-       * nothing to attach and the field would only invite agents to act on it.
+       * `.zitadel/secret`, confirmed with the server when the record names
+       * none. Omitted entirely off the cloud, where there is nothing to attach
+       * and the field would only invite agents to act on it.
        */
       claim?: ClaimState;
     };
@@ -231,24 +232,26 @@ function nextActionsFor(
     return [];
   }
   const claim =
-    project.claim?.kind === "detached"
-      ? project.claim.claimable
-        ? [
-            Claim.nudge(
-              suggest({ id: "claim" }),
-              project.claim.deadline === undefined ? undefined : new Date(project.claim.deadline),
-            ),
-          ]
-        : [
-            Claim.windowClosedNudge(
-              suggest({ id: "claim" }),
-              suggest({
-                id: "setup",
-                flags: { cwd: Claim.FRESH_DIRECTORY },
-              }),
-            ),
-          ]
-      : [];
+    project.claim?.kind === "attached" && project.claim.recorded === false
+      ? [Claim.unrecordedNudge(suggest({ id: "claim" }), project.claim.team_id)]
+      : project.claim?.kind === "detached"
+        ? project.claim.claimable
+          ? [
+              Claim.nudge(
+                suggest({ id: "claim" }),
+                project.claim.deadline === undefined ? undefined : new Date(project.claim.deadline),
+              ),
+            ]
+          : [
+              Claim.windowClosedNudge(
+                suggest({ id: "claim" }),
+                suggest({
+                  id: "setup",
+                  flags: { cwd: Claim.FRESH_DIRECTORY },
+                }),
+              ),
+            ]
+        : [];
   if (users === "none") {
     return [Guidance.verifyLogin(project.issuer), ...claim];
   }
@@ -324,7 +327,10 @@ function nextCommandsFor(
     );
   } else {
     commands.push(suggest({ id: "doctor" }));
-    if (project.claim?.kind === "detached") {
+    if (
+      project.claim?.kind === "detached" ||
+      (project.claim?.kind === "attached" && project.claim.recorded === false)
+    ) {
       commands.push(suggest({ id: "claim" }));
     }
     if (users === "none") {

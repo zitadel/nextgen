@@ -109,6 +109,7 @@ describe("confirmed claim state", () => {
       kind: "attached",
       team_id: "team-002",
       claimed_at: "2026-01-03T00:00:00Z",
+      recorded: false,
     });
   });
 

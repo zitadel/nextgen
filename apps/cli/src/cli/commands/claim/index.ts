@@ -324,12 +324,18 @@ export default class Claim extends Telemetered(ChangeCommand) {
     switch (started.outcome) {
       case "already-claimed": {
         const current = localRecord
-          ? await claimService.current().catch((error: unknown) => {
-              if (isCancellation(error)) {
-                throw error;
-              }
-              return undefined;
-            })
+          ? await new ClaimService(
+              (await this.connect({ prompt: false, timeoutMs: ClaimWindow.CONFIRM_TIMEOUT_MS }))
+                .client,
+              projectId,
+            )
+              .current()
+              .catch((error: unknown) => {
+                if (isCancellation(error)) {
+                  throw error;
+                }
+                return undefined;
+              })
           : undefined;
         if (localRecord && current?.status === "claimed") {
           await localRecord
