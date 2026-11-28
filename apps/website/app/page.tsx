@@ -21,6 +21,7 @@ import { acmeSsoRuns, historyRun, type Run, setupRun } from "./showcase/runs";
 import { SiteFooter } from "./site-footer";
 import { SiteHeader } from "./site-header";
 import { StartWindow } from "./start-window";
+import { StructuredData } from "./structured-data";
 
 // Under the title, whom it serves, each in a line: who it is for as a tag,
 // and what it gives them. What Zitadel Next is, in the message house's
@@ -177,6 +178,7 @@ function Shipped({ entries }: { entries: readonly Entry[] }) {
 export default function Home() {
   return (
     <>
+      <StructuredData />
       <SiteHeader />
       {/* Pulled up under the glass header by its height, so the light and
           the grain start at the top of the page and read through the glass.

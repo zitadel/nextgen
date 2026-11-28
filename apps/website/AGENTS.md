@@ -27,6 +27,9 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   the hero's lines. Render it from there, never as a copy.
 - The front page's meta description, for search and shares, is
   `DESCRIPTION` beside it (`app/layout.tsx`), not the sentence.
+- The front page's JSON-LD is `app/structured-data.tsx`, built from
+  `message.ts`, `links.ts` and the CLI's and server's `package.json`; never
+  add offers or ratings.
 - The questions about Zitadel Next as a whole live in `app/message.ts`, word
   for word; the phase and feature pages keep their own.
 - A front-page window renders what another page shows, from the same data or

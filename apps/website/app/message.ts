@@ -6,7 +6,12 @@
 const WHAT =
   "open-source auth platform your agent can run: the agent you already use sets up and changes every part, from the login screens to every policy.";
 
-export const SENTENCE = `Zitadel Next is the ${WHAT}`;
+// The product's name and its maker's, as the sentence and the front page's
+// structured data name them (structured-data.tsx).
+export const PRODUCT = "Zitadel Next";
+export const COMPANY = "Zitadel";
+
+export const SENTENCE = `${PRODUCT} is the ${WHAT}`;
 
 export const ANSWER = `The ${WHAT}`;
 
