@@ -436,17 +436,15 @@ export default class Deploy extends Telemetered(
    * reads before the steps that can fail or be declined.
    *
    * @param prepared - The prepared release.
-   * @returns The notices as the lines a result carries.
+   * @returns The notices as the lines a result carries, which are none on a
+   *   terminal, where they were just said.
    */
   private said(prepared: Awaited<ReturnType<Publisher["prepare"]>>): string[] {
     for (const warning of prepared.warnings) {
       warnings.report(warning);
     }
-    this.narrate(prepared.notices);
 
-    return prepared.notices.flatMap((notice, at) => {
-      return [...(at === 0 ? [] : [""]), ...notice.replace(/\n+$/, "").split("\n")];
-    });
+    return this.narrate(prepared.notices);
   }
 
   /**

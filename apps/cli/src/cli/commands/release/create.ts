@@ -144,10 +144,7 @@ export default class ReleaseCreate extends Telemetered(ChangeCommand) {
     for (const warning of prepared.warnings) {
       warnings.report(warning);
     }
-    this.narrate(prepared.notices);
-    const diff = prepared.notices.flatMap((notice, at) => {
-      return [...(at === 0 ? [] : [""]), ...notice.replace(/\n+$/, "").split("\n")];
-    });
+    const diff = this.narrate(prepared.notices);
 
     return {
       publisher,

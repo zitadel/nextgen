@@ -57,6 +57,10 @@ export class Ending {
    * everything else, which a server message pasted into it needs most of all,
    * and it keeps the dim place footer: which project, on which server, is
    * what a run that failed against the wrong one is read for.
+   *
+   * The answer follows what the run said directly, as a line follows the one
+   * before it. Next steps with no answer above them open on a blank line, and
+   * so does an ending {@link Summary.apart} sets apart from a block of text.
    */
   renderStandalone(): string {
     const rendered = this.body(false, false);
@@ -72,8 +76,9 @@ export class Ending {
       const after = this.after();
       const under = [...(hint === "" ? [] : [hint]), ...(after === "" ? [] : ["", after])];
       const footer = place.length === 0 ? [] : ["", pc.dim(place.join(" · "))];
+      const opening = this.summary.apart === true ? [""] : [];
 
-      return `${[...stated, ...under, ...footer].join("\n")}\n`;
+      return `${[...opening, ...stated, ...under, ...footer].join("\n")}\n`;
     }
     const footer = [
       ...(this.summary.title === "Done" ? [] : [this.summary.title]),
@@ -87,9 +92,13 @@ export class Ending {
         return part !== "";
       })
       .join(" · ");
+    const opensApart =
+      this.summary.apart === true
+        ? body !== "" || footer !== ""
+        : rendered.length === 0 && this.after() !== "";
 
     return [
-      ...(rendered.length === 0 && this.after() !== "" ? [""] : []),
+      ...(opensApart ? [""] : []),
       ...(body === "" ? [] : [body, ""]),
       ...(footer === "" ? [] : [pc.dim(footer)]),
       "",

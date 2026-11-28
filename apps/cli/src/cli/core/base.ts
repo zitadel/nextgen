@@ -485,11 +485,33 @@ export abstract class BaseCommand extends Loggable(Documented(Interruptible(Comm
    * Says the text a publish step produced for a person, such as the diff a
    * deploy is about to make. It goes through the narration, so a command that
    * draws a chain draws it inside the chain, and `--json` silences it.
+   *
+   * A pipe is given none of the narration, so the text comes back as the lines
+   * a result carries for that reader. On a terminal it has just been drawn, so
+   * nothing comes back and a result that ends on it does not show it twice;
+   * the ending opens on a blank line instead, so it is not read as part of it.
+   *
+   * @param notices - The text, each notice ending in its own newlines.
+   * @returns The notices as result lines, a blank line between two, or none on
+   *   a terminal.
    */
-  protected narrate(notices: readonly string[]): void {
-    for (const notice of notices) {
-      this.info(notice.replace(/\n+$/, ""));
+  protected narrate(notices: readonly string[]): string[] {
+    const said = notices.map((notice) => {
+      return notice.replace(/\n+$/, "");
+    });
+    for (const notice of said) {
+      this.info(notice);
     }
+    if (Output.screen) {
+      if (said.length > 0) {
+        this.ui.drewABlock();
+      }
+      return [];
+    }
+
+    return said.flatMap((notice, at) => {
+      return [...(at === 0 ? [] : [""]), ...notice.split("\n")];
+    });
   }
 
   /**
