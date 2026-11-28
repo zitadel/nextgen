@@ -655,6 +655,7 @@ describe("edge project declarations", () => {
     const configs = [
       "components",
       "sdk-angular",
+      "sdk-core",
       "sdk-next",
       "sdk-nuxt",
       "sdk-qwik",
@@ -668,7 +669,7 @@ describe("edge project declarations", () => {
       "sdk-vue",
     ].map((dir) => `${dir}/vitest.config.ts`);
     expect(
-      [...configs, "sdk-core/vite.config.ts"].flatMap((path) =>
+      configs.flatMap((path) =>
         edgeConfigProblems(read(path)).map((problem) => `${path}: ${problem}`),
       ),
     ).toEqual([]);
