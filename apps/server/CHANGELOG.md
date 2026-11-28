@@ -1,5 +1,57 @@
 # @zitadel/server
 
+## 0.10.0
+
+### Minor Changes
+
+- [#3365](https://github.com/zitadel/nextgen/pull/3365) [`054624f`](https://github.com/zitadel/nextgen/commit/054624f867bccdabe5a284fb9fe95934e3ddac2f) - `POST /applications` now honors the `Idempotency-Key` header for 24 hours. A retry with the same key and body writes no revision. It replaces the secrets of the clients the first request created and returns the new ones, so a lost response no longer loses the secrets. The same key with another body is refused with `422 app.idempotency_key_reused`. See [`publishApplication`](https://preview.zitadel.com/docs/reference/api/applications/publishApplication).
+
+- [#3378](https://github.com/zitadel/nextgen/pull/3378) [`074a400`](https://github.com/zitadel/nextgen/commit/074a400c74c8929a5b3359fab0fb827c7ed2a8b6) - `zitadel settings oauth enable` turns the project's OAuth authorization server on: it writes `.zitadel/oauth/oauth.json`, the one settings file beside the branding descriptor, and `zitadel deploy` ships it as the release's `oauth` resource. A release without the file leaves the authorization server off. `@zitadel/config` exports the file's `oauthConfigSchema`, its `oauth-settings.json` meta-schema and `OAUTH_FILE_SCHEMA_REF`, and the OpenAPI description of the OAuth settings names the file.
+
+- [#3387](https://github.com/zitadel/nextgen/pull/3387) [`f97f7e6`](https://github.com/zitadel/nextgen/commit/f97f7e61e69855e5a1d1ea97db8ab96dfb680f06) - The console's application page says whether a release declares the application (Code) or the API registered it (Registered). Each client shows its secret: configured for a registered client, the variable holding it for a declared one. For a declared application, the page says to edit a client locally and deploy.
+
+- [#3257](https://github.com/zitadel/nextgen/pull/3257) [`44f8d9b`](https://github.com/zitadel/nextgen/commit/44f8d9b3a0583517eab198ddd8075e7f9ad12c61) - The console's login flow screen draws the flow as a canvas: a card per step sketching its fields and actions in the project's branding, and a named arrow per transition. It zooms by Ctrl or ⌘ and the wheel, a pinch or the keyboard, pans by drag, opens full screen, and isolates a step's transitions in and out on hover or focus.
+  
+  `@zitadel/components` exports `brandingDeclarations(branding, side)`, the `--zl-*` values a branding revision paints for one side, for hosts that set them on an element rather than adopting the stylesheet.
+
+- [#3223](https://github.com/zitadel/nextgen/pull/3223) [`1eb99e9`](https://github.com/zitadel/nextgen/commit/1eb99e90464e7a2a6691b804ce36588ad5a49af1) - In the console, the Members tab of a project's Settings lists one row per person and per team with a role on the project, with the role and when it ends. A team opens to the people who hold the project through it. A row's menu removes its access, or, where it holds more than one role, the weakest.
+
+- [#3201](https://github.com/zitadel/nextgen/pull/3201) [`1bae790`](https://github.com/zitadel/nextgen/commit/1bae7903716aa288e1985239190d870753a5b2e8) - A release can declare applications: `POST /releases/build` takes `applications`, served by the deployments of that release ([docs](https://preview.zitadel.com/docs/reference/api/releases/buildRelease)), and a deploy is refused while a declared client's `${{ NAME }}` secret variable has no value, holds a plain value, or holds a secret that is empty or not a string. `GET /applications/revisions/{revision_id}` reads what a release pins, and the console's release detail lists the applications and OAuth settings it pins.
+  
+  `zitadel deploy` sends the applications under `.zitadel/applications/<slug>.json` with the release, and `deploy --dry-run` shows an added, changed or removed application in its diff. Before anything is uploaded, a deploy refuses a file that breaks the application schema, a client without a `client_id`, a confidential client that does not name its secret as a `${{ NAME }}` variable, two files with one slug, two clients with one `client_id`, and a secret variable another client or a connection names, and it refuses a secret variable the project lacks or holds as a plain value. `setup` copies the schema to `.zitadel/meta/application.json`, so editors check the file's shape. `@zitadel/config` exports `applicationConfigSchema` and `declaredApplicationIssues`.
+
+- [#3371](https://github.com/zitadel/nextgen/pull/3371) [`9765b76`](https://github.com/zitadel/nextgen/commit/9765b76066bc46b9100bf87671d7e427a47f4d50) - Events carry a `correlation_id` that joins the requests of one sign-in, invitation or project claim. `GET /events` ([docs](https://preview.zitadel.com/docs/reference/api/events/listEvents)), `zitadel event list --filter correlation_id=…` and the console's Events search filter by it. A sign-in keeps one ID from its authorization request to its token. An invitation's `journey_id` is that ID. A traced request's event names its trace in `metadata.trace_id`.
+
+- [#3260](https://github.com/zitadel/nextgen/pull/3260) [`478000d`](https://github.com/zitadel/nextgen/commit/478000d0d112b17a98a3f97dec3b0f61a04b97ee) - The [events API](https://preview.zitadel.com/docs/reference/api/events) and its [webhooks](https://preview.zitadel.com/docs/reference/api/event-webhooks) have a new type, `auth.request.exchange.failed`: an app presented an authorization code and a check refused it. It carries the app's `client_id` and a `reason`, and the console's "Only failures" filter includes it. The login does not issue codes yet, so nothing writes it for now.
+
+- [#3261](https://github.com/zitadel/nextgen/pull/3261) [`59e66d2`](https://github.com/zitadel/nextgen/commit/59e66d27885df30d8f19cb29b275c799ae0dd43b) - With `oauth.enabled`, `/oauth/<project_id>/jwks`, the `jwks_uri` of a project's issuer, serves the public keys of the project's token signing keys as a JWK set, so a backend can verify the project's access tokens. The set does not depend on the project's release: a release that turns OAuth off leaves it up, so tokens issued before stay verifiable until they expire. A project that does not exist answers 404. A verifier may cache the set for `oauth.jwks_max_age`, 5 minutes by default.
+
+- [#3262](https://github.com/zitadel/nextgen/pull/3262) [`1d947b8`](https://github.com/zitadel/nextgen/commit/1d947b853aaf7ef8c227dff50f6e0a7bfa0b07b1) - The token endpoint `/oauth/<project_id>/token` exchanges an authorization code for an access token: a JWT signed with the project's key, valid for five minutes, or until the session ends if that is earlier. The application authenticates with its client secret, in the `Authorization` header or in the form. No refresh token or ID token is issued yet, and the login does not issue codes yet.
+
+- [#3300](https://github.com/zitadel/nextgen/pull/3300) [`938e678`](https://github.com/zitadel/nextgen/commit/938e6787b788e8a61dae7b88ffde01f6e7a57cc1) - `GET /projects/{project_id}/admins` is removed; list a project's admins with [`GET /projects/{project_id}/members?relation=admin`](https://preview.zitadel.com/docs/reference/api/projects/listProjectMembers).
+  
+  **Breaking:** calls to `/projects/{project_id}/admins` and the `listProjectAdmins` client method no longer exist. Call `listProjectMembers` with `relation=admin`: it returns the same people, under `members`, each with `relation` and `sources`.
+
+### Patch Changes
+
+- [#3292](https://github.com/zitadel/nextgen/pull/3292) [`d0ecae9`](https://github.com/zitadel/nextgen/commit/d0ecae9c6ac6b46f92ccf73f8009fb3190a6f871) - The console's flow canvas opens already fitted to its card, and Ctrl with a mouse wheel zooms at the wheel's pace in every browser. A step that has keyboard focus keeps its transitions isolated while the pointer moves over other steps.
+
+- [#3298](https://github.com/zitadel/nextgen/pull/3298) [`9a4c6f2`](https://github.com/zitadel/nextgen/commit/9a4c6f25ef523526661b5da02152a0c49e7e32c8) - The console's invitation page now shows which account is signed in and offers **Use another account**, so an invitation is not accepted with the wrong one. A link left open in a tab is no longer shown to a different account that signs in there later.
+
+- [#3339](https://github.com/zitadel/nextgen/pull/3339) [`b869030`](https://github.com/zitadel/nextgen/commit/b869030d12f39846ba1717ccbc0d985acadfdf20) - In the console's **Invite member** dialog no role is preselected any more, and **Create invitation** stays disabled until you pick one, so a link no longer grants Admin by default. People who are not admins of a project no longer see **Invite member**, and the Invitations tab tells them only admins can see invitations instead of showing an error.
+
+- [#3277](https://github.com/zitadel/nextgen/pull/3277) [`a944d25`](https://github.com/zitadel/nextgen/commit/a944d252289dd3ade13476187c4d48cef1f696be) - The console's project Settings → General page titles its first card "Project details", draws Add origin as an outlined button and each origin's menu with a vertical three-dot icon, and shows variable values in a monospace face. On a narrow screen, the Variables and Secrets table scrolls inside its card.
+
+- [#3358](https://github.com/zitadel/nextgen/pull/3358) [`d0b5f3f`](https://github.com/zitadel/nextgen/commit/d0b5f3ff053f2faa2f9799c63bd19d777050b1e8) - Building a release again with unchanged flow definitions reuses the stored flow revision when a step declares a gate without `config`. Before, every build stored a new revision of that flow and a new release.
+
+- [#3201](https://github.com/zitadel/nextgen/pull/3201) [`1bae790`](https://github.com/zitadel/nextgen/commit/1bae7903716aa288e1985239190d870753a5b2e8) - A deploy is refused with `dep.variables_not_secret` when an identity provider's `client_secret` names a variable stored as a plain value, or as a secret that is empty or not a string, instead of every sign-in through that provider failing.
+
+- [#3360](https://github.com/zitadel/nextgen/pull/3360) [`1b95cfd`](https://github.com/zitadel/nextgen/commit/1b95cfdfd270d3251ce6df8ed697947758ddea6d) - Accepting or declining a project invitation as someone who already has access to the project, through a grant, a team, the owning team or operating the deployment, now answers `409 inv.already_member` with their role and leaves the invitation pending for the person it was meant for, and `lookupInvitation` returns that role as `membership` before either is called.
+
+- [#3026](https://github.com/zitadel/nextgen/pull/3026) [`20d1a9f`](https://github.com/zitadel/nextgen/commit/20d1a9f8ffa09eaf630bbb8fcbeb75cff4ae57fb) - A passkey sign-up with an email that already has an account now shows that the account exists before the browser asks to save a passkey. Before, the browser saved the passkey first and the server refused it, which left an unusable entry in the password manager.
+
+- [#3435](https://github.com/zitadel/nextgen/pull/3435) [`0e71400`](https://github.com/zitadel/nextgen/commit/0e71400dc331fe759fec81bbcad35f96f5d9900a) - Request and correlation IDs now say what they are. A new correlation ID is `corr_` and 32 hex digits, and the console's Events search takes `corr_…` straight to its chain. A request ID taken from a proxy (`server.request_id_header`) is now `req_` and the proxy's ID, as a minted one is: on the hosted cloud, search Vercel's logs for the part after `req_`.
+
 ## 0.9.0
 
 ### Minor Changes
