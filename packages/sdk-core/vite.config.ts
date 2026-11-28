@@ -1,42 +1,69 @@
-import { resolve } from "node:path";
-// `defineConfig` comes from `vitest/config` (not `vite`) so the `test` field
-// typechecks: Vitest 4 no longer augments Vite's own `UserConfig` with `test`.
-import { defineConfig } from "vitest/config";
+import dts from "unplugin-dts/vite";
+import { defineConfig } from "vite";
 
-import { baseTest, edgeProject, edgeSpecs } from "@zitadel/vitest-config";
+import pkg from "./package.json" with { type: "json" };
+
+const targets = Object.values(pkg.exports).map((target) => target.import);
+const names = targets.map((target) => target.replace(/^\.\/dist\/|\.m?js$/g, ""));
+const extension = targets.every((target) => target.endsWith(".mjs")) ? ".mjs" : ".js";
+const manifest: {
+  dependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
+} = pkg;
+const dependencies = Object.keys({
+  ...manifest.dependencies,
+  ...manifest.peerDependencies,
+});
 
 export default defineConfig({
-  root: import.meta.dirname,
-  cacheDir: ".vitest",
   build: {
-    emptyOutDir: false,
+    sourcemap: true,
     lib: {
-      entry: {
-        index: resolve(import.meta.dirname, "src/index.ts"),
-        types: resolve(import.meta.dirname, "src/types.ts"),
-        jwt: resolve(import.meta.dirname, "src/jwt.ts"),
-        middleware: resolve(import.meta.dirname, "src/middleware.ts"),
-        session: resolve(import.meta.dirname, "src/session.ts"),
-      },
-      formats: ["es" as const],
+      entry: Object.fromEntries(names.map((name) => [name, `src/${name}.ts`])),
+      formats: ["es"],
     },
-  },
-  test: {
-    ...baseTest,
-    name: "@zitadel/sdk-core",
-    projects: [
-      {
-        cacheDir: ".vitest/node",
-        test: {
-          name: "node",
-          globals: true,
-          environment: "node",
-          include: ["src/**/*.{test,spec}.{ts,tsx}"],
-          exclude: [edgeSpecs],
+    rolldownOptions: {
+      external: (id) => {
+        return dependencies.some((name) => id === name || id.startsWith(`${name}/`));
+      },
+      onwarn: (warning, warn) => {
+        if (warning.code !== "PLUGIN_TIMINGS") {
+          throw new Error(warning.message);
+        }
+        warn(warning);
+      },
+      output: {
+        entryFileNames: `[name]${extension}`,
+        chunkFileNames: `[name]-[hash]${extension}`,
+        minify: {
+          compress: {
+            keepNames: {
+              function: true,
+              class: true,
+            },
+          },
+          mangle: {
+            keepNames: true,
+          },
+          codegen: {
+            removeWhitespace: true,
+          },
         },
       },
-      // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
-      edgeProject({ root: import.meta.dirname }),
-    ],
+    },
   },
+  plugins: [
+    dts({
+      tsconfigPath: "./tsconfig.lib.json",
+      afterDiagnostic: (diagnostics) => {
+        if (diagnostics.length > 0) {
+          throw new Error("the declarations have type errors");
+        }
+      },
+      outDirs: {
+        dir: "dist",
+        moduleFormat: extension === ".mjs" ? "esm" : undefined,
+      },
+    }),
+  ],
 });

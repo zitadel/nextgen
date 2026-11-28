@@ -18,7 +18,7 @@
   ],
   "type": "module",
   "scripts": {
-    "build": "tsdown && attw --pack . --profile=esm-only --no-emoji --no-summary",
+    "build": "vite build && attw --pack . --profile=esm-only --no-emoji --no-summary",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
     "lint": "biome check . && knip --directory ../.. --workspace @zitadel/sdk-core --reporter symbols --reporter github-actions",
@@ -71,8 +71,8 @@
     "@zitadel/components": "workspace:*",
     "@zitadel/vitest-config": "workspace:*",
     "jsdom": "catalog:",
-    "tsdown": "catalog:",
     "typescript": "catalog:",
+    "unplugin-dts": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
   }
