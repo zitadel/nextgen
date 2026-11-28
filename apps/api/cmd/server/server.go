@@ -569,6 +569,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, do phases) (err er
 			WithPolicyService(policyService).
 			WithOAuthSettingsService(oauthSettingsService).
 			WithInvitationService(invitationService).
+			WithWebhookService(service.NewWebhookService(serviceDBPool, keyService)).
 			WithReadinessCheck(pool),
 		// The same platform project the handler resolves: sessions homed there
 		// can reach the platform operator path (ADR 075).

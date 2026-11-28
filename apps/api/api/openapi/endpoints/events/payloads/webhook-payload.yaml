@@ -1,0 +1,24 @@
+title: WebhookPayload
+type: object
+description: |
+  Payload for `webhook.created`, which holds every field, and
+  `webhook.updated`, which holds only the fields the update named, with their
+  new values. The webhook ID is the event's `entity_id`. The signing secret is
+  never included.
+properties:
+  url:
+    type: string
+    description: |
+      The URL the webhook's events are sent to, without its query and
+      fragment, which may carry a token.
+  description:
+    type: string
+    description: The note on what the webhook is for. Empty when it has none.
+  event_types:
+    type: array
+    description: The event types the webhook receives, or the single entry `*`.
+    items:
+      type: string
+  enabled:
+    type: boolean
+    description: Whether the server sends events to the webhook.

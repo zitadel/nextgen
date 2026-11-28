@@ -38604,11 +38604,91 @@ func (s CreateWebhookErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EncKeyDecryptFailedCreateWebhookErrorResponse:
+		e.FieldStart("code")
+		e.Str("enc_key.decrypt_failed")
+		{
+			s := s.EncKeyDecryptFailed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EncKeyEncryptFailedCreateWebhookErrorResponse:
+		e.FieldStart("code")
+		e.Str("enc_key.encrypt_failed")
+		{
+			s := s.EncKeyEncryptFailed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EncKeyNotFoundCreateWebhookErrorResponse:
+		e.FieldStart("code")
+		e.Str("enc_key.not_found")
+		{
+			s := s.EncKeyNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EvtInvalidCreateWebhookErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalCreateWebhookErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
 		{
 			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case TknInvalidCreateWebhookErrorResponse:
+		e.FieldStart("code")
+		e.Str("tkn.invalid")
+		{
+			s := s.TknInvalid
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -38641,6 +38721,22 @@ func (s CreateWebhookErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EncKeyUnknownAlgCreateWebhookErrorResponse:
+		e.FieldStart("code")
+		e.Str("enc_key.unknown_alg")
+		{
+			s := s.EncKeyUnknownAlg
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -38764,14 +38860,32 @@ func (s *CreateWebhookErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedCreateWebhookErrorResponse
 					found = true
+				case "enc_key.decrypt_failed":
+					s.Type = EncKeyDecryptFailedCreateWebhookErrorResponse
+					found = true
+				case "enc_key.encrypt_failed":
+					s.Type = EncKeyEncryptFailedCreateWebhookErrorResponse
+					found = true
+				case "enc_key.not_found":
+					s.Type = EncKeyNotFoundCreateWebhookErrorResponse
+					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidCreateWebhookErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalCreateWebhookErrorResponse
+					found = true
+				case "tkn.invalid":
+					s.Type = TknInvalidCreateWebhookErrorResponse
 					found = true
 				case "not_implemented":
 					s.Type = NotImplementedCreateWebhookErrorResponse
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateWebhookErrorResponse
+					found = true
+				case "enc_key.unknown_alg":
+					s.Type = EncKeyUnknownAlgCreateWebhookErrorResponse
 					found = true
 				case "unavailable":
 					s.Type = UnavailableCreateWebhookErrorResponse
@@ -38810,8 +38924,28 @@ func (s *CreateWebhookErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
+	case EncKeyDecryptFailedCreateWebhookErrorResponse:
+		if err := s.EncKeyDecryptFailed.Decode(d); err != nil {
+			return err
+		}
+	case EncKeyEncryptFailedCreateWebhookErrorResponse:
+		if err := s.EncKeyEncryptFailed.Decode(d); err != nil {
+			return err
+		}
+	case EncKeyNotFoundCreateWebhookErrorResponse:
+		if err := s.EncKeyNotFound.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidCreateWebhookErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
 	case InternalCreateWebhookErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case TknInvalidCreateWebhookErrorResponse:
+		if err := s.TknInvalid.Decode(d); err != nil {
 			return err
 		}
 	case NotImplementedCreateWebhookErrorResponse:
@@ -38820,6 +38954,10 @@ func (s *CreateWebhookErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidCreateWebhookErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case EncKeyUnknownAlgCreateWebhookErrorResponse:
+		if err := s.EncKeyUnknownAlg.Decode(d); err != nil {
 			return err
 		}
 	case UnavailableCreateWebhookErrorResponse:
@@ -40720,6 +40858,22 @@ func (s DeleteWebhookErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EvtInvalidDeleteWebhookErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalDeleteWebhookErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -40848,6 +41002,9 @@ func (s *DeleteWebhookErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedDeleteWebhookErrorResponse
 					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidDeleteWebhookErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalDeleteWebhookErrorResponse
 					found = true
@@ -40886,6 +41043,10 @@ func (s *DeleteWebhookErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case AuthUnauthorizedDeleteWebhookErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidDeleteWebhookErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
 			return err
 		}
 	case InternalDeleteWebhookErrorResponse:
@@ -53671,6 +53832,526 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				s.Payload.Encode(e)
 			}
 		}
+	case WebhookCreatedEventEvent:
+		e.FieldStart("event_type")
+		e.Str("webhook.created")
+		{
+			s := s.WebhookCreatedEvent
+			{
+				e.FieldStart("id")
+				e.Str(s.ID)
+			}
+			{
+				e.FieldStart("project_id")
+				s.ProjectID.Encode(e)
+			}
+			{
+				if s.TeamID.Set {
+					e.FieldStart("team_id")
+					s.TeamID.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("category")
+				s.Category.Encode(e)
+			}
+			{
+				e.FieldStart("occurred_at")
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
+			}
+			{
+				e.FieldStart("created_at")
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
+			}
+			{
+				if s.ActorID.Set {
+					e.FieldStart("actor_id")
+					s.ActorID.Encode(e)
+				}
+			}
+			{
+				if s.ActorType.Set {
+					e.FieldStart("actor_type")
+					s.ActorType.Encode(e)
+				}
+			}
+			{
+				if s.EntityType.Set {
+					e.FieldStart("entity_type")
+					s.EntityType.Encode(e)
+				}
+			}
+			{
+				if s.EntityID.Set {
+					e.FieldStart("entity_id")
+					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("client_id")
+				e.Str(s.ClientID)
+			}
+			{
+				if s.TokenID.Set {
+					e.FieldStart("token_id")
+					s.TokenID.Encode(e)
+				}
+			}
+			{
+				if s.DelegationType.Set {
+					e.FieldStart("delegation_type")
+					s.DelegationType.Encode(e)
+				}
+			}
+			{
+				if s.DelegationID.Set {
+					e.FieldStart("delegation_id")
+					s.DelegationID.Encode(e)
+				}
+			}
+			{
+				if s.Grantor.Set {
+					e.FieldStart("grantor")
+					s.Grantor.Encode(e)
+				}
+			}
+			{
+				if s.Fingerprint.Set {
+					e.FieldStart("fingerprint")
+					s.Fingerprint.Encode(e)
+				}
+			}
+			{
+				if s.RequestID.Set {
+					e.FieldStart("request_id")
+					s.RequestID.Encode(e)
+				}
+			}
+			{
+				if s.SessionID.Set {
+					e.FieldStart("session_id")
+					s.SessionID.Encode(e)
+				}
+			}
+			{
+				if s.FlowID.Set {
+					e.FieldStart("flow_id")
+					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
+				if s.Metadata.Set {
+					e.FieldStart("metadata")
+					s.Metadata.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("payload")
+				s.Payload.Encode(e)
+			}
+		}
+	case WebhookDeletedEventEvent:
+		e.FieldStart("event_type")
+		e.Str("webhook.deleted")
+		{
+			s := s.WebhookDeletedEvent
+			{
+				e.FieldStart("id")
+				e.Str(s.ID)
+			}
+			{
+				e.FieldStart("project_id")
+				s.ProjectID.Encode(e)
+			}
+			{
+				if s.TeamID.Set {
+					e.FieldStart("team_id")
+					s.TeamID.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("category")
+				s.Category.Encode(e)
+			}
+			{
+				e.FieldStart("occurred_at")
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
+			}
+			{
+				e.FieldStart("created_at")
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
+			}
+			{
+				if s.ActorID.Set {
+					e.FieldStart("actor_id")
+					s.ActorID.Encode(e)
+				}
+			}
+			{
+				if s.ActorType.Set {
+					e.FieldStart("actor_type")
+					s.ActorType.Encode(e)
+				}
+			}
+			{
+				if s.EntityType.Set {
+					e.FieldStart("entity_type")
+					s.EntityType.Encode(e)
+				}
+			}
+			{
+				if s.EntityID.Set {
+					e.FieldStart("entity_id")
+					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("client_id")
+				e.Str(s.ClientID)
+			}
+			{
+				if s.TokenID.Set {
+					e.FieldStart("token_id")
+					s.TokenID.Encode(e)
+				}
+			}
+			{
+				if s.DelegationType.Set {
+					e.FieldStart("delegation_type")
+					s.DelegationType.Encode(e)
+				}
+			}
+			{
+				if s.DelegationID.Set {
+					e.FieldStart("delegation_id")
+					s.DelegationID.Encode(e)
+				}
+			}
+			{
+				if s.Grantor.Set {
+					e.FieldStart("grantor")
+					s.Grantor.Encode(e)
+				}
+			}
+			{
+				if s.Fingerprint.Set {
+					e.FieldStart("fingerprint")
+					s.Fingerprint.Encode(e)
+				}
+			}
+			{
+				if s.RequestID.Set {
+					e.FieldStart("request_id")
+					s.RequestID.Encode(e)
+				}
+			}
+			{
+				if s.SessionID.Set {
+					e.FieldStart("session_id")
+					s.SessionID.Encode(e)
+				}
+			}
+			{
+				if s.FlowID.Set {
+					e.FieldStart("flow_id")
+					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
+				if s.Metadata.Set {
+					e.FieldStart("metadata")
+					s.Metadata.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("payload")
+				s.Payload.Encode(e)
+			}
+		}
+	case WebhookSecretRotatedEventEvent:
+		e.FieldStart("event_type")
+		e.Str("webhook.secret_rotated")
+		{
+			s := s.WebhookSecretRotatedEvent
+			{
+				e.FieldStart("id")
+				e.Str(s.ID)
+			}
+			{
+				e.FieldStart("project_id")
+				s.ProjectID.Encode(e)
+			}
+			{
+				if s.TeamID.Set {
+					e.FieldStart("team_id")
+					s.TeamID.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("category")
+				s.Category.Encode(e)
+			}
+			{
+				e.FieldStart("occurred_at")
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
+			}
+			{
+				e.FieldStart("created_at")
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
+			}
+			{
+				if s.ActorID.Set {
+					e.FieldStart("actor_id")
+					s.ActorID.Encode(e)
+				}
+			}
+			{
+				if s.ActorType.Set {
+					e.FieldStart("actor_type")
+					s.ActorType.Encode(e)
+				}
+			}
+			{
+				if s.EntityType.Set {
+					e.FieldStart("entity_type")
+					s.EntityType.Encode(e)
+				}
+			}
+			{
+				if s.EntityID.Set {
+					e.FieldStart("entity_id")
+					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("client_id")
+				e.Str(s.ClientID)
+			}
+			{
+				if s.TokenID.Set {
+					e.FieldStart("token_id")
+					s.TokenID.Encode(e)
+				}
+			}
+			{
+				if s.DelegationType.Set {
+					e.FieldStart("delegation_type")
+					s.DelegationType.Encode(e)
+				}
+			}
+			{
+				if s.DelegationID.Set {
+					e.FieldStart("delegation_id")
+					s.DelegationID.Encode(e)
+				}
+			}
+			{
+				if s.Grantor.Set {
+					e.FieldStart("grantor")
+					s.Grantor.Encode(e)
+				}
+			}
+			{
+				if s.Fingerprint.Set {
+					e.FieldStart("fingerprint")
+					s.Fingerprint.Encode(e)
+				}
+			}
+			{
+				if s.RequestID.Set {
+					e.FieldStart("request_id")
+					s.RequestID.Encode(e)
+				}
+			}
+			{
+				if s.SessionID.Set {
+					e.FieldStart("session_id")
+					s.SessionID.Encode(e)
+				}
+			}
+			{
+				if s.FlowID.Set {
+					e.FieldStart("flow_id")
+					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
+				if s.Metadata.Set {
+					e.FieldStart("metadata")
+					s.Metadata.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("payload")
+				s.Payload.Encode(e)
+			}
+		}
+	case WebhookUpdatedEventEvent:
+		e.FieldStart("event_type")
+		e.Str("webhook.updated")
+		{
+			s := s.WebhookUpdatedEvent
+			{
+				e.FieldStart("id")
+				e.Str(s.ID)
+			}
+			{
+				e.FieldStart("project_id")
+				s.ProjectID.Encode(e)
+			}
+			{
+				if s.TeamID.Set {
+					e.FieldStart("team_id")
+					s.TeamID.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("category")
+				s.Category.Encode(e)
+			}
+			{
+				e.FieldStart("occurred_at")
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
+			}
+			{
+				e.FieldStart("created_at")
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
+			}
+			{
+				if s.ActorID.Set {
+					e.FieldStart("actor_id")
+					s.ActorID.Encode(e)
+				}
+			}
+			{
+				if s.ActorType.Set {
+					e.FieldStart("actor_type")
+					s.ActorType.Encode(e)
+				}
+			}
+			{
+				if s.EntityType.Set {
+					e.FieldStart("entity_type")
+					s.EntityType.Encode(e)
+				}
+			}
+			{
+				if s.EntityID.Set {
+					e.FieldStart("entity_id")
+					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("client_id")
+				e.Str(s.ClientID)
+			}
+			{
+				if s.TokenID.Set {
+					e.FieldStart("token_id")
+					s.TokenID.Encode(e)
+				}
+			}
+			{
+				if s.DelegationType.Set {
+					e.FieldStart("delegation_type")
+					s.DelegationType.Encode(e)
+				}
+			}
+			{
+				if s.DelegationID.Set {
+					e.FieldStart("delegation_id")
+					s.DelegationID.Encode(e)
+				}
+			}
+			{
+				if s.Grantor.Set {
+					e.FieldStart("grantor")
+					s.Grantor.Encode(e)
+				}
+			}
+			{
+				if s.Fingerprint.Set {
+					e.FieldStart("fingerprint")
+					s.Fingerprint.Encode(e)
+				}
+			}
+			{
+				if s.RequestID.Set {
+					e.FieldStart("request_id")
+					s.RequestID.Encode(e)
+				}
+			}
+			{
+				if s.SessionID.Set {
+					e.FieldStart("session_id")
+					s.SessionID.Encode(e)
+				}
+			}
+			{
+				if s.FlowID.Set {
+					e.FieldStart("flow_id")
+					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.CorrelationID.Set {
+					e.FieldStart("correlation_id")
+					s.CorrelationID.Encode(e)
+				}
+			}
+			{
+				if s.Metadata.Set {
+					e.FieldStart("metadata")
+					s.Metadata.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("payload")
+				s.Payload.Encode(e)
+			}
+		}
 	}
 }
 
@@ -53864,6 +54545,18 @@ func (s *Event) Decode(d *jx.Decoder) error {
 					found = true
 				case "variable.set":
 					s.Type = VariableSetEventEvent
+					found = true
+				case "webhook.created":
+					s.Type = WebhookCreatedEventEvent
+					found = true
+				case "webhook.deleted":
+					s.Type = WebhookDeletedEventEvent
+					found = true
+				case "webhook.secret_rotated":
+					s.Type = WebhookSecretRotatedEventEvent
+					found = true
+				case "webhook.updated":
+					s.Type = WebhookUpdatedEventEvent
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -54101,6 +54794,22 @@ func (s *Event) Decode(d *jx.Decoder) error {
 		}
 	case VariableSetEventEvent:
 		if err := s.VariableSetEvent.Decode(d); err != nil {
+			return err
+		}
+	case WebhookCreatedEventEvent:
+		if err := s.WebhookCreatedEvent.Decode(d); err != nil {
+			return err
+		}
+	case WebhookDeletedEventEvent:
+		if err := s.WebhookDeletedEvent.Decode(d); err != nil {
+			return err
+		}
+	case WebhookSecretRotatedEventEvent:
+		if err := s.WebhookSecretRotatedEvent.Decode(d); err != nil {
+			return err
+		}
+	case WebhookUpdatedEventEvent:
+		if err := s.WebhookUpdatedEvent.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -109288,6 +109997,534 @@ func (s *NilWebhookEvent55Entity) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes WebhookEvent56Actor as json.
+func (o NilWebhookEvent56Actor) Encode(e *jx.Encoder) {
+	if o.Null {
+		e.Null()
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes WebhookEvent56Actor from json.
+func (o *NilWebhookEvent56Actor) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode NilWebhookEvent56Actor to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v WebhookEvent56Actor
+		o.Value = v
+		o.Null = true
+		return nil
+	}
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s NilWebhookEvent56Actor) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *NilWebhookEvent56Actor) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookEvent56ActorType as json.
+func (o NilWebhookEvent56ActorType) Encode(e *jx.Encoder) {
+	if o.Null {
+		e.Null()
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes WebhookEvent56ActorType from json.
+func (o *NilWebhookEvent56ActorType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode NilWebhookEvent56ActorType to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v WebhookEvent56ActorType
+		o.Value = v
+		o.Null = true
+		return nil
+	}
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s NilWebhookEvent56ActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *NilWebhookEvent56ActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookEvent56Entity as json.
+func (o NilWebhookEvent56Entity) Encode(e *jx.Encoder) {
+	if o.Null {
+		e.Null()
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes WebhookEvent56Entity from json.
+func (o *NilWebhookEvent56Entity) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode NilWebhookEvent56Entity to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v WebhookEvent56Entity
+		o.Value = v
+		o.Null = true
+		return nil
+	}
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s NilWebhookEvent56Entity) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *NilWebhookEvent56Entity) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookEvent57Actor as json.
+func (o NilWebhookEvent57Actor) Encode(e *jx.Encoder) {
+	if o.Null {
+		e.Null()
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes WebhookEvent57Actor from json.
+func (o *NilWebhookEvent57Actor) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode NilWebhookEvent57Actor to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v WebhookEvent57Actor
+		o.Value = v
+		o.Null = true
+		return nil
+	}
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s NilWebhookEvent57Actor) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *NilWebhookEvent57Actor) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookEvent57ActorType as json.
+func (o NilWebhookEvent57ActorType) Encode(e *jx.Encoder) {
+	if o.Null {
+		e.Null()
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes WebhookEvent57ActorType from json.
+func (o *NilWebhookEvent57ActorType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode NilWebhookEvent57ActorType to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v WebhookEvent57ActorType
+		o.Value = v
+		o.Null = true
+		return nil
+	}
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s NilWebhookEvent57ActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *NilWebhookEvent57ActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookEvent57Entity as json.
+func (o NilWebhookEvent57Entity) Encode(e *jx.Encoder) {
+	if o.Null {
+		e.Null()
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes WebhookEvent57Entity from json.
+func (o *NilWebhookEvent57Entity) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode NilWebhookEvent57Entity to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v WebhookEvent57Entity
+		o.Value = v
+		o.Null = true
+		return nil
+	}
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s NilWebhookEvent57Entity) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *NilWebhookEvent57Entity) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookEvent58Actor as json.
+func (o NilWebhookEvent58Actor) Encode(e *jx.Encoder) {
+	if o.Null {
+		e.Null()
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes WebhookEvent58Actor from json.
+func (o *NilWebhookEvent58Actor) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode NilWebhookEvent58Actor to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v WebhookEvent58Actor
+		o.Value = v
+		o.Null = true
+		return nil
+	}
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s NilWebhookEvent58Actor) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *NilWebhookEvent58Actor) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookEvent58ActorType as json.
+func (o NilWebhookEvent58ActorType) Encode(e *jx.Encoder) {
+	if o.Null {
+		e.Null()
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes WebhookEvent58ActorType from json.
+func (o *NilWebhookEvent58ActorType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode NilWebhookEvent58ActorType to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v WebhookEvent58ActorType
+		o.Value = v
+		o.Null = true
+		return nil
+	}
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s NilWebhookEvent58ActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *NilWebhookEvent58ActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookEvent58Entity as json.
+func (o NilWebhookEvent58Entity) Encode(e *jx.Encoder) {
+	if o.Null {
+		e.Null()
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes WebhookEvent58Entity from json.
+func (o *NilWebhookEvent58Entity) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode NilWebhookEvent58Entity to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v WebhookEvent58Entity
+		o.Value = v
+		o.Null = true
+		return nil
+	}
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s NilWebhookEvent58Entity) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *NilWebhookEvent58Entity) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookEvent59Actor as json.
+func (o NilWebhookEvent59Actor) Encode(e *jx.Encoder) {
+	if o.Null {
+		e.Null()
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes WebhookEvent59Actor from json.
+func (o *NilWebhookEvent59Actor) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode NilWebhookEvent59Actor to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v WebhookEvent59Actor
+		o.Value = v
+		o.Null = true
+		return nil
+	}
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s NilWebhookEvent59Actor) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *NilWebhookEvent59Actor) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookEvent59ActorType as json.
+func (o NilWebhookEvent59ActorType) Encode(e *jx.Encoder) {
+	if o.Null {
+		e.Null()
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes WebhookEvent59ActorType from json.
+func (o *NilWebhookEvent59ActorType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode NilWebhookEvent59ActorType to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v WebhookEvent59ActorType
+		o.Value = v
+		o.Null = true
+		return nil
+	}
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s NilWebhookEvent59ActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *NilWebhookEvent59ActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookEvent59Entity as json.
+func (o NilWebhookEvent59Entity) Encode(e *jx.Encoder) {
+	if o.Null {
+		e.Null()
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes WebhookEvent59Entity from json.
+func (o *NilWebhookEvent59Entity) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode NilWebhookEvent59Entity to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v WebhookEvent59Entity
+		o.Value = v
+		o.Null = true
+		return nil
+	}
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s NilWebhookEvent59Entity) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *NilWebhookEvent59Entity) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes WebhookEvent5Actor as json.
 func (o NilWebhookEvent5Actor) Encode(e *jx.Encoder) {
 	if o.Null {
@@ -121624,6 +122861,202 @@ func (s *OptNilVariableSetEventActorType) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes WebhookCreatedEventActorType as json.
+func (o OptNilWebhookCreatedEventActorType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	if o.Null {
+		e.Null()
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes WebhookCreatedEventActorType from json.
+func (o *OptNilWebhookCreatedEventActorType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptNilWebhookCreatedEventActorType to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v WebhookCreatedEventActorType
+		o.Value = v
+		o.Set = true
+		o.Null = true
+		return nil
+	}
+	o.Set = true
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptNilWebhookCreatedEventActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptNilWebhookCreatedEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookDeletedEventActorType as json.
+func (o OptNilWebhookDeletedEventActorType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	if o.Null {
+		e.Null()
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes WebhookDeletedEventActorType from json.
+func (o *OptNilWebhookDeletedEventActorType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptNilWebhookDeletedEventActorType to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v WebhookDeletedEventActorType
+		o.Value = v
+		o.Set = true
+		o.Null = true
+		return nil
+	}
+	o.Set = true
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptNilWebhookDeletedEventActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptNilWebhookDeletedEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookSecretRotatedEventActorType as json.
+func (o OptNilWebhookSecretRotatedEventActorType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	if o.Null {
+		e.Null()
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes WebhookSecretRotatedEventActorType from json.
+func (o *OptNilWebhookSecretRotatedEventActorType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptNilWebhookSecretRotatedEventActorType to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v WebhookSecretRotatedEventActorType
+		o.Value = v
+		o.Set = true
+		o.Null = true
+		return nil
+	}
+	o.Set = true
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptNilWebhookSecretRotatedEventActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptNilWebhookSecretRotatedEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookUpdatedEventActorType as json.
+func (o OptNilWebhookUpdatedEventActorType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	if o.Null {
+		e.Null()
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes WebhookUpdatedEventActorType from json.
+func (o *OptNilWebhookUpdatedEventActorType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptNilWebhookUpdatedEventActorType to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v WebhookUpdatedEventActorType
+		o.Value = v
+		o.Set = true
+		o.Null = true
+		return nil
+	}
+	o.Set = true
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptNilWebhookUpdatedEventActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptNilWebhookUpdatedEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes NotImplementedDetails as json.
 func (o OptNotImplementedDetails) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -126599,6 +128032,72 @@ func (s *OptVariableSetPayloadKind) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes WebhookCreatedEventDelegationType as json.
+func (o OptWebhookCreatedEventDelegationType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes WebhookCreatedEventDelegationType from json.
+func (o *OptWebhookCreatedEventDelegationType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptWebhookCreatedEventDelegationType to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptWebhookCreatedEventDelegationType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptWebhookCreatedEventDelegationType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookDeletedEventDelegationType as json.
+func (o OptWebhookDeletedEventDelegationType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes WebhookDeletedEventDelegationType from json.
+func (o *OptWebhookDeletedEventDelegationType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptWebhookDeletedEventDelegationType to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptWebhookDeletedEventDelegationType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptWebhookDeletedEventDelegationType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes WebhookInvalidDetails as json.
 func (o OptWebhookInvalidDetails) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -126735,6 +128234,39 @@ func (s *OptWebhookPermissionDeniedDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes WebhookSecretRotatedEventDelegationType as json.
+func (o OptWebhookSecretRotatedEventDelegationType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes WebhookSecretRotatedEventDelegationType from json.
+func (o *OptWebhookSecretRotatedEventDelegationType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptWebhookSecretRotatedEventDelegationType to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptWebhookSecretRotatedEventDelegationType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptWebhookSecretRotatedEventDelegationType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes WebhookURL as json.
 func (o OptWebhookURL) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -126764,6 +128296,39 @@ func (s OptWebhookURL) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptWebhookURL) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookUpdatedEventDelegationType as json.
+func (o OptWebhookUpdatedEventDelegationType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes WebhookUpdatedEventDelegationType from json.
+func (o *OptWebhookUpdatedEventDelegationType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptWebhookUpdatedEventDelegationType to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptWebhookUpdatedEventDelegationType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptWebhookUpdatedEventDelegationType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -157883,11 +159448,91 @@ func (s RotateWebhookSecretErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EncKeyDecryptFailedRotateWebhookSecretErrorResponse:
+		e.FieldStart("code")
+		e.Str("enc_key.decrypt_failed")
+		{
+			s := s.EncKeyDecryptFailed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EncKeyEncryptFailedRotateWebhookSecretErrorResponse:
+		e.FieldStart("code")
+		e.Str("enc_key.encrypt_failed")
+		{
+			s := s.EncKeyEncryptFailed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EncKeyNotFoundRotateWebhookSecretErrorResponse:
+		e.FieldStart("code")
+		e.Str("enc_key.not_found")
+		{
+			s := s.EncKeyNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EvtInvalidRotateWebhookSecretErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalRotateWebhookSecretErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
 		{
 			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case TknInvalidRotateWebhookSecretErrorResponse:
+		e.FieldStart("code")
+		e.Str("tkn.invalid")
+		{
+			s := s.TknInvalid
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -157920,6 +159565,22 @@ func (s RotateWebhookSecretErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EncKeyUnknownAlgRotateWebhookSecretErrorResponse:
+		e.FieldStart("code")
+		e.Str("enc_key.unknown_alg")
+		{
+			s := s.EncKeyUnknownAlg
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -158011,14 +159672,32 @@ func (s *RotateWebhookSecretErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedRotateWebhookSecretErrorResponse
 					found = true
+				case "enc_key.decrypt_failed":
+					s.Type = EncKeyDecryptFailedRotateWebhookSecretErrorResponse
+					found = true
+				case "enc_key.encrypt_failed":
+					s.Type = EncKeyEncryptFailedRotateWebhookSecretErrorResponse
+					found = true
+				case "enc_key.not_found":
+					s.Type = EncKeyNotFoundRotateWebhookSecretErrorResponse
+					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidRotateWebhookSecretErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalRotateWebhookSecretErrorResponse
+					found = true
+				case "tkn.invalid":
+					s.Type = TknInvalidRotateWebhookSecretErrorResponse
 					found = true
 				case "not_implemented":
 					s.Type = NotImplementedRotateWebhookSecretErrorResponse
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidRotateWebhookSecretErrorResponse
+					found = true
+				case "enc_key.unknown_alg":
+					s.Type = EncKeyUnknownAlgRotateWebhookSecretErrorResponse
 					found = true
 				case "unavailable":
 					s.Type = UnavailableRotateWebhookSecretErrorResponse
@@ -158051,8 +159730,28 @@ func (s *RotateWebhookSecretErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
+	case EncKeyDecryptFailedRotateWebhookSecretErrorResponse:
+		if err := s.EncKeyDecryptFailed.Decode(d); err != nil {
+			return err
+		}
+	case EncKeyEncryptFailedRotateWebhookSecretErrorResponse:
+		if err := s.EncKeyEncryptFailed.Decode(d); err != nil {
+			return err
+		}
+	case EncKeyNotFoundRotateWebhookSecretErrorResponse:
+		if err := s.EncKeyNotFound.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidRotateWebhookSecretErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
 	case InternalRotateWebhookSecretErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case TknInvalidRotateWebhookSecretErrorResponse:
+		if err := s.TknInvalid.Decode(d); err != nil {
 			return err
 		}
 	case NotImplementedRotateWebhookSecretErrorResponse:
@@ -158061,6 +159760,10 @@ func (s *RotateWebhookSecretErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidRotateWebhookSecretErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case EncKeyUnknownAlgRotateWebhookSecretErrorResponse:
+		if err := s.EncKeyUnknownAlg.Decode(d); err != nil {
 			return err
 		}
 	case UnavailableRotateWebhookSecretErrorResponse:
@@ -175954,6 +177657,22 @@ func (s UpdateWebhookErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EvtInvalidUpdateWebhookErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalUpdateWebhookErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -176098,6 +177817,9 @@ func (s *UpdateWebhookErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedUpdateWebhookErrorResponse
 					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidUpdateWebhookErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalUpdateWebhookErrorResponse
 					found = true
@@ -176139,6 +177861,10 @@ func (s *UpdateWebhookErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case AuthUnauthorizedUpdateWebhookErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidUpdateWebhookErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
 			return err
 		}
 	case InternalUpdateWebhookErrorResponse:
@@ -187960,6 +189686,1244 @@ func (s *Webhook) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode implements json.Marshaler.
+func (s *WebhookCreatedEvent) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *WebhookCreatedEvent) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("id")
+		e.Str(s.ID)
+	}
+	{
+		e.FieldStart("project_id")
+		s.ProjectID.Encode(e)
+	}
+	{
+		if s.TeamID.Set {
+			e.FieldStart("team_id")
+			s.TeamID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("event_type")
+		e.Str("webhook.created")
+	}
+	{
+		e.FieldStart("category")
+		s.Category.Encode(e)
+	}
+	{
+		e.FieldStart("occurred_at")
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
+	}
+	{
+		e.FieldStart("created_at")
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
+	}
+	{
+		if s.ActorID.Set {
+			e.FieldStart("actor_id")
+			s.ActorID.Encode(e)
+		}
+	}
+	{
+		if s.ActorType.Set {
+			e.FieldStart("actor_type")
+			s.ActorType.Encode(e)
+		}
+	}
+	{
+		if s.EntityType.Set {
+			e.FieldStart("entity_type")
+			s.EntityType.Encode(e)
+		}
+	}
+	{
+		if s.EntityID.Set {
+			e.FieldStart("entity_id")
+			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("client_id")
+		e.Str(s.ClientID)
+	}
+	{
+		if s.TokenID.Set {
+			e.FieldStart("token_id")
+			s.TokenID.Encode(e)
+		}
+	}
+	{
+		if s.DelegationType.Set {
+			e.FieldStart("delegation_type")
+			s.DelegationType.Encode(e)
+		}
+	}
+	{
+		if s.DelegationID.Set {
+			e.FieldStart("delegation_id")
+			s.DelegationID.Encode(e)
+		}
+	}
+	{
+		if s.Grantor.Set {
+			e.FieldStart("grantor")
+			s.Grantor.Encode(e)
+		}
+	}
+	{
+		if s.Fingerprint.Set {
+			e.FieldStart("fingerprint")
+			s.Fingerprint.Encode(e)
+		}
+	}
+	{
+		if s.RequestID.Set {
+			e.FieldStart("request_id")
+			s.RequestID.Encode(e)
+		}
+	}
+	{
+		if s.SessionID.Set {
+			e.FieldStart("session_id")
+			s.SessionID.Encode(e)
+		}
+	}
+	{
+		if s.FlowID.Set {
+			e.FieldStart("flow_id")
+			s.FlowID.Encode(e)
+		}
+	}
+	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
+		if s.Metadata.Set {
+			e.FieldStart("metadata")
+			s.Metadata.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("payload")
+		s.Payload.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfWebhookCreatedEvent = [24]string{
+	0:  "id",
+	1:  "project_id",
+	2:  "team_id",
+	3:  "event_type",
+	4:  "category",
+	5:  "occurred_at",
+	6:  "created_at",
+	7:  "actor_id",
+	8:  "actor_type",
+	9:  "entity_type",
+	10: "entity_id",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
+}
+
+// Decode decodes WebhookCreatedEvent from json.
+func (s *WebhookCreatedEvent) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookCreatedEvent to nil")
+	}
+	var requiredBitSet [3]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.ID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "project_id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ProjectID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"project_id\"")
+			}
+		case "team_id":
+			if err := func() error {
+				s.TeamID.Reset()
+				if err := s.TeamID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"team_id\"")
+			}
+		case "event_type":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				v, err := d.Str()
+				s.EventType = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"event_type\"")
+			}
+		case "category":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.Category.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"category\"")
+			}
+		case "occurred_at":
+			requiredBitSet[0] |= 1 << 5
+			if err := func() error {
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
+				s.OccurredAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"occurred_at\"")
+			}
+		case "created_at":
+			requiredBitSet[0] |= 1 << 6
+			if err := func() error {
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
+				s.CreatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created_at\"")
+			}
+		case "actor_id":
+			if err := func() error {
+				s.ActorID.Reset()
+				if err := s.ActorID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_id\"")
+			}
+		case "actor_type":
+			if err := func() error {
+				s.ActorType.Reset()
+				if err := s.ActorType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_type\"")
+			}
+		case "entity_type":
+			if err := func() error {
+				s.EntityType.Reset()
+				if err := s.EntityType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity_type\"")
+			}
+		case "entity_id":
+			if err := func() error {
+				s.EntityID.Reset()
+				if err := s.EntityID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity_id\"")
+			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
+		case "client_id":
+			requiredBitSet[1] |= 1 << 4
+			if err := func() error {
+				v, err := d.Str()
+				s.ClientID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"client_id\"")
+			}
+		case "token_id":
+			if err := func() error {
+				s.TokenID.Reset()
+				if err := s.TokenID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"token_id\"")
+			}
+		case "delegation_type":
+			if err := func() error {
+				s.DelegationType.Reset()
+				if err := s.DelegationType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"delegation_type\"")
+			}
+		case "delegation_id":
+			if err := func() error {
+				s.DelegationID.Reset()
+				if err := s.DelegationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"delegation_id\"")
+			}
+		case "grantor":
+			if err := func() error {
+				s.Grantor.Reset()
+				if err := s.Grantor.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"grantor\"")
+			}
+		case "fingerprint":
+			if err := func() error {
+				s.Fingerprint.Reset()
+				if err := s.Fingerprint.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"fingerprint\"")
+			}
+		case "request_id":
+			if err := func() error {
+				s.RequestID.Reset()
+				if err := s.RequestID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"request_id\"")
+			}
+		case "session_id":
+			if err := func() error {
+				s.SessionID.Reset()
+				if err := s.SessionID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"session_id\"")
+			}
+		case "flow_id":
+			if err := func() error {
+				s.FlowID.Reset()
+				if err := s.FlowID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"flow_id\"")
+			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
+		case "metadata":
+			if err := func() error {
+				s.Metadata.Reset()
+				if err := s.Metadata.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"metadata\"")
+			}
+		case "payload":
+			requiredBitSet[2] |= 1 << 7
+			if err := func() error {
+				if err := s.Payload.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"payload\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode WebhookCreatedEvent")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [3]uint8{
+		0b01111011,
+		0b00010000,
+		0b10000000,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfWebhookCreatedEvent) {
+					name = jsonFieldsNameOfWebhookCreatedEvent[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *WebhookCreatedEvent) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookCreatedEvent) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookCreatedEventActorType as json.
+func (s WebhookCreatedEventActorType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes WebhookCreatedEventActorType from json.
+func (s *WebhookCreatedEventActorType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookCreatedEventActorType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch WebhookCreatedEventActorType(v) {
+	case WebhookCreatedEventActorTypeHuman:
+		*s = WebhookCreatedEventActorTypeHuman
+	case WebhookCreatedEventActorTypeService:
+		*s = WebhookCreatedEventActorTypeService
+	case WebhookCreatedEventActorTypeSystem:
+		*s = WebhookCreatedEventActorTypeSystem
+	case WebhookCreatedEventActorTypeAgent:
+		*s = WebhookCreatedEventActorTypeAgent
+	default:
+		*s = WebhookCreatedEventActorType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s WebhookCreatedEventActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookCreatedEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookCreatedEventCategory as json.
+func (s WebhookCreatedEventCategory) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes WebhookCreatedEventCategory from json.
+func (s *WebhookCreatedEventCategory) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookCreatedEventCategory to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch WebhookCreatedEventCategory(v) {
+	case WebhookCreatedEventCategoryRequest:
+		*s = WebhookCreatedEventCategoryRequest
+	case WebhookCreatedEventCategoryAuth:
+		*s = WebhookCreatedEventCategoryAuth
+	case WebhookCreatedEventCategorySession:
+		*s = WebhookCreatedEventCategorySession
+	case WebhookCreatedEventCategoryAdmin:
+		*s = WebhookCreatedEventCategoryAdmin
+	case WebhookCreatedEventCategoryEntity:
+		*s = WebhookCreatedEventCategoryEntity
+	case WebhookCreatedEventCategorySignal:
+		*s = WebhookCreatedEventCategorySignal
+	default:
+		*s = WebhookCreatedEventCategory(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s WebhookCreatedEventCategory) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookCreatedEventCategory) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookCreatedEventDelegationType as json.
+func (s WebhookCreatedEventDelegationType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes WebhookCreatedEventDelegationType from json.
+func (s *WebhookCreatedEventDelegationType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookCreatedEventDelegationType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch WebhookCreatedEventDelegationType(v) {
+	case WebhookCreatedEventDelegationTypeDirect:
+		*s = WebhookCreatedEventDelegationTypeDirect
+	case WebhookCreatedEventDelegationTypeDelegated:
+		*s = WebhookCreatedEventDelegationTypeDelegated
+	case WebhookCreatedEventDelegationTypePatShared:
+		*s = WebhookCreatedEventDelegationTypePatShared
+	case WebhookCreatedEventDelegationTypeExchanged:
+		*s = WebhookCreatedEventDelegationTypeExchanged
+	default:
+		*s = WebhookCreatedEventDelegationType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s WebhookCreatedEventDelegationType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookCreatedEventDelegationType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *WebhookDeletedEvent) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *WebhookDeletedEvent) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("id")
+		e.Str(s.ID)
+	}
+	{
+		e.FieldStart("project_id")
+		s.ProjectID.Encode(e)
+	}
+	{
+		if s.TeamID.Set {
+			e.FieldStart("team_id")
+			s.TeamID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("event_type")
+		e.Str("webhook.deleted")
+	}
+	{
+		e.FieldStart("category")
+		s.Category.Encode(e)
+	}
+	{
+		e.FieldStart("occurred_at")
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
+	}
+	{
+		e.FieldStart("created_at")
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
+	}
+	{
+		if s.ActorID.Set {
+			e.FieldStart("actor_id")
+			s.ActorID.Encode(e)
+		}
+	}
+	{
+		if s.ActorType.Set {
+			e.FieldStart("actor_type")
+			s.ActorType.Encode(e)
+		}
+	}
+	{
+		if s.EntityType.Set {
+			e.FieldStart("entity_type")
+			s.EntityType.Encode(e)
+		}
+	}
+	{
+		if s.EntityID.Set {
+			e.FieldStart("entity_id")
+			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("client_id")
+		e.Str(s.ClientID)
+	}
+	{
+		if s.TokenID.Set {
+			e.FieldStart("token_id")
+			s.TokenID.Encode(e)
+		}
+	}
+	{
+		if s.DelegationType.Set {
+			e.FieldStart("delegation_type")
+			s.DelegationType.Encode(e)
+		}
+	}
+	{
+		if s.DelegationID.Set {
+			e.FieldStart("delegation_id")
+			s.DelegationID.Encode(e)
+		}
+	}
+	{
+		if s.Grantor.Set {
+			e.FieldStart("grantor")
+			s.Grantor.Encode(e)
+		}
+	}
+	{
+		if s.Fingerprint.Set {
+			e.FieldStart("fingerprint")
+			s.Fingerprint.Encode(e)
+		}
+	}
+	{
+		if s.RequestID.Set {
+			e.FieldStart("request_id")
+			s.RequestID.Encode(e)
+		}
+	}
+	{
+		if s.SessionID.Set {
+			e.FieldStart("session_id")
+			s.SessionID.Encode(e)
+		}
+	}
+	{
+		if s.FlowID.Set {
+			e.FieldStart("flow_id")
+			s.FlowID.Encode(e)
+		}
+	}
+	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
+		if s.Metadata.Set {
+			e.FieldStart("metadata")
+			s.Metadata.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("payload")
+		s.Payload.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfWebhookDeletedEvent = [24]string{
+	0:  "id",
+	1:  "project_id",
+	2:  "team_id",
+	3:  "event_type",
+	4:  "category",
+	5:  "occurred_at",
+	6:  "created_at",
+	7:  "actor_id",
+	8:  "actor_type",
+	9:  "entity_type",
+	10: "entity_id",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
+}
+
+// Decode decodes WebhookDeletedEvent from json.
+func (s *WebhookDeletedEvent) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookDeletedEvent to nil")
+	}
+	var requiredBitSet [3]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.ID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "project_id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ProjectID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"project_id\"")
+			}
+		case "team_id":
+			if err := func() error {
+				s.TeamID.Reset()
+				if err := s.TeamID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"team_id\"")
+			}
+		case "event_type":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				v, err := d.Str()
+				s.EventType = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"event_type\"")
+			}
+		case "category":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.Category.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"category\"")
+			}
+		case "occurred_at":
+			requiredBitSet[0] |= 1 << 5
+			if err := func() error {
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
+				s.OccurredAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"occurred_at\"")
+			}
+		case "created_at":
+			requiredBitSet[0] |= 1 << 6
+			if err := func() error {
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
+				s.CreatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created_at\"")
+			}
+		case "actor_id":
+			if err := func() error {
+				s.ActorID.Reset()
+				if err := s.ActorID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_id\"")
+			}
+		case "actor_type":
+			if err := func() error {
+				s.ActorType.Reset()
+				if err := s.ActorType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_type\"")
+			}
+		case "entity_type":
+			if err := func() error {
+				s.EntityType.Reset()
+				if err := s.EntityType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity_type\"")
+			}
+		case "entity_id":
+			if err := func() error {
+				s.EntityID.Reset()
+				if err := s.EntityID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity_id\"")
+			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
+		case "client_id":
+			requiredBitSet[1] |= 1 << 4
+			if err := func() error {
+				v, err := d.Str()
+				s.ClientID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"client_id\"")
+			}
+		case "token_id":
+			if err := func() error {
+				s.TokenID.Reset()
+				if err := s.TokenID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"token_id\"")
+			}
+		case "delegation_type":
+			if err := func() error {
+				s.DelegationType.Reset()
+				if err := s.DelegationType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"delegation_type\"")
+			}
+		case "delegation_id":
+			if err := func() error {
+				s.DelegationID.Reset()
+				if err := s.DelegationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"delegation_id\"")
+			}
+		case "grantor":
+			if err := func() error {
+				s.Grantor.Reset()
+				if err := s.Grantor.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"grantor\"")
+			}
+		case "fingerprint":
+			if err := func() error {
+				s.Fingerprint.Reset()
+				if err := s.Fingerprint.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"fingerprint\"")
+			}
+		case "request_id":
+			if err := func() error {
+				s.RequestID.Reset()
+				if err := s.RequestID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"request_id\"")
+			}
+		case "session_id":
+			if err := func() error {
+				s.SessionID.Reset()
+				if err := s.SessionID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"session_id\"")
+			}
+		case "flow_id":
+			if err := func() error {
+				s.FlowID.Reset()
+				if err := s.FlowID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"flow_id\"")
+			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
+		case "metadata":
+			if err := func() error {
+				s.Metadata.Reset()
+				if err := s.Metadata.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"metadata\"")
+			}
+		case "payload":
+			requiredBitSet[2] |= 1 << 7
+			if err := func() error {
+				if err := s.Payload.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"payload\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode WebhookDeletedEvent")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [3]uint8{
+		0b01111011,
+		0b00010000,
+		0b10000000,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfWebhookDeletedEvent) {
+					name = jsonFieldsNameOfWebhookDeletedEvent[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *WebhookDeletedEvent) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookDeletedEvent) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookDeletedEventActorType as json.
+func (s WebhookDeletedEventActorType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes WebhookDeletedEventActorType from json.
+func (s *WebhookDeletedEventActorType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookDeletedEventActorType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch WebhookDeletedEventActorType(v) {
+	case WebhookDeletedEventActorTypeHuman:
+		*s = WebhookDeletedEventActorTypeHuman
+	case WebhookDeletedEventActorTypeService:
+		*s = WebhookDeletedEventActorTypeService
+	case WebhookDeletedEventActorTypeSystem:
+		*s = WebhookDeletedEventActorTypeSystem
+	case WebhookDeletedEventActorTypeAgent:
+		*s = WebhookDeletedEventActorTypeAgent
+	default:
+		*s = WebhookDeletedEventActorType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s WebhookDeletedEventActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookDeletedEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookDeletedEventCategory as json.
+func (s WebhookDeletedEventCategory) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes WebhookDeletedEventCategory from json.
+func (s *WebhookDeletedEventCategory) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookDeletedEventCategory to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch WebhookDeletedEventCategory(v) {
+	case WebhookDeletedEventCategoryRequest:
+		*s = WebhookDeletedEventCategoryRequest
+	case WebhookDeletedEventCategoryAuth:
+		*s = WebhookDeletedEventCategoryAuth
+	case WebhookDeletedEventCategorySession:
+		*s = WebhookDeletedEventCategorySession
+	case WebhookDeletedEventCategoryAdmin:
+		*s = WebhookDeletedEventCategoryAdmin
+	case WebhookDeletedEventCategoryEntity:
+		*s = WebhookDeletedEventCategoryEntity
+	case WebhookDeletedEventCategorySignal:
+		*s = WebhookDeletedEventCategorySignal
+	default:
+		*s = WebhookDeletedEventCategory(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s WebhookDeletedEventCategory) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookDeletedEventCategory) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookDeletedEventDelegationType as json.
+func (s WebhookDeletedEventDelegationType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes WebhookDeletedEventDelegationType from json.
+func (s *WebhookDeletedEventDelegationType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookDeletedEventDelegationType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch WebhookDeletedEventDelegationType(v) {
+	case WebhookDeletedEventDelegationTypeDirect:
+		*s = WebhookDeletedEventDelegationTypeDirect
+	case WebhookDeletedEventDelegationTypeDelegated:
+		*s = WebhookDeletedEventDelegationTypeDelegated
+	case WebhookDeletedEventDelegationTypePatShared:
+		*s = WebhookDeletedEventDelegationTypePatShared
+	case WebhookDeletedEventDelegationTypeExchanged:
+		*s = WebhookDeletedEventDelegationTypeExchanged
+	default:
+		*s = WebhookDeletedEventDelegationType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s WebhookDeletedEventDelegationType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookDeletedEventDelegationType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes WebhookEvent as json.
 func (s WebhookEvent) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -189649,6 +192613,126 @@ func (s WebhookEvent) encodeFields(e *jx.Encoder) {
 				s.Data.Encode(e)
 			}
 		}
+	case WebhookEvent56WebhookEvent:
+		e.FieldStart("type")
+		e.Str("webhook.created")
+		{
+			s := s.WebhookEvent56
+			{
+				e.FieldStart("id")
+				e.Str(s.ID)
+			}
+			{
+				e.FieldStart("created_at")
+				json.EncodeDateTime(e, s.CreatedAt)
+			}
+			{
+				e.FieldStart("project_id")
+				s.ProjectID.Encode(e)
+			}
+			{
+				e.FieldStart("actor")
+				s.Actor.Encode(e)
+			}
+			{
+				e.FieldStart("entity")
+				s.Entity.Encode(e)
+			}
+			{
+				e.FieldStart("data")
+				s.Data.Encode(e)
+			}
+		}
+	case WebhookEvent57WebhookEvent:
+		e.FieldStart("type")
+		e.Str("webhook.deleted")
+		{
+			s := s.WebhookEvent57
+			{
+				e.FieldStart("id")
+				e.Str(s.ID)
+			}
+			{
+				e.FieldStart("created_at")
+				json.EncodeDateTime(e, s.CreatedAt)
+			}
+			{
+				e.FieldStart("project_id")
+				s.ProjectID.Encode(e)
+			}
+			{
+				e.FieldStart("actor")
+				s.Actor.Encode(e)
+			}
+			{
+				e.FieldStart("entity")
+				s.Entity.Encode(e)
+			}
+			{
+				e.FieldStart("data")
+				s.Data.Encode(e)
+			}
+		}
+	case WebhookEvent58WebhookEvent:
+		e.FieldStart("type")
+		e.Str("webhook.secret_rotated")
+		{
+			s := s.WebhookEvent58
+			{
+				e.FieldStart("id")
+				e.Str(s.ID)
+			}
+			{
+				e.FieldStart("created_at")
+				json.EncodeDateTime(e, s.CreatedAt)
+			}
+			{
+				e.FieldStart("project_id")
+				s.ProjectID.Encode(e)
+			}
+			{
+				e.FieldStart("actor")
+				s.Actor.Encode(e)
+			}
+			{
+				e.FieldStart("entity")
+				s.Entity.Encode(e)
+			}
+			{
+				e.FieldStart("data")
+				s.Data.Encode(e)
+			}
+		}
+	case WebhookEvent59WebhookEvent:
+		e.FieldStart("type")
+		e.Str("webhook.updated")
+		{
+			s := s.WebhookEvent59
+			{
+				e.FieldStart("id")
+				e.Str(s.ID)
+			}
+			{
+				e.FieldStart("created_at")
+				json.EncodeDateTime(e, s.CreatedAt)
+			}
+			{
+				e.FieldStart("project_id")
+				s.ProjectID.Encode(e)
+			}
+			{
+				e.FieldStart("actor")
+				s.Actor.Encode(e)
+			}
+			{
+				e.FieldStart("entity")
+				s.Entity.Encode(e)
+			}
+			{
+				e.FieldStart("data")
+				s.Data.Encode(e)
+			}
+		}
 	}
 }
 
@@ -189842,6 +192926,18 @@ func (s *WebhookEvent) Decode(d *jx.Decoder) error {
 					found = true
 				case "variable.set":
 					s.Type = WebhookEvent55WebhookEvent
+					found = true
+				case "webhook.created":
+					s.Type = WebhookEvent56WebhookEvent
+					found = true
+				case "webhook.deleted":
+					s.Type = WebhookEvent57WebhookEvent
+					found = true
+				case "webhook.secret_rotated":
+					s.Type = WebhookEvent58WebhookEvent
+					found = true
+				case "webhook.updated":
+					s.Type = WebhookEvent59WebhookEvent
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -190079,6 +193175,22 @@ func (s *WebhookEvent) Decode(d *jx.Decoder) error {
 		}
 	case WebhookEvent55WebhookEvent:
 		if err := s.WebhookEvent55.Decode(d); err != nil {
+			return err
+		}
+	case WebhookEvent56WebhookEvent:
+		if err := s.WebhookEvent56.Decode(d); err != nil {
+			return err
+		}
+	case WebhookEvent57WebhookEvent:
+		if err := s.WebhookEvent57.Decode(d); err != nil {
+			return err
+		}
+	case WebhookEvent58WebhookEvent:
+		if err := s.WebhookEvent58.Decode(d); err != nil {
+			return err
+		}
+	case WebhookEvent59WebhookEvent:
+		if err := s.WebhookEvent59.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -213343,6 +216455,1814 @@ func (s *WebhookEvent55Entity) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
+func (s *WebhookEvent56) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *WebhookEvent56) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("id")
+		e.Str(s.ID)
+	}
+	{
+		e.FieldStart("type")
+		e.Str("webhook.created")
+	}
+	{
+		e.FieldStart("created_at")
+		json.EncodeDateTime(e, s.CreatedAt)
+	}
+	{
+		e.FieldStart("project_id")
+		s.ProjectID.Encode(e)
+	}
+	{
+		e.FieldStart("actor")
+		s.Actor.Encode(e)
+	}
+	{
+		e.FieldStart("entity")
+		s.Entity.Encode(e)
+	}
+	{
+		e.FieldStart("data")
+		s.Data.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfWebhookEvent56 = [7]string{
+	0: "id",
+	1: "type",
+	2: "created_at",
+	3: "project_id",
+	4: "actor",
+	5: "entity",
+	6: "data",
+}
+
+// Decode decodes WebhookEvent56 from json.
+func (s *WebhookEvent56) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookEvent56 to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.ID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "type":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Type = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"type\"")
+			}
+		case "created_at":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.CreatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created_at\"")
+			}
+		case "project_id":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				if err := s.ProjectID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"project_id\"")
+			}
+		case "actor":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.Actor.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor\"")
+			}
+		case "entity":
+			requiredBitSet[0] |= 1 << 5
+			if err := func() error {
+				if err := s.Entity.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity\"")
+			}
+		case "data":
+			requiredBitSet[0] |= 1 << 6
+			if err := func() error {
+				if err := s.Data.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"data\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode WebhookEvent56")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b01111111,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfWebhookEvent56) {
+					name = jsonFieldsNameOfWebhookEvent56[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *WebhookEvent56) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookEvent56) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *WebhookEvent56Actor) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *WebhookEvent56Actor) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("type")
+		s.Type.Encode(e)
+	}
+	{
+		e.FieldStart("id")
+		s.ID.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfWebhookEvent56Actor = [2]string{
+	0: "type",
+	1: "id",
+}
+
+// Decode decodes WebhookEvent56Actor from json.
+func (s *WebhookEvent56Actor) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookEvent56Actor to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "type":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.Type.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"type\"")
+			}
+		case "id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode WebhookEvent56Actor")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfWebhookEvent56Actor) {
+					name = jsonFieldsNameOfWebhookEvent56Actor[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *WebhookEvent56Actor) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookEvent56Actor) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookEvent56ActorType as json.
+func (s WebhookEvent56ActorType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes WebhookEvent56ActorType from json.
+func (s *WebhookEvent56ActorType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookEvent56ActorType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch WebhookEvent56ActorType(v) {
+	case WebhookEvent56ActorTypeHuman:
+		*s = WebhookEvent56ActorTypeHuman
+	case WebhookEvent56ActorTypeService:
+		*s = WebhookEvent56ActorTypeService
+	case WebhookEvent56ActorTypeSystem:
+		*s = WebhookEvent56ActorTypeSystem
+	case WebhookEvent56ActorTypeAgent:
+		*s = WebhookEvent56ActorTypeAgent
+	default:
+		*s = WebhookEvent56ActorType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s WebhookEvent56ActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookEvent56ActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *WebhookEvent56Entity) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *WebhookEvent56Entity) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("type")
+		s.Type.Encode(e)
+	}
+	{
+		e.FieldStart("id")
+		s.ID.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfWebhookEvent56Entity = [2]string{
+	0: "type",
+	1: "id",
+}
+
+// Decode decodes WebhookEvent56Entity from json.
+func (s *WebhookEvent56Entity) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookEvent56Entity to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "type":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.Type.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"type\"")
+			}
+		case "id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode WebhookEvent56Entity")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfWebhookEvent56Entity) {
+					name = jsonFieldsNameOfWebhookEvent56Entity[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *WebhookEvent56Entity) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookEvent56Entity) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *WebhookEvent57) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *WebhookEvent57) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("id")
+		e.Str(s.ID)
+	}
+	{
+		e.FieldStart("type")
+		e.Str("webhook.deleted")
+	}
+	{
+		e.FieldStart("created_at")
+		json.EncodeDateTime(e, s.CreatedAt)
+	}
+	{
+		e.FieldStart("project_id")
+		s.ProjectID.Encode(e)
+	}
+	{
+		e.FieldStart("actor")
+		s.Actor.Encode(e)
+	}
+	{
+		e.FieldStart("entity")
+		s.Entity.Encode(e)
+	}
+	{
+		e.FieldStart("data")
+		s.Data.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfWebhookEvent57 = [7]string{
+	0: "id",
+	1: "type",
+	2: "created_at",
+	3: "project_id",
+	4: "actor",
+	5: "entity",
+	6: "data",
+}
+
+// Decode decodes WebhookEvent57 from json.
+func (s *WebhookEvent57) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookEvent57 to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.ID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "type":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Type = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"type\"")
+			}
+		case "created_at":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.CreatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created_at\"")
+			}
+		case "project_id":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				if err := s.ProjectID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"project_id\"")
+			}
+		case "actor":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.Actor.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor\"")
+			}
+		case "entity":
+			requiredBitSet[0] |= 1 << 5
+			if err := func() error {
+				if err := s.Entity.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity\"")
+			}
+		case "data":
+			requiredBitSet[0] |= 1 << 6
+			if err := func() error {
+				if err := s.Data.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"data\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode WebhookEvent57")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b01111111,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfWebhookEvent57) {
+					name = jsonFieldsNameOfWebhookEvent57[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *WebhookEvent57) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookEvent57) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *WebhookEvent57Actor) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *WebhookEvent57Actor) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("type")
+		s.Type.Encode(e)
+	}
+	{
+		e.FieldStart("id")
+		s.ID.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfWebhookEvent57Actor = [2]string{
+	0: "type",
+	1: "id",
+}
+
+// Decode decodes WebhookEvent57Actor from json.
+func (s *WebhookEvent57Actor) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookEvent57Actor to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "type":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.Type.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"type\"")
+			}
+		case "id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode WebhookEvent57Actor")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfWebhookEvent57Actor) {
+					name = jsonFieldsNameOfWebhookEvent57Actor[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *WebhookEvent57Actor) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookEvent57Actor) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookEvent57ActorType as json.
+func (s WebhookEvent57ActorType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes WebhookEvent57ActorType from json.
+func (s *WebhookEvent57ActorType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookEvent57ActorType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch WebhookEvent57ActorType(v) {
+	case WebhookEvent57ActorTypeHuman:
+		*s = WebhookEvent57ActorTypeHuman
+	case WebhookEvent57ActorTypeService:
+		*s = WebhookEvent57ActorTypeService
+	case WebhookEvent57ActorTypeSystem:
+		*s = WebhookEvent57ActorTypeSystem
+	case WebhookEvent57ActorTypeAgent:
+		*s = WebhookEvent57ActorTypeAgent
+	default:
+		*s = WebhookEvent57ActorType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s WebhookEvent57ActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookEvent57ActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *WebhookEvent57Entity) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *WebhookEvent57Entity) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("type")
+		s.Type.Encode(e)
+	}
+	{
+		e.FieldStart("id")
+		s.ID.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfWebhookEvent57Entity = [2]string{
+	0: "type",
+	1: "id",
+}
+
+// Decode decodes WebhookEvent57Entity from json.
+func (s *WebhookEvent57Entity) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookEvent57Entity to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "type":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.Type.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"type\"")
+			}
+		case "id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode WebhookEvent57Entity")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfWebhookEvent57Entity) {
+					name = jsonFieldsNameOfWebhookEvent57Entity[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *WebhookEvent57Entity) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookEvent57Entity) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *WebhookEvent58) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *WebhookEvent58) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("id")
+		e.Str(s.ID)
+	}
+	{
+		e.FieldStart("type")
+		e.Str("webhook.secret_rotated")
+	}
+	{
+		e.FieldStart("created_at")
+		json.EncodeDateTime(e, s.CreatedAt)
+	}
+	{
+		e.FieldStart("project_id")
+		s.ProjectID.Encode(e)
+	}
+	{
+		e.FieldStart("actor")
+		s.Actor.Encode(e)
+	}
+	{
+		e.FieldStart("entity")
+		s.Entity.Encode(e)
+	}
+	{
+		e.FieldStart("data")
+		s.Data.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfWebhookEvent58 = [7]string{
+	0: "id",
+	1: "type",
+	2: "created_at",
+	3: "project_id",
+	4: "actor",
+	5: "entity",
+	6: "data",
+}
+
+// Decode decodes WebhookEvent58 from json.
+func (s *WebhookEvent58) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookEvent58 to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.ID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "type":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Type = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"type\"")
+			}
+		case "created_at":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.CreatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created_at\"")
+			}
+		case "project_id":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				if err := s.ProjectID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"project_id\"")
+			}
+		case "actor":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.Actor.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor\"")
+			}
+		case "entity":
+			requiredBitSet[0] |= 1 << 5
+			if err := func() error {
+				if err := s.Entity.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity\"")
+			}
+		case "data":
+			requiredBitSet[0] |= 1 << 6
+			if err := func() error {
+				if err := s.Data.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"data\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode WebhookEvent58")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b01111111,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfWebhookEvent58) {
+					name = jsonFieldsNameOfWebhookEvent58[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *WebhookEvent58) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookEvent58) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *WebhookEvent58Actor) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *WebhookEvent58Actor) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("type")
+		s.Type.Encode(e)
+	}
+	{
+		e.FieldStart("id")
+		s.ID.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfWebhookEvent58Actor = [2]string{
+	0: "type",
+	1: "id",
+}
+
+// Decode decodes WebhookEvent58Actor from json.
+func (s *WebhookEvent58Actor) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookEvent58Actor to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "type":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.Type.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"type\"")
+			}
+		case "id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode WebhookEvent58Actor")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfWebhookEvent58Actor) {
+					name = jsonFieldsNameOfWebhookEvent58Actor[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *WebhookEvent58Actor) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookEvent58Actor) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookEvent58ActorType as json.
+func (s WebhookEvent58ActorType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes WebhookEvent58ActorType from json.
+func (s *WebhookEvent58ActorType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookEvent58ActorType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch WebhookEvent58ActorType(v) {
+	case WebhookEvent58ActorTypeHuman:
+		*s = WebhookEvent58ActorTypeHuman
+	case WebhookEvent58ActorTypeService:
+		*s = WebhookEvent58ActorTypeService
+	case WebhookEvent58ActorTypeSystem:
+		*s = WebhookEvent58ActorTypeSystem
+	case WebhookEvent58ActorTypeAgent:
+		*s = WebhookEvent58ActorTypeAgent
+	default:
+		*s = WebhookEvent58ActorType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s WebhookEvent58ActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookEvent58ActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *WebhookEvent58Entity) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *WebhookEvent58Entity) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("type")
+		s.Type.Encode(e)
+	}
+	{
+		e.FieldStart("id")
+		s.ID.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfWebhookEvent58Entity = [2]string{
+	0: "type",
+	1: "id",
+}
+
+// Decode decodes WebhookEvent58Entity from json.
+func (s *WebhookEvent58Entity) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookEvent58Entity to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "type":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.Type.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"type\"")
+			}
+		case "id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode WebhookEvent58Entity")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfWebhookEvent58Entity) {
+					name = jsonFieldsNameOfWebhookEvent58Entity[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *WebhookEvent58Entity) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookEvent58Entity) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *WebhookEvent59) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *WebhookEvent59) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("id")
+		e.Str(s.ID)
+	}
+	{
+		e.FieldStart("type")
+		e.Str("webhook.updated")
+	}
+	{
+		e.FieldStart("created_at")
+		json.EncodeDateTime(e, s.CreatedAt)
+	}
+	{
+		e.FieldStart("project_id")
+		s.ProjectID.Encode(e)
+	}
+	{
+		e.FieldStart("actor")
+		s.Actor.Encode(e)
+	}
+	{
+		e.FieldStart("entity")
+		s.Entity.Encode(e)
+	}
+	{
+		e.FieldStart("data")
+		s.Data.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfWebhookEvent59 = [7]string{
+	0: "id",
+	1: "type",
+	2: "created_at",
+	3: "project_id",
+	4: "actor",
+	5: "entity",
+	6: "data",
+}
+
+// Decode decodes WebhookEvent59 from json.
+func (s *WebhookEvent59) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookEvent59 to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.ID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "type":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Type = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"type\"")
+			}
+		case "created_at":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.CreatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created_at\"")
+			}
+		case "project_id":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				if err := s.ProjectID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"project_id\"")
+			}
+		case "actor":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.Actor.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor\"")
+			}
+		case "entity":
+			requiredBitSet[0] |= 1 << 5
+			if err := func() error {
+				if err := s.Entity.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity\"")
+			}
+		case "data":
+			requiredBitSet[0] |= 1 << 6
+			if err := func() error {
+				if err := s.Data.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"data\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode WebhookEvent59")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b01111111,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfWebhookEvent59) {
+					name = jsonFieldsNameOfWebhookEvent59[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *WebhookEvent59) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookEvent59) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *WebhookEvent59Actor) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *WebhookEvent59Actor) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("type")
+		s.Type.Encode(e)
+	}
+	{
+		e.FieldStart("id")
+		s.ID.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfWebhookEvent59Actor = [2]string{
+	0: "type",
+	1: "id",
+}
+
+// Decode decodes WebhookEvent59Actor from json.
+func (s *WebhookEvent59Actor) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookEvent59Actor to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "type":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.Type.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"type\"")
+			}
+		case "id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode WebhookEvent59Actor")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfWebhookEvent59Actor) {
+					name = jsonFieldsNameOfWebhookEvent59Actor[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *WebhookEvent59Actor) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookEvent59Actor) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookEvent59ActorType as json.
+func (s WebhookEvent59ActorType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes WebhookEvent59ActorType from json.
+func (s *WebhookEvent59ActorType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookEvent59ActorType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch WebhookEvent59ActorType(v) {
+	case WebhookEvent59ActorTypeHuman:
+		*s = WebhookEvent59ActorTypeHuman
+	case WebhookEvent59ActorTypeService:
+		*s = WebhookEvent59ActorTypeService
+	case WebhookEvent59ActorTypeSystem:
+		*s = WebhookEvent59ActorTypeSystem
+	case WebhookEvent59ActorTypeAgent:
+		*s = WebhookEvent59ActorTypeAgent
+	default:
+		*s = WebhookEvent59ActorType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s WebhookEvent59ActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookEvent59ActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *WebhookEvent59Entity) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *WebhookEvent59Entity) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("type")
+		s.Type.Encode(e)
+	}
+	{
+		e.FieldStart("id")
+		s.ID.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfWebhookEvent59Entity = [2]string{
+	0: "type",
+	1: "id",
+}
+
+// Decode decodes WebhookEvent59Entity from json.
+func (s *WebhookEvent59Entity) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookEvent59Entity to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "type":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.Type.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"type\"")
+			}
+		case "id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode WebhookEvent59Entity")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfWebhookEvent59Entity) {
+					name = jsonFieldsNameOfWebhookEvent59Entity[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *WebhookEvent59Entity) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookEvent59Entity) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
 func (s *WebhookEvent5Actor) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -216112,6 +221032,133 @@ func (s *WebhookNotFoundDetails) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
+func (s *WebhookPayload) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *WebhookPayload) encodeFields(e *jx.Encoder) {
+	{
+		if s.URL.Set {
+			e.FieldStart("url")
+			s.URL.Encode(e)
+		}
+	}
+	{
+		if s.Description.Set {
+			e.FieldStart("description")
+			s.Description.Encode(e)
+		}
+	}
+	{
+		if s.EventTypes != nil {
+			e.FieldStart("event_types")
+			e.ArrStart()
+			for _, elem := range s.EventTypes {
+				e.Str(elem)
+			}
+			e.ArrEnd()
+		}
+	}
+	{
+		if s.Enabled.Set {
+			e.FieldStart("enabled")
+			s.Enabled.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfWebhookPayload = [4]string{
+	0: "url",
+	1: "description",
+	2: "event_types",
+	3: "enabled",
+}
+
+// Decode decodes WebhookPayload from json.
+func (s *WebhookPayload) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookPayload to nil")
+	}
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "url":
+			if err := func() error {
+				s.URL.Reset()
+				if err := s.URL.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"url\"")
+			}
+		case "description":
+			if err := func() error {
+				s.Description.Reset()
+				if err := s.Description.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"description\"")
+			}
+		case "event_types":
+			if err := func() error {
+				s.EventTypes = make([]string, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem string
+					v, err := d.Str()
+					elem = string(v)
+					if err != nil {
+						return err
+					}
+					s.EventTypes = append(s.EventTypes, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"event_types\"")
+			}
+		case "enabled":
+			if err := func() error {
+				s.Enabled.Reset()
+				if err := s.Enabled.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"enabled\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode WebhookPayload")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *WebhookPayload) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookPayload) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
 func (s *WebhookPermissionDenied) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -216299,6 +221346,625 @@ func (s *WebhookPermissionDeniedDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode implements json.Marshaler.
+func (s *WebhookSecretRotatedEvent) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *WebhookSecretRotatedEvent) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("id")
+		e.Str(s.ID)
+	}
+	{
+		e.FieldStart("project_id")
+		s.ProjectID.Encode(e)
+	}
+	{
+		if s.TeamID.Set {
+			e.FieldStart("team_id")
+			s.TeamID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("event_type")
+		e.Str("webhook.secret_rotated")
+	}
+	{
+		e.FieldStart("category")
+		s.Category.Encode(e)
+	}
+	{
+		e.FieldStart("occurred_at")
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
+	}
+	{
+		e.FieldStart("created_at")
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
+	}
+	{
+		if s.ActorID.Set {
+			e.FieldStart("actor_id")
+			s.ActorID.Encode(e)
+		}
+	}
+	{
+		if s.ActorType.Set {
+			e.FieldStart("actor_type")
+			s.ActorType.Encode(e)
+		}
+	}
+	{
+		if s.EntityType.Set {
+			e.FieldStart("entity_type")
+			s.EntityType.Encode(e)
+		}
+	}
+	{
+		if s.EntityID.Set {
+			e.FieldStart("entity_id")
+			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("client_id")
+		e.Str(s.ClientID)
+	}
+	{
+		if s.TokenID.Set {
+			e.FieldStart("token_id")
+			s.TokenID.Encode(e)
+		}
+	}
+	{
+		if s.DelegationType.Set {
+			e.FieldStart("delegation_type")
+			s.DelegationType.Encode(e)
+		}
+	}
+	{
+		if s.DelegationID.Set {
+			e.FieldStart("delegation_id")
+			s.DelegationID.Encode(e)
+		}
+	}
+	{
+		if s.Grantor.Set {
+			e.FieldStart("grantor")
+			s.Grantor.Encode(e)
+		}
+	}
+	{
+		if s.Fingerprint.Set {
+			e.FieldStart("fingerprint")
+			s.Fingerprint.Encode(e)
+		}
+	}
+	{
+		if s.RequestID.Set {
+			e.FieldStart("request_id")
+			s.RequestID.Encode(e)
+		}
+	}
+	{
+		if s.SessionID.Set {
+			e.FieldStart("session_id")
+			s.SessionID.Encode(e)
+		}
+	}
+	{
+		if s.FlowID.Set {
+			e.FieldStart("flow_id")
+			s.FlowID.Encode(e)
+		}
+	}
+	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
+		if s.Metadata.Set {
+			e.FieldStart("metadata")
+			s.Metadata.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("payload")
+		s.Payload.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfWebhookSecretRotatedEvent = [24]string{
+	0:  "id",
+	1:  "project_id",
+	2:  "team_id",
+	3:  "event_type",
+	4:  "category",
+	5:  "occurred_at",
+	6:  "created_at",
+	7:  "actor_id",
+	8:  "actor_type",
+	9:  "entity_type",
+	10: "entity_id",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
+}
+
+// Decode decodes WebhookSecretRotatedEvent from json.
+func (s *WebhookSecretRotatedEvent) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookSecretRotatedEvent to nil")
+	}
+	var requiredBitSet [3]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.ID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "project_id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ProjectID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"project_id\"")
+			}
+		case "team_id":
+			if err := func() error {
+				s.TeamID.Reset()
+				if err := s.TeamID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"team_id\"")
+			}
+		case "event_type":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				v, err := d.Str()
+				s.EventType = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"event_type\"")
+			}
+		case "category":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.Category.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"category\"")
+			}
+		case "occurred_at":
+			requiredBitSet[0] |= 1 << 5
+			if err := func() error {
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
+				s.OccurredAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"occurred_at\"")
+			}
+		case "created_at":
+			requiredBitSet[0] |= 1 << 6
+			if err := func() error {
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
+				s.CreatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created_at\"")
+			}
+		case "actor_id":
+			if err := func() error {
+				s.ActorID.Reset()
+				if err := s.ActorID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_id\"")
+			}
+		case "actor_type":
+			if err := func() error {
+				s.ActorType.Reset()
+				if err := s.ActorType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_type\"")
+			}
+		case "entity_type":
+			if err := func() error {
+				s.EntityType.Reset()
+				if err := s.EntityType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity_type\"")
+			}
+		case "entity_id":
+			if err := func() error {
+				s.EntityID.Reset()
+				if err := s.EntityID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity_id\"")
+			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
+		case "client_id":
+			requiredBitSet[1] |= 1 << 4
+			if err := func() error {
+				v, err := d.Str()
+				s.ClientID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"client_id\"")
+			}
+		case "token_id":
+			if err := func() error {
+				s.TokenID.Reset()
+				if err := s.TokenID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"token_id\"")
+			}
+		case "delegation_type":
+			if err := func() error {
+				s.DelegationType.Reset()
+				if err := s.DelegationType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"delegation_type\"")
+			}
+		case "delegation_id":
+			if err := func() error {
+				s.DelegationID.Reset()
+				if err := s.DelegationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"delegation_id\"")
+			}
+		case "grantor":
+			if err := func() error {
+				s.Grantor.Reset()
+				if err := s.Grantor.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"grantor\"")
+			}
+		case "fingerprint":
+			if err := func() error {
+				s.Fingerprint.Reset()
+				if err := s.Fingerprint.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"fingerprint\"")
+			}
+		case "request_id":
+			if err := func() error {
+				s.RequestID.Reset()
+				if err := s.RequestID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"request_id\"")
+			}
+		case "session_id":
+			if err := func() error {
+				s.SessionID.Reset()
+				if err := s.SessionID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"session_id\"")
+			}
+		case "flow_id":
+			if err := func() error {
+				s.FlowID.Reset()
+				if err := s.FlowID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"flow_id\"")
+			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
+		case "metadata":
+			if err := func() error {
+				s.Metadata.Reset()
+				if err := s.Metadata.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"metadata\"")
+			}
+		case "payload":
+			requiredBitSet[2] |= 1 << 7
+			if err := func() error {
+				if err := s.Payload.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"payload\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode WebhookSecretRotatedEvent")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [3]uint8{
+		0b01111011,
+		0b00010000,
+		0b10000000,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfWebhookSecretRotatedEvent) {
+					name = jsonFieldsNameOfWebhookSecretRotatedEvent[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *WebhookSecretRotatedEvent) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookSecretRotatedEvent) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookSecretRotatedEventActorType as json.
+func (s WebhookSecretRotatedEventActorType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes WebhookSecretRotatedEventActorType from json.
+func (s *WebhookSecretRotatedEventActorType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookSecretRotatedEventActorType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch WebhookSecretRotatedEventActorType(v) {
+	case WebhookSecretRotatedEventActorTypeHuman:
+		*s = WebhookSecretRotatedEventActorTypeHuman
+	case WebhookSecretRotatedEventActorTypeService:
+		*s = WebhookSecretRotatedEventActorTypeService
+	case WebhookSecretRotatedEventActorTypeSystem:
+		*s = WebhookSecretRotatedEventActorTypeSystem
+	case WebhookSecretRotatedEventActorTypeAgent:
+		*s = WebhookSecretRotatedEventActorTypeAgent
+	default:
+		*s = WebhookSecretRotatedEventActorType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s WebhookSecretRotatedEventActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookSecretRotatedEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookSecretRotatedEventCategory as json.
+func (s WebhookSecretRotatedEventCategory) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes WebhookSecretRotatedEventCategory from json.
+func (s *WebhookSecretRotatedEventCategory) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookSecretRotatedEventCategory to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch WebhookSecretRotatedEventCategory(v) {
+	case WebhookSecretRotatedEventCategoryRequest:
+		*s = WebhookSecretRotatedEventCategoryRequest
+	case WebhookSecretRotatedEventCategoryAuth:
+		*s = WebhookSecretRotatedEventCategoryAuth
+	case WebhookSecretRotatedEventCategorySession:
+		*s = WebhookSecretRotatedEventCategorySession
+	case WebhookSecretRotatedEventCategoryAdmin:
+		*s = WebhookSecretRotatedEventCategoryAdmin
+	case WebhookSecretRotatedEventCategoryEntity:
+		*s = WebhookSecretRotatedEventCategoryEntity
+	case WebhookSecretRotatedEventCategorySignal:
+		*s = WebhookSecretRotatedEventCategorySignal
+	default:
+		*s = WebhookSecretRotatedEventCategory(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s WebhookSecretRotatedEventCategory) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookSecretRotatedEventCategory) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookSecretRotatedEventDelegationType as json.
+func (s WebhookSecretRotatedEventDelegationType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes WebhookSecretRotatedEventDelegationType from json.
+func (s *WebhookSecretRotatedEventDelegationType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookSecretRotatedEventDelegationType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch WebhookSecretRotatedEventDelegationType(v) {
+	case WebhookSecretRotatedEventDelegationTypeDirect:
+		*s = WebhookSecretRotatedEventDelegationTypeDirect
+	case WebhookSecretRotatedEventDelegationTypeDelegated:
+		*s = WebhookSecretRotatedEventDelegationTypeDelegated
+	case WebhookSecretRotatedEventDelegationTypePatShared:
+		*s = WebhookSecretRotatedEventDelegationTypePatShared
+	case WebhookSecretRotatedEventDelegationTypeExchanged:
+		*s = WebhookSecretRotatedEventDelegationTypeExchanged
+	default:
+		*s = WebhookSecretRotatedEventDelegationType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s WebhookSecretRotatedEventDelegationType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookSecretRotatedEventDelegationType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes WebhookURL as json.
 func (s WebhookURL) Encode(e *jx.Encoder) {
 	unwrapped := string(s)
@@ -216335,6 +222001,625 @@ func (s WebhookURL) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *WebhookURL) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *WebhookUpdatedEvent) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *WebhookUpdatedEvent) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("id")
+		e.Str(s.ID)
+	}
+	{
+		e.FieldStart("project_id")
+		s.ProjectID.Encode(e)
+	}
+	{
+		if s.TeamID.Set {
+			e.FieldStart("team_id")
+			s.TeamID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("event_type")
+		e.Str("webhook.updated")
+	}
+	{
+		e.FieldStart("category")
+		s.Category.Encode(e)
+	}
+	{
+		e.FieldStart("occurred_at")
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
+	}
+	{
+		e.FieldStart("created_at")
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
+	}
+	{
+		if s.ActorID.Set {
+			e.FieldStart("actor_id")
+			s.ActorID.Encode(e)
+		}
+	}
+	{
+		if s.ActorType.Set {
+			e.FieldStart("actor_type")
+			s.ActorType.Encode(e)
+		}
+	}
+	{
+		if s.EntityType.Set {
+			e.FieldStart("entity_type")
+			s.EntityType.Encode(e)
+		}
+	}
+	{
+		if s.EntityID.Set {
+			e.FieldStart("entity_id")
+			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("client_id")
+		e.Str(s.ClientID)
+	}
+	{
+		if s.TokenID.Set {
+			e.FieldStart("token_id")
+			s.TokenID.Encode(e)
+		}
+	}
+	{
+		if s.DelegationType.Set {
+			e.FieldStart("delegation_type")
+			s.DelegationType.Encode(e)
+		}
+	}
+	{
+		if s.DelegationID.Set {
+			e.FieldStart("delegation_id")
+			s.DelegationID.Encode(e)
+		}
+	}
+	{
+		if s.Grantor.Set {
+			e.FieldStart("grantor")
+			s.Grantor.Encode(e)
+		}
+	}
+	{
+		if s.Fingerprint.Set {
+			e.FieldStart("fingerprint")
+			s.Fingerprint.Encode(e)
+		}
+	}
+	{
+		if s.RequestID.Set {
+			e.FieldStart("request_id")
+			s.RequestID.Encode(e)
+		}
+	}
+	{
+		if s.SessionID.Set {
+			e.FieldStart("session_id")
+			s.SessionID.Encode(e)
+		}
+	}
+	{
+		if s.FlowID.Set {
+			e.FieldStart("flow_id")
+			s.FlowID.Encode(e)
+		}
+	}
+	{
+		if s.CorrelationID.Set {
+			e.FieldStart("correlation_id")
+			s.CorrelationID.Encode(e)
+		}
+	}
+	{
+		if s.Metadata.Set {
+			e.FieldStart("metadata")
+			s.Metadata.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("payload")
+		s.Payload.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfWebhookUpdatedEvent = [24]string{
+	0:  "id",
+	1:  "project_id",
+	2:  "team_id",
+	3:  "event_type",
+	4:  "category",
+	5:  "occurred_at",
+	6:  "created_at",
+	7:  "actor_id",
+	8:  "actor_type",
+	9:  "entity_type",
+	10: "entity_id",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "correlation_id",
+	22: "metadata",
+	23: "payload",
+}
+
+// Decode decodes WebhookUpdatedEvent from json.
+func (s *WebhookUpdatedEvent) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookUpdatedEvent to nil")
+	}
+	var requiredBitSet [3]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.ID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "project_id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ProjectID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"project_id\"")
+			}
+		case "team_id":
+			if err := func() error {
+				s.TeamID.Reset()
+				if err := s.TeamID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"team_id\"")
+			}
+		case "event_type":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				v, err := d.Str()
+				s.EventType = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"event_type\"")
+			}
+		case "category":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.Category.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"category\"")
+			}
+		case "occurred_at":
+			requiredBitSet[0] |= 1 << 5
+			if err := func() error {
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
+				s.OccurredAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"occurred_at\"")
+			}
+		case "created_at":
+			requiredBitSet[0] |= 1 << 6
+			if err := func() error {
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
+				s.CreatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created_at\"")
+			}
+		case "actor_id":
+			if err := func() error {
+				s.ActorID.Reset()
+				if err := s.ActorID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_id\"")
+			}
+		case "actor_type":
+			if err := func() error {
+				s.ActorType.Reset()
+				if err := s.ActorType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_type\"")
+			}
+		case "entity_type":
+			if err := func() error {
+				s.EntityType.Reset()
+				if err := s.EntityType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity_type\"")
+			}
+		case "entity_id":
+			if err := func() error {
+				s.EntityID.Reset()
+				if err := s.EntityID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity_id\"")
+			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
+		case "client_id":
+			requiredBitSet[1] |= 1 << 4
+			if err := func() error {
+				v, err := d.Str()
+				s.ClientID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"client_id\"")
+			}
+		case "token_id":
+			if err := func() error {
+				s.TokenID.Reset()
+				if err := s.TokenID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"token_id\"")
+			}
+		case "delegation_type":
+			if err := func() error {
+				s.DelegationType.Reset()
+				if err := s.DelegationType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"delegation_type\"")
+			}
+		case "delegation_id":
+			if err := func() error {
+				s.DelegationID.Reset()
+				if err := s.DelegationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"delegation_id\"")
+			}
+		case "grantor":
+			if err := func() error {
+				s.Grantor.Reset()
+				if err := s.Grantor.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"grantor\"")
+			}
+		case "fingerprint":
+			if err := func() error {
+				s.Fingerprint.Reset()
+				if err := s.Fingerprint.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"fingerprint\"")
+			}
+		case "request_id":
+			if err := func() error {
+				s.RequestID.Reset()
+				if err := s.RequestID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"request_id\"")
+			}
+		case "session_id":
+			if err := func() error {
+				s.SessionID.Reset()
+				if err := s.SessionID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"session_id\"")
+			}
+		case "flow_id":
+			if err := func() error {
+				s.FlowID.Reset()
+				if err := s.FlowID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"flow_id\"")
+			}
+		case "correlation_id":
+			if err := func() error {
+				s.CorrelationID.Reset()
+				if err := s.CorrelationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"correlation_id\"")
+			}
+		case "metadata":
+			if err := func() error {
+				s.Metadata.Reset()
+				if err := s.Metadata.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"metadata\"")
+			}
+		case "payload":
+			requiredBitSet[2] |= 1 << 7
+			if err := func() error {
+				if err := s.Payload.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"payload\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode WebhookUpdatedEvent")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [3]uint8{
+		0b01111011,
+		0b00010000,
+		0b10000000,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfWebhookUpdatedEvent) {
+					name = jsonFieldsNameOfWebhookUpdatedEvent[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *WebhookUpdatedEvent) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookUpdatedEvent) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookUpdatedEventActorType as json.
+func (s WebhookUpdatedEventActorType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes WebhookUpdatedEventActorType from json.
+func (s *WebhookUpdatedEventActorType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookUpdatedEventActorType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch WebhookUpdatedEventActorType(v) {
+	case WebhookUpdatedEventActorTypeHuman:
+		*s = WebhookUpdatedEventActorTypeHuman
+	case WebhookUpdatedEventActorTypeService:
+		*s = WebhookUpdatedEventActorTypeService
+	case WebhookUpdatedEventActorTypeSystem:
+		*s = WebhookUpdatedEventActorTypeSystem
+	case WebhookUpdatedEventActorTypeAgent:
+		*s = WebhookUpdatedEventActorTypeAgent
+	default:
+		*s = WebhookUpdatedEventActorType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s WebhookUpdatedEventActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookUpdatedEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookUpdatedEventCategory as json.
+func (s WebhookUpdatedEventCategory) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes WebhookUpdatedEventCategory from json.
+func (s *WebhookUpdatedEventCategory) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookUpdatedEventCategory to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch WebhookUpdatedEventCategory(v) {
+	case WebhookUpdatedEventCategoryRequest:
+		*s = WebhookUpdatedEventCategoryRequest
+	case WebhookUpdatedEventCategoryAuth:
+		*s = WebhookUpdatedEventCategoryAuth
+	case WebhookUpdatedEventCategorySession:
+		*s = WebhookUpdatedEventCategorySession
+	case WebhookUpdatedEventCategoryAdmin:
+		*s = WebhookUpdatedEventCategoryAdmin
+	case WebhookUpdatedEventCategoryEntity:
+		*s = WebhookUpdatedEventCategoryEntity
+	case WebhookUpdatedEventCategorySignal:
+		*s = WebhookUpdatedEventCategorySignal
+	default:
+		*s = WebhookUpdatedEventCategory(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s WebhookUpdatedEventCategory) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookUpdatedEventCategory) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes WebhookUpdatedEventDelegationType as json.
+func (s WebhookUpdatedEventDelegationType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes WebhookUpdatedEventDelegationType from json.
+func (s *WebhookUpdatedEventDelegationType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode WebhookUpdatedEventDelegationType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch WebhookUpdatedEventDelegationType(v) {
+	case WebhookUpdatedEventDelegationTypeDirect:
+		*s = WebhookUpdatedEventDelegationTypeDirect
+	case WebhookUpdatedEventDelegationTypeDelegated:
+		*s = WebhookUpdatedEventDelegationTypeDelegated
+	case WebhookUpdatedEventDelegationTypePatShared:
+		*s = WebhookUpdatedEventDelegationTypePatShared
+	case WebhookUpdatedEventDelegationTypeExchanged:
+		*s = WebhookUpdatedEventDelegationTypeExchanged
+	default:
+		*s = WebhookUpdatedEventDelegationType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s WebhookUpdatedEventDelegationType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *WebhookUpdatedEventDelegationType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

@@ -236,6 +236,10 @@ export const EVENT_TYPES = [
   "user.updated",
   "variable.removed",
   "variable.set",
+  "webhook.created",
+  "webhook.deleted",
+  "webhook.secret_rotated",
+  "webhook.updated",
 ] as const satisfies readonly ProjectEvent["event_type"][];
 
 // Fails to compile while the API knows a type the list above lacks.
