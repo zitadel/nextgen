@@ -115,17 +115,18 @@ test("the server gets its own root paths, the website every other", async ({ req
 
 // A path under the API's prefix that no operation matches reaches the server:
 // a browser gets its error page and a program its envelope, and both quote
-// Vercel's ID for the request, the one Vercel's logs file it under (ADR 076).
-// The response's x-vercel-id is no match for it on a protected preview, which
-// answers through one more hop with an ID of its own that Vercel does not log,
-// so the check asks only that the server quotes one of Vercel's IDs, not a
-// req_ ID it minted.
+// req_ and Vercel's ID for the request, the one Vercel's logs file it under
+// (ADR 076). The response's x-vercel-id is no match for it on a protected
+// preview, which answers through one more hop with an ID of its own that
+// Vercel does not log, so the check asks only that the server quotes one of
+// Vercel's IDs, not a req_ ID it minted.
 test("an API path nothing serves: a page for a browser, the envelope for a program", async ({
   request,
 }) => {
   const path = "/api/v1/no-such-page-routes-spec";
-  // Five characters, the Unix time in milliseconds, twelve hex digits.
-  const vercelRequestID = /^[0-9a-z]{5}-\d{13}-[0-9a-f]{12}$/;
+  // req_ and Vercel's ID: five characters, the Unix time in milliseconds,
+  // twelve hex digits.
+  const vercelRequestID = /^req_[0-9a-z]{5}-\d{13}-[0-9a-f]{12}$/;
 
   const page = await request.get(path, { headers: { accept: "text/html" } });
   expect(page.status()).toBe(404);
