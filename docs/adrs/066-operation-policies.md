@@ -28,7 +28,6 @@ Some work was planned as part of ([zitadel#11596](https://github.com/zitadel/zit
 
 No defined settings / policy model. Some configuration is hard-coded, for example:
 - Password minimum length: [`MinLength: 8`](../../apps/api/internal/domain/flow_field_resolver_schema.go)
-- Passkey user verification is a fixed [`"preferred"`](../../apps/api/internal/domain/flow_state_machine.go)
 - Failed authentication attempts are recorded "for rate-limiting purposes" with no threshold reading them.
 
 The first priority is to introduce proper password policies ([#898](https://github.com/zitadel/nextgen/issues/898)):
